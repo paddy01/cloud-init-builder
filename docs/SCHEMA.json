@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/schema.json",
+  "title": "Internal Data Structure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hostname",
+    "users",
+    "packages"
+  ],
+  "properties": {
+    "hostname": {
+      "type": "string",
+      "description": "Target host name.",
+      "minLength": 1
+    },
+    "users": {
+      "type": "array",
+      "description": "List of users to configure.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "packages": {
+      "type": "array",
+      "description": "List of packages to install.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  }
+}

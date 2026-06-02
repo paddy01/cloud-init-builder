@@ -1,0 +1,625 @@
+# Cloud-Init Builder - YAML Generation Rules
+
+## Purpose
+
+This document defines how the Cloud-Init Builder converts UI selections into valid cloud-init YAML.
+
+The primary goals are:
+
+* Generate clean YAML
+* Generate valid cloud-init configurations
+* Minimize unnecessary output
+* Preserve user intent
+* Produce deterministic results
+
+---
+
+# 1. General Principles
+
+## 1.1 Deterministic Output
+
+Identical input must always generate identical YAML.
+
+Requirements:
+
+* Stable key ordering
+* Stable array ordering
+* Consistent formatting
+* No random values
+
+---
+
+## 1.2 Official Cloud-Init Compatibility
+
+Generated YAML must follow:
+
+* Current cloud-init schema
+* Official cloud-init documentation
+* Supported module definitions
+
+The builder must never invent unsupported keys.
+
+---
+
+## 1.3 UTF-8 Encoding
+
+Generated files must use:
+
+```text
+UTF-8
+LF line endings
+```
+
+---
+
+# 2. YAML Header Rules
+
+Every generated configuration begins with:
+
+```yaml
+#cloud-config
+```
+
+This header is mandatory for cloud-config documents.
+
+---
+
+# 3. Empty Value Handling
+
+## 3.1 Omit Empty Sections
+
+Do not generate empty structures.
+
+Bad:
+
+```yaml
+users: []
+```
+
+```yaml
+packages: []
+```
+
+```yaml
+write_files: []
+```
+
+Good:
+
+```yaml
+users:
+  - name: ubuntu
+```
+
+Only output sections containing data.
+
+---
+
+## 3.2 Omit Empty Keys
+
+Bad:
+
+```yaml
+users:
+  - name: ubuntu
+    gecos:
+```
+
+Good:
+
+```yaml
+users:
+  - name: ubuntu
+```
+
+---
+
+## 3.3 Omit Null Values
+
+Bad:
+
+```yaml
+timezone: null
+```
+
+Good:
+
+```yaml
+# omitted
+```
+
+---
+
+# 4. Ordering Rules
+
+## 4.1 Top-Level Section Order
+
+Use a fixed ordering regardless of UI interaction sequence.
+
+Recommended order:
+
+```yaml
+users
+ssh_authorized_keys
+packages
+package_update
+package_upgrade
+write_files
+mounts
+disk_setup
+fs_setup
+network
+runcmd
+power_state
+```
+
+This improves readability and version control diffs.
+
+---
+
+## 4.2 Object Key Ordering
+
+Keys inside objects should follow cloud-init documentation order whenever possible.
+
+Example:
+
+```yaml
+- name: ubuntu
+  gecos: Ubuntu User
+  groups:
+    - sudo
+  sudo: ALL=(ALL) NOPASSWD:ALL
+  shell: /bin/bash
+```
+
+---
+
+## 4.3 Preserve User Ordering
+
+User-created lists should preserve insertion order.
+
+Examples:
+
+```yaml
+packages:
+  - vim
+  - curl
+  - git
+```
+
+```yaml
+runcmd:
+  - apt update
+  - apt upgrade -y
+```
+
+---
+
+# 5. YAML Formatting Rules
+
+## 5.1 Indentation
+
+Use:
+
+```text
+2 spaces
+```
+
+Never use tabs.
+
+---
+
+## 5.2 Quoting
+
+Only quote values when required.
+
+Good:
+
+```yaml
+hostname: web01
+```
+
+Good:
+
+```yaml
+password: "abc:123"
+```
+
+Avoid unnecessary quoting.
+
+---
+
+## 5.3 Multiline Strings
+
+Use block scalar syntax.
+
+Example:
+
+```yaml
+content: |
+  line 1
+  line 2
+  line 3
+```
+
+Required for:
+
+* write_files content
+* scripts
+* certificates
+* SSH keys containing line breaks
+
+---
+
+## 5.4 Boolean Formatting
+
+Always emit:
+
+```yaml
+true
+false
+```
+
+Never:
+
+```yaml
+True
+False
+YES
+NO
+```
+
+---
+
+# 6. User Generation Rules
+
+## 6.1 Default User
+
+If the user modifies the default distribution account:
+
+```yaml
+users:
+  - default
+```
+
+must remain unless explicitly removed.
+
+---
+
+## 6.2 Password Handling
+
+Never generate plaintext passwords.
+
+Preferred:
+
+```yaml
+passwd: $6$...
+lock_passwd: false
+```
+
+Reject insecure plaintext storage.
+
+---
+
+## 6.3 SSH Keys
+
+Keys must be emitted exactly as entered.
+
+Example:
+
+```yaml
+ssh_authorized_keys:
+  - ssh-ed25519 AAAA...
+```
+
+No normalization beyond trimming trailing whitespace.
+
+---
+
+# 7. Package Rules
+
+## 7.1 Package Update
+
+Only emit when enabled.
+
+```yaml
+package_update: true
+```
+
+---
+
+## 7.2 Package Upgrade
+
+Only emit when enabled.
+
+```yaml
+package_upgrade: true
+```
+
+---
+
+## 7.3 Package List
+
+Generate only when packages exist.
+
+```yaml
+packages:
+  - vim
+  - curl
+```
+
+---
+
+# 8. File Generation Rules
+
+## 8.1 write_files Structure
+
+Example:
+
+```yaml
+write_files:
+  - path: /etc/motd
+    permissions: "0644"
+    owner: root:root
+    content: |
+      Welcome
+```
+
+---
+
+## 8.2 Permissions
+
+Always quote permission values.
+
+Good:
+
+```yaml
+permissions: "0644"
+```
+
+Avoid:
+
+```yaml
+permissions: 0644
+```
+
+---
+
+## 8.3 Content Preservation
+
+Preserve:
+
+* Whitespace
+* Newlines
+* Indentation
+
+Exactly as entered by the user.
+
+---
+
+# 9. Command Generation Rules
+
+## 9.1 runcmd
+
+Generate only when commands exist.
+
+Example:
+
+```yaml
+runcmd:
+  - apt update
+  - systemctl restart ssh
+```
+
+---
+
+## 9.2 Preserve Order
+
+Execution order must match UI order.
+
+---
+
+# 10. Network Configuration
+
+## 10.1 Network Version
+
+Default:
+
+```yaml
+network:
+  version: 2
+```
+
+unless another version is explicitly selected.
+
+---
+
+## 10.2 Stable Interface Ordering
+
+Interfaces sorted by name:
+
+```yaml
+eth0
+eth1
+ens18
+ens19
+```
+
+This improves diff stability.
+
+---
+
+# 11. Storage Configuration
+
+## 11.1 Preserve Dependency Order
+
+Storage objects must be generated in dependency sequence:
+
+```yaml
+disk_setup
+fs_setup
+mounts
+```
+
+Never reorder automatically.
+
+---
+
+# 12. Comments Handling
+
+## 12.1 Generated Comments
+
+Optional generator comments may be added.
+
+Example:
+
+```yaml
+# Generated by Cloud-Init Builder
+# Version: 1.0
+```
+
+---
+
+## 12.2 User Comments
+
+User-defined comments should be preserved when supported by the editor.
+
+Example:
+
+```yaml
+# Internal application disk
+```
+
+Comments must never alter generated structure.
+
+---
+
+# 13. Validation Rules
+
+Before export:
+
+* Validate YAML syntax
+* Validate cloud-init schema
+* Validate required fields
+* Detect duplicate keys
+* Detect invalid module combinations
+
+Generation must fail if validation fails.
+
+---
+
+# 14. Multi-Document Support
+
+## 14.1 Single Document Default
+
+Default export:
+
+```yaml
+#cloud-config
+...
+```
+
+Single document only.
+
+---
+
+## 14.2 Multi-Document Export
+
+Advanced mode may support:
+
+```yaml
+#cloud-config
+...
+
+---
+#part-handler
+...
+```
+
+using YAML document separators:
+
+```yaml
+---
+```
+
+---
+
+## 14.3 MIME Export Support
+
+Future versions may support:
+
+* cloud-config
+* shell scripts
+* boothooks
+* part handlers
+
+combined into MIME multipart archives.
+
+Not required for MVP.
+
+---
+
+# 15. Export Modes
+
+## YAML Export
+
+Produces:
+
+```yaml
+#cloud-config
+...
+```
+
+---
+
+## JSON Export
+
+Optional future feature.
+
+Generated JSON must represent the same schema and values as YAML output.
+
+---
+
+# 16. Version Control Friendliness
+
+Generated output should:
+
+* Be deterministic
+* Avoid unnecessary whitespace changes
+* Avoid key reordering
+* Avoid random identifiers
+
+This ensures clean Git diffs and reproducible infrastructure.
+
+---
+
+# 17. MVP Generation Scope
+
+Version 1 generation must support:
+
+* Identity
+* Users
+* SSH Keys
+* Packages
+* Network Config
+* Storage Config
+* Write Files
+* Run Commands
+
+All other cloud-init modules are outside MVP scope.
+
+---
+
+# 18. Future Extensions
+
+Future releases may add:
+
+* Full schema-driven generation
+* Custom cloud-init modules
+* MIME multipart generation
+* Jinja templating support
+* User-defined generation templates
+* Cloud-provider specific presets
+* Import and round-trip editing support
+
+Generation rules defined here must remain backward compatible whenever possible.
