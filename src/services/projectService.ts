@@ -91,8 +91,28 @@ export async function importProject(file: File): Promise<ImportResult> {
   const fallbackName =
     typeof rawMetadata?.name === "string" ? rawMetadata.name : "Untitled Project";
 
+  const defaults = createDefaultProject(fallbackName);
+  const rawMeta = rawMetadata ?? {};
+
   return {
-    project: createDefaultProject(fallbackName),
+    project: {
+      ...defaults,
+      ...migrated,
+      formatVersion: CURRENT_FORMAT_VERSION,
+      metadata: {
+        ...defaults.metadata,
+        ...(typeof rawMeta.name === "string" ? { name: rawMeta.name } : {}),
+        ...(typeof rawMeta.createdAt === "string"
+          ? { createdAt: rawMeta.createdAt }
+          : {}),
+        ...(typeof rawMeta.updatedAt === "string"
+          ? { updatedAt: rawMeta.updatedAt }
+          : {}),
+        ...(typeof rawMeta.appVersion === "string"
+          ? { appVersion: rawMeta.appVersion }
+          : {}),
+      },
+    } as ProjectFile,
     warnings,
   };
 }
