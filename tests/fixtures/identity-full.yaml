@@ -1,0 +1,7 @@
+#cloud-config
+hostname: web01
+fqdn: web01.lan.example.com
+prefer_fqdn_over_hostname: true
+manage_etc_hosts: localhost
+timezone: Europe/Stockholm
+locale: en_US.UTF-8

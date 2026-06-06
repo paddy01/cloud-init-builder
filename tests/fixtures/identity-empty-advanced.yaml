@@ -1,0 +1,3 @@
+#cloud-config
+hostname: web01
+fqdn: web01.lan.example.com
