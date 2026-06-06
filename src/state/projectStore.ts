@@ -1,6 +1,28 @@
 import { create } from "zustand";
+import type { IdentityConfig } from "../models/identity.ts";
 import { createDefaultProject, type ProjectFile } from "../models/project.ts";
 import type { ImportWarning } from "../services/projectService.ts";
+
+const EMPTY_STRING_NORMALIZED_KEYS = [
+  "hostname",
+  "fqdn",
+  "timezone",
+  "locale",
+] as const satisfies readonly (keyof IdentityConfig)[];
+
+function normalizeIdentityEmptyStrings(
+  identity: IdentityConfig,
+): IdentityConfig {
+  const normalized = { ...identity };
+
+  for (const key of EMPTY_STRING_NORMALIZED_KEYS) {
+    if (normalized[key] === "") {
+      normalized[key] = undefined;
+    }
+  }
+
+  return normalized;
+}
 
 export interface ProjectState {
   project: ProjectFile | null;
@@ -10,6 +32,7 @@ export interface ProjectState {
   newProject: (name: string) => void;
   loadProject: (project: ProjectFile, warnings?: ImportWarning[]) => void;
   updateMetadata: (name: string) => void;
+  updateIdentity: (patch: Partial<IdentityConfig>) => void;
   markSaved: () => void;
   clearWarnings: () => void;
 }
@@ -49,6 +72,28 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         metadata: {
           ...project.metadata,
           name,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      isDirty: true,
+    });
+  },
+
+  updateIdentity: (patch) => {
+    const { project } = get();
+    if (!project) return;
+
+    const mergedIdentity = normalizeIdentityEmptyStrings({
+      ...project.identity,
+      ...patch,
+    });
+
+    set({
+      project: {
+        ...project,
+        identity: mergedIdentity,
+        metadata: {
+          ...project.metadata,
           updatedAt: new Date().toISOString(),
         },
       },

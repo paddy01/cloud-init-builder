@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import futureProjectV99 from "../fixtures/future-project-v99.cib.json?raw";
 import invalidProjectBadMetadata from "../fixtures/invalid-project-bad-metadata.cib.json?raw";
+import validProjectIdentityFull from "../fixtures/valid-project-identity-full.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
   CURRENT_FORMAT_VERSION,
@@ -49,6 +50,37 @@ describe("lossless pass-through of unknown keys", () => {
       fqdn: "web-server.example.com",
     });
     expect(secondImport.project.users).toEqual([{ name: "deploy", sudo: true }]);
+  });
+
+  it("preserves all advanced identity fields across round-trip per Pitfall 6", async () => {
+    const result = await importProject(
+      fileFromJson(
+        validProjectIdentityFull,
+        "valid-project-identity-full.cib.json",
+      ),
+    );
+
+    expect(result.project.identity).toEqual({
+      hostname: "web01",
+      fqdn: "web01.lan.example.com",
+      prefer_fqdn_over_hostname: true,
+      manage_etc_hosts: "localhost",
+      timezone: "Europe/Stockholm",
+      locale: "en_US.UTF-8",
+    });
+    expect(result.warnings).toEqual([]);
+
+    const exported = JSON.stringify(result.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exported));
+
+    expect(secondImport.project.identity).toEqual({
+      hostname: "web01",
+      fqdn: "web01.lan.example.com",
+      prefer_fqdn_over_hostname: true,
+      manage_etc_hosts: "localhost",
+      timezone: "Europe/Stockholm",
+      locale: "en_US.UTF-8",
+    });
   });
 
   it("preserves identity and users through the lenient fallback path per D-11", async () => {
