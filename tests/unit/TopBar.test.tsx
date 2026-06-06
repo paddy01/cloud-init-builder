@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TopBar } from "../../src/layouts/TopBar.tsx";
 import { useProjectStore } from "../../src/state/projectStore.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import * as projectService from "../../src/services/projectService.ts";
+import * as yamlService from "../../src/services/yamlService.ts";
 
 describe("TopBar Open dirty guard (WR-01)", () => {
   beforeEach(() => {
@@ -168,5 +169,157 @@ describe("TopBar warning banner detail (IN-02)", () => {
     render(<TopBar />);
 
     expect(screen.getByText(/and 2 more/i)).toBeInTheDocument();
+  });
+});
+
+describe("Export YAML button", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+    vi.spyOn(window, "confirm");
+    vi.spyOn(window, "alert");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is disabled on a fresh project with D-12 tooltip on wrapper span", () => {
+    useProjectStore.getState().newProject("Test");
+    render(<TopBar />);
+
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toBeDisabled();
+
+    const wrapper = exportBtn.closest("span");
+    expect(wrapper).toHaveAttribute("title");
+    expect(wrapper?.getAttribute("title")).toContain("Cannot export yet");
+    expect(wrapper?.getAttribute("title")).toContain("1 validation error");
+  });
+
+  it("enables after updateIdentity sets hostname", () => {
+    useProjectStore.getState().newProject("Test");
+    const { rerender } = render(<TopBar />);
+
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    });
+    rerender(<TopBar />);
+
+    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
+  });
+
+  it("calls exportCloudInitYaml without markSaved", async () => {
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    });
+    const exportSpy = vi
+      .spyOn(yamlService, "exportCloudInitYaml")
+      .mockReturnValue(true);
+
+    render(<TopBar />);
+    expect(useProjectStore.getState().isDirty).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: /export yaml/i }));
+
+    expect(exportSpy).toHaveBeenCalledWith(useProjectStore.getState().project);
+    expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+});
+
+describe("Copy YAML button", () => {
+  const writeTextMock = vi.fn();
+
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+    vi.spyOn(window, "confirm");
+    vi.spyOn(window, "alert");
+    writeTextMock.mockReset();
+    vi.stubGlobal("navigator", { clipboard: { writeText: writeTextMock } });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("shows success feedback then clears after 2000 ms", async () => {
+    vi.useFakeTimers();
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    });
+    writeTextMock.mockResolvedValue(undefined);
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<TopBar />);
+    await user.click(screen.getByRole("button", { name: /copy yaml/i }));
+
+    expect(screen.getByText("Copied YAML to clipboard.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByText("Copied YAML to clipboard.")).not.toBeInTheDocument();
+  });
+
+  it("shows failure feedback then clears after 4000 ms", async () => {
+    vi.useFakeTimers();
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    });
+    writeTextMock.mockRejectedValue(new Error("clipboard denied"));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<TopBar />);
+    await user.click(screen.getByRole("button", { name: /copy yaml/i }));
+
+    expect(
+      screen.getByText("Couldn't copy. Select the preview text and copy manually."),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(
+      screen.queryByText("Couldn't copy. Select the preview text and copy manually."),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("TopBar typography", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses font-semibold not font-bold for the title", () => {
+    render(<TopBar />);
+    const heading = screen.getByRole("heading", {
+      level: 1,
+      name: /cloud-init builder/i,
+    });
+    expect(heading.className).toContain("font-semibold");
+    expect(heading.className).not.toContain("font-bold");
   });
 });
