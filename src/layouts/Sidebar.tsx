@@ -7,9 +7,18 @@ export function Sidebar() {
       <ul className="space-y-1 px-2">
         {SECTIONS.map((section) => (
           <li key={section}>
-            <span className="block cursor-not-allowed rounded px-3 py-2 text-sm text-gray-400">
-              {section}
-            </span>
+            {section === "Identity" ? (
+              <span
+                aria-current="page"
+                className="block border-l-2 border-blue-600 bg-blue-50 px-3 py-2 text-sm text-blue-700"
+              >
+                {section}
+              </span>
+            ) : (
+              <span className="block cursor-not-allowed rounded px-3 py-2 text-sm text-gray-400">
+                {section}
+              </span>
+            )}
           </li>
         ))}
       </ul>
