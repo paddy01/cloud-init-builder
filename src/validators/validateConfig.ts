@@ -38,7 +38,7 @@ export function validateIdentity(
       message: "Hostname is required to export YAML.",
       severity: "error",
     });
-  } else if (!isValidHostname(id.hostname)) {
+  } else if (!isValidHostname(id.hostname.trim())) {
     issues.push({
       path: "identity.hostname",
       code: "HOSTNAME_INVALID",
