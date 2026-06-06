@@ -1,4 +1,7 @@
-import type { IdentityConfig } from "../models/identity.ts";
+import {
+  MANAGE_ETC_HOSTS_VALUES,
+  type IdentityConfig,
+} from "../models/identity.ts";
 import { isValidFqdn, isValidHostname } from "./hostname.ts";
 import { isValidLocale } from "./locale.ts";
 import { isValidTimezone } from "./timezone.ts";
@@ -14,6 +17,19 @@ export function validateIdentity(
   id: IdentityConfig | undefined,
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const allowedManageEtcHosts = new Set<unknown>(MANAGE_ETC_HOSTS_VALUES);
+
+  if (
+    id?.manage_etc_hosts !== undefined &&
+    !allowedManageEtcHosts.has(id.manage_etc_hosts)
+  ) {
+    issues.push({
+      path: "identity.manage_etc_hosts",
+      code: "MANAGE_ETC_HOSTS_INVALID",
+      message: "Manage /etc/hosts must be true, false, or localhost.",
+      severity: "error",
+    });
+  }
 
   if (!id?.hostname || id.hostname.trim() === "") {
     issues.push({
