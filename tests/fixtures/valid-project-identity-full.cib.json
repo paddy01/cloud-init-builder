@@ -1,0 +1,17 @@
+{
+  "formatVersion": 1,
+  "metadata": {
+    "name": "Test Server Template",
+    "createdAt": "2026-06-01T10:00:00.000Z",
+    "updatedAt": "2026-06-01T12:30:00.000Z",
+    "appVersion": "0.1.0"
+  },
+  "identity": {
+    "hostname": "web01",
+    "fqdn": "web01.lan.example.com",
+    "prefer_fqdn_over_hostname": true,
+    "manage_etc_hosts": "localhost",
+    "timezone": "Europe/Stockholm",
+    "locale": "en_US.UTF-8"
+  }
+}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { identitySchema } from "./identity.ts";
 import { APP_VERSION } from "../utils/version.ts";
 
 export const projectMetadataSchema = z.object({
@@ -11,6 +12,7 @@ export const projectMetadataSchema = z.object({
 export const projectFileSchema = z.looseObject({
   formatVersion: z.number().int(),
   metadata: projectMetadataSchema,
+  identity: identitySchema.optional(),
 });
 
 export type ProjectFile = z.infer<typeof projectFileSchema>;
