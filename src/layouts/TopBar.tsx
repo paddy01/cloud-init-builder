@@ -21,11 +21,18 @@ export function TopBar() {
 
   const handleSave = () => {
     if (!project) return;
-    exportProject(project, project.metadata.name);
-    markSaved();
+    const dispatched = exportProject(project, project.metadata.name);
+    if (dispatched) {
+      markSaved();
+    }
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDirty && !window.confirm("You have unsaved changes. Open another project anyway?")) {
+      event.target.value = "";
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -86,12 +93,25 @@ export function TopBar() {
         />
       </header>
       {importWarnings.length > 0 && (
-        <div className="flex items-center justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-          <p>
-            {importWarnings.length} import warning
-            {importWarnings.length === 1 ? "" : "s"}: some fields were invalid and
-            defaults were applied.
-          </p>
+        <div className="flex items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          <div className="flex-1">
+            <p>
+              {importWarnings.length} import warning
+              {importWarnings.length === 1 ? "" : "s"}: some fields were invalid and
+              defaults were applied.
+            </p>
+            <ul className="mt-1 list-disc pl-5 text-xs">
+              {importWarnings.slice(0, 3).map((warning, index) => (
+                <li key={`${warning.path}-${index}`}>
+                  <code className="font-mono">{warning.path || "(root)"}</code> —{" "}
+                  {warning.message}
+                </li>
+              ))}
+              {importWarnings.length > 3 && (
+                <li className="italic">…and {importWarnings.length - 3} more</li>
+              )}
+            </ul>
+          </div>
           <button
             type="button"
             onClick={clearWarnings}
