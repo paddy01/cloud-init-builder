@@ -108,6 +108,8 @@ describe("exportProject", () => {
   let anchor: { href: string; download: string; click: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
     anchor = { href: "", download: "", click };
 
     vi.stubGlobal("URL", {
@@ -122,9 +124,17 @@ describe("exportProject", () => {
 
       return document.createElement(tagName);
     });
+
+    vi.spyOn(document.body, "appendChild").mockImplementation(
+      (node) => node as Node,
+    );
+    vi.spyOn(document.body, "removeChild").mockImplementation(
+      (node) => node as Node,
+    );
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     createObjectURL.mockClear();
     revokeObjectURL.mockClear();
@@ -142,8 +152,9 @@ describe("exportProject", () => {
       },
     };
 
-    exportProject(project, "My Project");
+    const dispatched = exportProject(project, "My Project");
 
+    expect(dispatched).toBe(true);
     expect(createObjectURL).toHaveBeenCalledOnce();
     const [blobArg] = createObjectURL.mock.calls[0] ?? [];
     expect(blobArg).toBeInstanceOf(Blob);
@@ -151,7 +162,31 @@ describe("exportProject", () => {
       expect(blobArg.type).toBe("application/json");
     }
     expect(anchor.download).toBe(getExportFilename("My Project"));
+    expect(document.body.appendChild).toHaveBeenCalledWith(anchor);
     expect(anchor.click).toHaveBeenCalledOnce();
+    expect(document.body.removeChild).toHaveBeenCalledWith(anchor);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+  });
+
+  it("returns false when document.body.appendChild throws", () => {
+    const project = {
+      formatVersion: 1,
+      metadata: {
+        name: "x",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+    };
+
+    vi.spyOn(document.body, "appendChild").mockImplementation(() => {
+      throw new Error("DOM detached");
+    });
+
+    expect(exportProject(project, "x")).toBe(false);
+    expect(anchor.click).not.toHaveBeenCalled();
   });
 });

@@ -37,17 +37,24 @@ function migrateProject(raw: Record<string, unknown>): Record<string, unknown> {
   return migrated;
 }
 
-export function exportProject(project: ProjectFile, projectName: string): void {
-  const json = JSON.stringify(project, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
+export function exportProject(project: ProjectFile, projectName: string): boolean {
+  try {
+    const json = JSON.stringify(project, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
 
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = getExportFilename(projectName);
-  anchor.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = getExportFilename(projectName);
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 
-  URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function importProject(file: File): Promise<ImportResult> {
