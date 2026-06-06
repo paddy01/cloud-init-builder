@@ -79,5 +79,14 @@ export function validateIdentity(
     });
   }
 
+  if (id?.prefer_fqdn_over_hostname && !id.fqdn?.trim()) {
+    issues.push({
+      path: "identity.prefer_fqdn_over_hostname",
+      code: "PREFER_FQDN_WITHOUT_FQDN",
+      message: "Prefer FQDN is enabled but no FQDN is set.",
+      severity: "warning",
+    });
+  }
+
   return issues;
 }
