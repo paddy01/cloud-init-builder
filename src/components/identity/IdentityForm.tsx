@@ -28,13 +28,17 @@ export function IdentityForm() {
       </p>
 
       <div className="space-y-1">
-        <label className="text-sm font-semibold text-gray-700">
+        <label
+          htmlFor="identity-hostname"
+          className="text-sm font-semibold text-gray-700"
+        >
           Hostname
           <span aria-label="required" className="text-red-600">
             *
           </span>
         </label>
         <input
+          id="identity-hostname"
           type="text"
           placeholder="e.g. web01"
           value={identity?.hostname ?? ""}
@@ -51,10 +55,14 @@ export function IdentityForm() {
       </div>
 
       <div className="space-y-1">
-        <label className="text-sm font-semibold text-gray-700">
+        <label
+          htmlFor="identity-fqdn"
+          className="text-sm font-semibold text-gray-700"
+        >
           Fully-qualified domain name (FQDN)
         </label>
         <input
+          id="identity-fqdn"
           type="text"
           placeholder="e.g. web01.lan.example.com"
           value={identity?.fqdn ?? ""}
