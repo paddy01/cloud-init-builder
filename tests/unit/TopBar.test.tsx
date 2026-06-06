@@ -262,13 +262,14 @@ describe("Copy YAML button", () => {
     });
     writeTextMock.mockResolvedValue(undefined);
 
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<TopBar />);
-    await user.click(screen.getByRole("button", { name: /copy yaml/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
+    });
 
     expect(screen.getByText("Copied YAML to clipboard.")).toBeInTheDocument();
 
-    await act(async () => {
+    act(() => {
       vi.advanceTimersByTime(2000);
     });
     expect(screen.queryByText("Copied YAML to clipboard.")).not.toBeInTheDocument();
@@ -282,15 +283,16 @@ describe("Copy YAML button", () => {
     });
     writeTextMock.mockRejectedValue(new Error("clipboard denied"));
 
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<TopBar />);
-    await user.click(screen.getByRole("button", { name: /copy yaml/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
+    });
 
     expect(
       screen.getByText("Couldn't copy. Select the preview text and copy manually."),
     ).toBeInTheDocument();
 
-    await act(async () => {
+    act(() => {
       vi.advanceTimersByTime(4000);
     });
     expect(
