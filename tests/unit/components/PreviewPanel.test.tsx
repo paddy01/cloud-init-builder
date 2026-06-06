@@ -22,14 +22,12 @@ describe("PreviewPanel empty state", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows empty state when project is null", () => {
+  it("shows no-project state when project is null", () => {
     render(<PreviewPanel />);
 
-    expect(screen.getByText("No identity yet")).toBeInTheDocument();
+    expect(screen.getByText("No project loaded")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Add a hostname on the left to see your cloud-init YAML appear here.",
-      ),
+      screen.getByText("Create or open a project to preview cloud-init YAML."),
     ).toBeInTheDocument();
   });
 

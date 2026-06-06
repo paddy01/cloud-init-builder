@@ -36,7 +36,9 @@ describe("IdentityForm", () => {
     render(<IdentityForm />);
 
     expect(screen.getByText("*")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Hostname/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText((_, element) => element?.id === "identity-hostname"),
+    ).toBeInTheDocument();
   });
 
   it('typing "web01" into hostname updates store', async () => {
