@@ -2,5 +2,15 @@
   "formatVersion": 1,
   "metadata": {
     "name": "Incomplete Project"
-  }
+  },
+  "identity": {
+    "hostname": "incomplete-host",
+    "fqdn": "incomplete-host.example.com"
+  },
+  "users": [
+    {
+      "name": "admin",
+      "sudo": true
+    }
+  ]
 }
