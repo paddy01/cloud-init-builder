@@ -1,7 +1,14 @@
+import { useEffect } from "react";
+import { useBeforeUnload } from "../hooks/useBeforeUnload.ts";
+import { MainLayout } from "../layouts/MainLayout.tsx";
+import { useProjectStore } from "../state/projectStore.ts";
+
 export default function App() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <h1 className="text-2xl font-semibold">Cloud-Init Builder</h1>
-    </div>
-  );
+  useBeforeUnload();
+
+  useEffect(() => {
+    useProjectStore.getState().newProject("Untitled Project");
+  }, []);
+
+  return <MainLayout />;
 }
