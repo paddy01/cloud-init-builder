@@ -1,25 +1,16 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  APP_VERSION,
-} from "../../src/utils/version.ts";
+import validProjectV1 from "../fixtures/valid-project-v1.cib.json?raw";
+import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
+import { APP_VERSION } from "../../src/utils/version.ts";
 import {
   CURRENT_FORMAT_VERSION,
   createDefaultProject,
   projectFileSchema,
 } from "../../src/models/project.ts";
 
-const fixturesDir = join(import.meta.dirname, "../fixtures");
-
-function loadFixture(name: string): unknown {
-  const text = readFileSync(join(fixturesDir, name), "utf-8");
-  return JSON.parse(text);
-}
-
 describe("projectFileSchema", () => {
   it("parses valid-project-v1 fixture with correct formatVersion and metadata", () => {
-    const data = loadFixture("valid-project-v1.cib.json");
+    const data = JSON.parse(validProjectV1);
     const result = projectFileSchema.parse(data);
 
     expect(result.formatVersion).toBe(1);
@@ -30,7 +21,7 @@ describe("projectFileSchema", () => {
   });
 
   it("preserves unknown top-level keys from valid-project-with-extras fixture", () => {
-    const data = loadFixture("valid-project-with-extras.cib.json");
+    const data = JSON.parse(validProjectWithExtras);
     const result = projectFileSchema.parse(data);
 
     expect(result.identity).toEqual({
