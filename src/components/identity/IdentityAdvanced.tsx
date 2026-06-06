@@ -19,9 +19,10 @@ export function IdentityAdvanced() {
   );
 
   return (
-    <details className="border-t border-gray-200">
-      <summary className="cursor-pointer py-3 text-sm font-semibold text-gray-700">
-        Advanced identity (4 more fields)
+    <details className="border-t border-gray-200 group">
+      <summary className="cursor-pointer py-3 text-sm font-semibold text-gray-700 list-none [&::-webkit-details-marker]:hidden">
+        <span className="group-open:hidden">Advanced identity (4 more fields)</span>
+        <span className="hidden group-open:inline">Advanced identity</span>
       </summary>
       <div className="space-y-4 pt-2 pb-4">
         <div className="space-y-1">
