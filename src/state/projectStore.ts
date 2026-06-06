@@ -10,15 +10,21 @@ const EMPTY_STRING_NORMALIZED_KEYS = [
   "locale",
 ] as const satisfies readonly (keyof IdentityConfig)[];
 
+function normalizeIdentityTextField(
+  value: string | undefined,
+): string | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 function normalizeIdentityEmptyStrings(
   identity: IdentityConfig,
 ): IdentityConfig {
   const normalized = { ...identity };
 
   for (const key of EMPTY_STRING_NORMALIZED_KEYS) {
-    if (normalized[key] === "") {
-      normalized[key] = undefined;
-    }
+    normalized[key] = normalizeIdentityTextField(normalized[key]);
   }
 
   return normalized;

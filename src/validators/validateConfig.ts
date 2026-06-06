@@ -32,7 +32,8 @@ export function validateIdentity(
     });
   }
 
-  if (id?.fqdn && id.fqdn.trim() !== "" && !isValidFqdn(id.fqdn)) {
+  const fqdn = id?.fqdn?.trim();
+  if (fqdn && !isValidFqdn(fqdn)) {
     issues.push({
       path: "identity.fqdn",
       code: "FQDN_INVALID",
@@ -41,7 +42,8 @@ export function validateIdentity(
     });
   }
 
-  if (id?.timezone && id.timezone.trim() !== "" && !isValidTimezone(id.timezone)) {
+  const timezone = id?.timezone?.trim();
+  if (timezone && !isValidTimezone(timezone)) {
     issues.push({
       path: "identity.timezone",
       code: "TIMEZONE_INVALID",
@@ -50,7 +52,8 @@ export function validateIdentity(
     });
   }
 
-  if (id?.locale && id.locale.trim() !== "" && !isValidLocale(id.locale)) {
+  const locale = id?.locale?.trim();
+  if (locale && !isValidLocale(locale)) {
     issues.push({
       path: "identity.locale",
       code: "LOCALE_INVALID",
