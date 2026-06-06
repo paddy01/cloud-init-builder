@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import futureProjectV99 from "../fixtures/future-project-v99.cib.json?raw";
+import invalidProjectBadMetadata from "../fixtures/invalid-project-bad-metadata.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
   CURRENT_FORMAT_VERSION,
@@ -48,6 +49,22 @@ describe("lossless pass-through of unknown keys", () => {
       fqdn: "web-server.example.com",
     });
     expect(secondImport.project.users).toEqual([{ name: "deploy", sudo: true }]);
+  });
+
+  it("preserves identity and users through the lenient fallback path per D-11", async () => {
+    const result = await importProject(
+      fileFromJson(
+        invalidProjectBadMetadata,
+        "invalid-project-bad-metadata.cib.json",
+      ),
+    );
+
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.project.identity).toEqual({
+      hostname: "incomplete-host",
+      fqdn: "incomplete-host.example.com",
+    });
+    expect(result.project.users).toEqual([{ name: "admin", sudo: true }]);
   });
 });
 

@@ -40,6 +40,25 @@ describe("importProject", () => {
     expect(result.project.metadata.appVersion).toBe("0.1.0");
   });
 
+  it("preserves identity and users from lenient fallback when metadata is partially invalid per D-11 (CR-01)", async () => {
+    const result = await importProject(
+      fixtureFile(
+        invalidProjectBadMetadata,
+        "invalid-project-bad-metadata.cib.json",
+      ),
+    );
+
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.project.identity).toEqual({
+      hostname: "incomplete-host",
+      fqdn: "incomplete-host.example.com",
+    });
+    expect(result.project.users).toEqual([{ name: "admin", sudo: true }]);
+    expect(result.project.metadata.name).toBe("Incomplete Project");
+    expect(result.project.metadata.appVersion).toBe("0.1.0");
+    expect(result.project.formatVersion).toBe(1);
+  });
+
   it("rejects future-project-v99 with a version error per D-05", async () => {
     await expect(
       importProject(fixtureFile(futureProjectV99, "future-project-v99.cib.json")),
