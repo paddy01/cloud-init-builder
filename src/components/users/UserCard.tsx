@@ -1,0 +1,135 @@
+import { useLayoutEffect, useRef } from "react";
+import type { BuilderUser } from "../../models/users.ts";
+import { getUserHeaderMetadata } from "../../models/users.ts";
+import { useProjectStore } from "../../state/projectStore.ts";
+
+const inputClassName =
+  "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
+  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+
+interface UserCardProps {
+  user: BuilderUser;
+  shouldFocusUsername?: boolean;
+  onFocused?: () => void;
+  onRemove: (id: string) => void;
+}
+
+export function UserCard({
+  user,
+  shouldFocusUsername = false,
+  onFocused,
+  onRemove,
+}: UserCardProps) {
+  const updateUser = useProjectStore((state) => state.updateUser);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const { title, secondary, badges } = getUserHeaderMetadata(user);
+
+  useLayoutEffect(() => {
+    if (!shouldFocusUsername) return;
+    usernameRef.current?.focus({ preventScroll: true });
+    onFocused?.();
+  }, [shouldFocusUsername, onFocused]);
+
+  const handleRemove = () => {
+    if (
+      !window.confirm(
+        "Remove user? This removes the custom user card from the project.",
+      )
+    ) {
+      return;
+    }
+    onRemove(user.id);
+  };
+
+  return (
+    <article
+      aria-labelledby={`user-card-title-${user.id}`}
+      className="rounded-lg border border-gray-200 bg-white p-6"
+    >
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="space-y-2">
+          <div>
+            <p
+              id={`user-card-title-${user.id}`}
+              className="text-sm font-semibold text-gray-900"
+            >
+              {title}
+            </p>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
+              {secondary.map((line) => (
+                <span key={`${user.id}-${line}`}>{line}</span>
+              ))}
+            </div>
+          </div>
+          {badges.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {badges.map((badge) => (
+                <span
+                  key={`${user.id}-${badge}`}
+                  className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className="text-sm text-red-600 hover:text-red-700"
+          onClick={handleRemove}
+        >
+          Remove user
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <label
+            htmlFor={`user-username-${user.id}`}
+            className="text-sm font-semibold text-gray-700"
+          >
+            Username
+          </label>
+          <input
+            ref={usernameRef}
+            id={`user-username-${user.id}`}
+            type="text"
+            placeholder="e.g. deploy"
+            value={user.name ?? ""}
+            onChange={(event) =>
+              updateUser(user.id, { name: event.target.value })
+            }
+            className={inputClassName}
+          />
+          <p className="text-xs text-gray-500">
+            Letters, numbers, underscores, and hyphens. Must start with a letter
+            or underscore.
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <label
+            htmlFor={`user-gecos-${user.id}`}
+            className="text-sm font-semibold text-gray-700"
+          >
+            Full name
+          </label>
+          <input
+            id={`user-gecos-${user.id}`}
+            type="text"
+            placeholder="e.g. Deploy User"
+            value={user.gecos ?? ""}
+            onChange={(event) =>
+              updateUser(user.id, { gecos: event.target.value })
+            }
+            className={inputClassName}
+          />
+          <p className="text-xs text-gray-500">
+            Optional. Written to cloud-init as the user&apos;s GECOS value.
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}

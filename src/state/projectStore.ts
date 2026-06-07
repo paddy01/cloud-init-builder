@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import type { IdentityConfig } from "../models/identity.ts";
 import { createDefaultProject, type ProjectFile } from "../models/project.ts";
-import { isUsersConfig, type UsersConfig } from "../models/users.ts";
+import {
+  createBlankUser,
+  isUsersConfig,
+  type BuilderUser,
+  type UsersConfig,
+} from "../models/users.ts";
 import type { ImportWarning } from "../services/projectService.ts";
 
 const EMPTY_STRING_NORMALIZED_KEYS = [
@@ -41,8 +46,37 @@ export interface ProjectState {
   updateMetadata: (name: string) => void;
   updateIdentity: (patch: Partial<IdentityConfig>) => void;
   setPreserveDefault: (enabled: boolean) => void;
+  addUser: (id?: string) => string | undefined;
+  updateUser: (id: string, patch: Partial<BuilderUser>) => void;
+  removeUser: (id: string) => void;
   markSaved: () => void;
   clearWarnings: () => void;
+}
+
+function updateProjectUsers(
+  set: (
+    partial:
+      | Partial<ProjectState>
+      | ((state: ProjectState) => Partial<ProjectState>),
+  ) => void,
+  get: () => ProjectState,
+  recipe: (users: UsersConfig) => UsersConfig,
+): void {
+  const { project } = get();
+  if (!project?.users || !isUsersConfig(project.users)) return;
+
+  const nextUsers = recipe(project.users);
+  set({
+    project: {
+      ...project,
+      users: nextUsers,
+      metadata: {
+        ...project.metadata,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    isDirty: true,
+  });
 }
 
 export const useProjectStore = create<ProjectState>()((set, get) => ({
@@ -129,6 +163,34 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       },
       isDirty: true,
     });
+  },
+
+  addUser: (id) => {
+    const { project } = get();
+    if (!project?.users || !isUsersConfig(project.users)) return undefined;
+
+    const user = createBlankUser(id);
+    updateProjectUsers(set, get, (users) => ({
+      ...users,
+      entries: [...users.entries, user],
+    }));
+    return user.id;
+  },
+
+  updateUser: (id, patch) => {
+    updateProjectUsers(set, get, (users) => ({
+      ...users,
+      entries: users.entries.map((user) =>
+        user.id === id ? { ...user, ...patch } : user,
+      ),
+    }));
+  },
+
+  removeUser: (id) => {
+    updateProjectUsers(set, get, (users) => ({
+      ...users,
+      entries: users.entries.filter((user) => user.id !== id),
+    }));
   },
 
   markSaved: () => {

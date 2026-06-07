@@ -8,6 +8,7 @@ import {
   importProject,
   MAX_FILE_SIZE,
 } from "../../src/services/projectService.ts";
+import { isUsersConfig } from "../../src/models/users.ts";
 import { getExportFilename } from "../../src/utils/slugify.ts";
 
 function fixtureFile(content: string, name: string): File {
@@ -53,7 +54,17 @@ describe("importProject", () => {
       hostname: "incomplete-host",
       fqdn: "incomplete-host.example.com",
     });
-    expect(result.project.users).toEqual([{ name: "admin", sudo: true }]);
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.preserveDefault).toBe(false);
+    expect(result.project.users.entries).toHaveLength(1);
+    expect(result.project.users.entries[0]).toMatchObject({
+      name: "admin",
+      sudo: true,
+      shell: "/bin/bash",
+    });
     expect(result.project.metadata.name).toBe("Incomplete Project");
     expect(result.project.metadata.appVersion).toBe("0.1.0");
     expect(result.project.formatVersion).toBe(1);
@@ -77,7 +88,92 @@ describe("importProject", () => {
       hostname: "web-server",
       fqdn: "web-server.example.com",
     });
-    expect(result.project.users).toEqual([{ name: "deploy", sudo: true }]);
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.preserveDefault).toBe(false);
+    expect(result.project.users.entries).toHaveLength(1);
+    expect(result.project.users.entries[0]).toMatchObject({
+      name: "deploy",
+      sudo: true,
+      shell: "/bin/bash",
+    });
+  });
+
+  it("normalizes absent users to default config", async () => {
+    const withoutUsers = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "No Users",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+    });
+
+    const result = await importProject(
+      fixtureFile(withoutUsers, "no-users.cib.json"),
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.project.users).toEqual({
+      preserveDefault: true,
+      entries: [],
+    });
+  });
+
+  it("normalizes legacy arrays with default sentinel", async () => {
+    const legacy = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "Legacy",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: ["default", { name: "ops", sudo: true }],
+    });
+
+    const result = await importProject(
+      fixtureFile(legacy, "legacy-default.cib.json"),
+    );
+
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.preserveDefault).toBe(true);
+    expect(result.project.users.entries).toHaveLength(1);
+    expect(result.project.users.entries[0]).toMatchObject({
+      name: "ops",
+      sudo: true,
+    });
+  });
+
+  it("replaces invalid users shapes with defaults and a warning", async () => {
+    const invalidUsers = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "Bad Users",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: { broken: true },
+    });
+
+    const result = await importProject(
+      fixtureFile(invalidUsers, "invalid-users.cib.json"),
+    );
+
+    expect(result.project.users).toEqual({
+      preserveDefault: true,
+      entries: [],
+    });
+    expect(result.warnings.some((warning) => warning.path === "users")).toBe(
+      true,
+    );
   });
 
   it("rejects files exceeding MAX_FILE_SIZE", async () => {

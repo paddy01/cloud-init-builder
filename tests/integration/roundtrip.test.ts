@@ -7,6 +7,7 @@ import {
   CURRENT_FORMAT_VERSION,
   createDefaultProject,
 } from "../../src/models/project.ts";
+import { isUsersConfig } from "../../src/models/users.ts";
 import { importProject } from "../../src/services/projectService.ts";
 
 function fileFromJson(json: string, name = "roundtrip.cib.json"): File {
@@ -40,7 +41,15 @@ describe("lossless pass-through of unknown keys", () => {
       hostname: "web-server",
       fqdn: "web-server.example.com",
     });
-    expect(firstImport.project.users).toEqual([{ name: "deploy", sudo: true }]);
+    expect(isUsersConfig(firstImport.project.users)).toBe(true);
+    if (!isUsersConfig(firstImport.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(firstImport.project.users.preserveDefault).toBe(false);
+    expect(firstImport.project.users.entries[0]).toMatchObject({
+      name: "deploy",
+      sudo: true,
+    });
 
     const exported = JSON.stringify(firstImport.project, null, 2);
     const secondImport = await importProject(fileFromJson(exported));
@@ -49,7 +58,7 @@ describe("lossless pass-through of unknown keys", () => {
       hostname: "web-server",
       fqdn: "web-server.example.com",
     });
-    expect(secondImport.project.users).toEqual([{ name: "deploy", sudo: true }]);
+    expect(secondImport.project.users).toEqual(firstImport.project.users);
   });
 
   it("preserves all advanced identity fields across round-trip per Pitfall 6", async () => {
@@ -96,7 +105,11 @@ describe("lossless pass-through of unknown keys", () => {
       hostname: "incomplete-host",
       fqdn: "incomplete-host.example.com",
     });
-    expect(result.project.users).toEqual([{ name: "admin", sudo: true }]);
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.entries[0]).toMatchObject({ name: "admin" });
   });
 });
 

@@ -4,6 +4,7 @@ import {
   projectFileSchema,
   type ProjectFile,
 } from "../models/project.ts";
+import { normalizeUsersSection } from "../models/users.ts";
 import { getExportFilename } from "../utils/slugify.ts";
 
 export interface ImportWarning {
@@ -31,7 +32,9 @@ async function readFileText(file: File): Promise<string> {
   });
 }
 
-function migrateProject(raw: Record<string, unknown>): Record<string, unknown> {
+function migrateProject(
+  raw: Record<string, unknown>,
+): { migrated: Record<string, unknown>; warnings: ImportWarning[] } {
   const version =
     typeof raw.formatVersion === "number" ? raw.formatVersion : 0;
 
@@ -42,12 +45,17 @@ function migrateProject(raw: Record<string, unknown>): Record<string, unknown> {
   }
 
   const migrated = { ...raw };
+  const usersNormalization = normalizeUsersSection(raw.users);
+  migrated.users = usersNormalization.users;
 
   // Future: add migration steps here
   // if (version < 2) migrated = migrateV1toV2(migrated);
 
   migrated.formatVersion = CURRENT_FORMAT_VERSION;
-  return migrated;
+  return {
+    migrated,
+    warnings: usersNormalization.warnings,
+  };
 }
 
 export function exportProject(project: ProjectFile, projectName: string): boolean {
@@ -89,17 +97,22 @@ export async function importProject(file: File): Promise<ImportResult> {
     throw new Error("Project file must be a JSON object.");
   }
 
-  const migrated = migrateProject(raw as Record<string, unknown>);
+  const { migrated, warnings: migrationWarnings } = migrateProject(
+    raw as Record<string, unknown>,
+  );
   const result = projectFileSchema.safeParse(migrated);
 
   if (result.success) {
-    return { project: result.data, warnings: [] };
+    return { project: result.data, warnings: migrationWarnings };
   }
 
-  const warnings: ImportWarning[] = result.error.issues.map((issue) => ({
-    path: issue.path.join("."),
-    message: issue.message,
-  }));
+  const warnings: ImportWarning[] = [
+    ...migrationWarnings,
+    ...result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
+  ];
 
   const rawMetadata =
     typeof migrated.metadata === "object" &&
