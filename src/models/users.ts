@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSupportedPasswordHash } from "../validators/passwordHash.ts";
 
 const sudoSchema = z.union([
   z.string(),
@@ -6,6 +7,11 @@ const sudoSchema = z.union([
   z.null(),
   z.boolean(),
 ]);
+
+export const builderSshAuthorizedKeySchema = z.object({
+  id: z.string(),
+  value: z.string(),
+});
 
 export const builderUserSchema = z.object({
   id: z.string(),
@@ -18,6 +24,9 @@ export const builderUserSchema = z.object({
   no_create_home: z.boolean().optional(),
   homedir: z.string().optional(),
   system: z.boolean().optional(),
+  lock_passwd: z.boolean().optional(),
+  passwd: z.string().optional(),
+  ssh_authorized_keys: z.array(builderSshAuthorizedKeySchema).optional(),
 });
 
 export const usersConfigSchema = z.object({
@@ -25,6 +34,9 @@ export const usersConfigSchema = z.object({
   entries: z.array(builderUserSchema),
 });
 
+export type BuilderSshAuthorizedKey = z.infer<
+  typeof builderSshAuthorizedKeySchema
+>;
 export type BuilderUser = z.infer<typeof builderUserSchema>;
 export type UsersConfig = z.infer<typeof usersConfigSchema>;
 
@@ -87,7 +99,84 @@ export function createUserId(): string {
 }
 
 export function createBlankUser(id = createUserId()): BuilderUser {
-  return { id, shell: "/bin/bash" };
+  return { id, shell: "/bin/bash", lock_passwd: true };
+}
+
+let sshKeyIdCounter = 0;
+
+export function createSshKeyId(): string {
+  sshKeyIdCounter += 1;
+  return `ssh-key-${sshKeyIdCounter}`;
+}
+
+export function createBlankSshAuthorizedKey(
+  id = createSshKeyId(),
+): BuilderSshAuthorizedKey {
+  return { id, value: "" };
+}
+
+function isBlankOptionalString(value: string | undefined): boolean {
+  return value === undefined || value.trim() === "";
+}
+
+function hasNonblankGroups(groups: string[] | undefined): boolean {
+  return groups?.some((group) => group.trim() !== "") ?? false;
+}
+
+function hasNonblankSshRows(
+  rows: BuilderSshAuthorizedKey[] | undefined,
+): boolean {
+  return rows?.some((row) => row.value.trim() !== "") ?? false;
+}
+
+export function isSemanticallyBlankUser(user: BuilderUser): boolean {
+  if (!isBlankOptionalString(user.name)) {
+    return false;
+  }
+  if (!isBlankOptionalString(user.gecos)) {
+    return false;
+  }
+  if (!isBlankOptionalString(user.primary_group)) {
+    return false;
+  }
+  if (!isBlankOptionalString(user.homedir)) {
+    return false;
+  }
+  if (hasNonblankGroups(user.groups)) {
+    return false;
+  }
+  if (user.sudo !== undefined && user.sudo !== false) {
+    return false;
+  }
+
+  const shell = user.shell?.trim() ?? "";
+  if (shell !== "" && shell !== "/bin/bash") {
+    return false;
+  }
+
+  if (user.no_create_home === true) {
+    return false;
+  }
+  if (user.system === true) {
+    return false;
+  }
+
+  if (
+    user.passwd !== undefined &&
+    user.passwd !== "" &&
+    isSupportedPasswordHash(user.passwd)
+  ) {
+    return false;
+  }
+  if (user.lock_passwd === false) {
+    return false;
+  }
+
+  if (hasNonblankSshRows(user.ssh_authorized_keys)) {
+    return false;
+  }
+
+  return true;
 }
 
 export function isUsersConfig(value: unknown): value is UsersConfig {

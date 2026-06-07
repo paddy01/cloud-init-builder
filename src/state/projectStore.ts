@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { IdentityConfig } from "../models/identity.ts";
 import { createDefaultProject, type ProjectFile } from "../models/project.ts";
 import {
+  createBlankSshAuthorizedKey,
   createBlankUser,
   isUsersConfig,
   type BuilderUser,
@@ -49,6 +50,13 @@ export interface ProjectState {
   addUser: (id?: string) => string | undefined;
   updateUser: (id: string, patch: Partial<BuilderUser>) => void;
   removeUser: (id: string) => void;
+  addSshAuthorizedKey: (userId: string, rowId?: string) => string | undefined;
+  updateSshAuthorizedKey: (
+    userId: string,
+    rowId: string,
+    value: string,
+  ) => void;
+  removeSshAuthorizedKey: (userId: string, rowId: string) => void;
   markSaved: () => void;
   clearWarnings: () => void;
 }
@@ -190,6 +198,57 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     updateProjectUsers(set, get, (users) => ({
       ...users,
       entries: users.entries.filter((user) => user.id !== id),
+    }));
+  },
+
+  addSshAuthorizedKey: (userId, rowId) => {
+    const { project } = get();
+    if (!project?.users || !isUsersConfig(project.users)) return undefined;
+
+    const row = createBlankSshAuthorizedKey(rowId);
+    updateProjectUsers(set, get, (users) => ({
+      ...users,
+      entries: users.entries.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              ssh_authorized_keys: [...(user.ssh_authorized_keys ?? []), row],
+            }
+          : user,
+      ),
+    }));
+    return row.id;
+  },
+
+  updateSshAuthorizedKey: (userId, rowId, value) => {
+    updateProjectUsers(set, get, (users) => ({
+      ...users,
+      entries: users.entries.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              ssh_authorized_keys: (user.ssh_authorized_keys ?? []).map((row) =>
+                row.id === rowId ? { ...row, value } : row,
+              ),
+            }
+          : user,
+      ),
+    }));
+  },
+
+  removeSshAuthorizedKey: (userId, rowId) => {
+    updateProjectUsers(set, get, (users) => ({
+      ...users,
+      entries: users.entries.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              ssh_authorized_keys: (user.ssh_authorized_keys ?? []).filter(
+                (row) => row.id !== rowId,
+              ),
+            }
+          : user,
+      ),
     }));
   },
 
