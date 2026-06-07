@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useUserValidation } from "../components/users/UserValidationContext.tsx";
 import { exportProject, importProject } from "../services/projectService.ts";
 import { copyCloudInitYaml, exportCloudInitYaml } from "../services/yamlService.ts";
 import { useProjectStore } from "../state/projectStore.ts";
-import { validateIdentity } from "../validators/validateConfig.ts";
+import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
+import { useEditorNavigation } from "./EditorNavigationContext.tsx";
+
+function isUserIssue(path: string): boolean {
+  return path.startsWith("users.");
+}
 
 export function TopBar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -14,29 +20,41 @@ export function TopBar() {
   const loadProject = useProjectStore((state) => state.loadProject);
   const markSaved = useProjectStore((state) => state.markSaved);
   const clearWarnings = useProjectStore((state) => state.clearWarnings);
+  const { setActiveSection } = useEditorNavigation();
+  const {
+    blockingErrors,
+    revealAllUserValidation,
+    requestFocus,
+  } = useUserValidation();
 
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
-  const issues = useMemo(
-    () => validateIdentity(project?.identity),
-    [project?.identity],
-  );
-  const exportBlocked = issues.some((i) => i.severity === "error");
-  const exportDisabled = project === null || exportBlocked;
-  const errorCount = issues.filter((i) => i.severity === "error").length;
+  const exportBlocked = blockingErrors.length > 0;
+  const noProject = project === null;
+  const nativeExportDisabled = noProject;
+  const userErrors = blockingErrors.filter((issue) => isUserIssue(issue.path));
+  const userErrorCount = userErrors.length;
+  const hasUserErrors = userErrorCount > 0;
 
   const exportTooltipText = useMemo(() => {
-    if (project === null) {
+    if (noProject) {
       return "Open a project or click New to start.";
     }
-    if (errorCount === 1) {
+    if (hasUserErrors) {
+      if (userErrorCount === 1) {
+        return "Cannot export yet. 1 user validation error prevents export. Review the Users validation summary.";
+      }
+      return `Cannot export yet. ${userErrorCount} user validation errors prevent export. Review the Users validation summary.`;
+    }
+    const identityErrorCount = blockingErrors.length;
+    if (identityErrorCount === 1) {
       return "Cannot export yet. 1 validation error prevents export. Fix the highlighted field below.";
     }
-    if (errorCount > 1) {
-      return `Cannot export yet. ${errorCount} validation errors prevent export. Fix the highlighted fields below.`;
+    if (identityErrorCount > 1) {
+      return `Cannot export yet. ${identityErrorCount} validation errors prevent export. Fix the highlighted fields below.`;
     }
     return "";
-  }, [project, errorCount]);
+  }, [blockingErrors.length, hasUserErrors, noProject, userErrorCount]);
 
   useEffect(() => {
     return () => {
@@ -56,6 +74,16 @@ export function TopBar() {
     }, ms);
   };
 
+  const handleBlockedExport = () => {
+    revealAllUserValidation();
+    if (hasUserErrors) {
+      setActiveSection("users");
+      requestFocus(USERS_VALIDATION_SUMMARY_HEADING_ID);
+      return;
+    }
+    setActiveSection("identity");
+  };
+
   const handleNew = () => {
     if (isDirty && !window.confirm("You have unsaved changes. Create a new project anyway?")) {
       return;
@@ -72,8 +100,23 @@ export function TopBar() {
   };
 
   const handleExportYaml = () => {
-    if (!project) return;
+    if (!project || nativeExportDisabled) return;
+    if (exportBlocked) {
+      handleBlockedExport();
+      return;
+    }
     exportCloudInitYaml(project);
+  };
+
+  const handleExportKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    if (!exportBlocked || nativeExportDisabled) {
+      return;
+    }
+    event.preventDefault();
+    handleBlockedExport();
   };
 
   const handleCopyYaml = async () => {
@@ -109,12 +152,19 @@ export function TopBar() {
     }
   };
 
+  const exportButtonClassName =
+    exportBlocked && !nativeExportDisabled
+      ? "rounded bg-blue-600 px-3 py-1.5 text-sm text-white opacity-50 cursor-not-allowed"
+      : "rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50";
+
   const exportYamlButton = (
     <button
       type="button"
       onClick={handleExportYaml}
-      disabled={exportDisabled}
-      className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+      onKeyDown={handleExportKeyDown}
+      disabled={nativeExportDisabled}
+      aria-disabled={exportBlocked && !nativeExportDisabled ? true : undefined}
+      className={exportButtonClassName}
     >
       Export YAML
     </button>
@@ -167,7 +217,7 @@ export function TopBar() {
         >
           Copy YAML
         </button>
-        {exportDisabled ? (
+        {exportBlocked && !nativeExportDisabled ? (
           <span title={exportTooltipText}>{exportYamlButton}</span>
         ) : (
           exportYamlButton

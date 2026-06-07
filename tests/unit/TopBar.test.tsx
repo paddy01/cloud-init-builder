@@ -1,11 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { UserValidationProvider } from "../../src/components/users/UserValidationContext.tsx";
+import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationContext.tsx";
 import { TopBar } from "../../src/layouts/TopBar.tsx";
 import { useProjectStore } from "../../src/state/projectStore.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import * as projectService from "../../src/services/projectService.ts";
 import * as yamlService from "../../src/services/yamlService.ts";
+
+function renderTopBar(
+  activeSection: "identity" | "users" = "identity",
+  setActiveSection = vi.fn(),
+) {
+  return render(
+    <UserValidationProvider>
+      <EditorNavigationProvider
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+      >
+        <TopBar />
+      </EditorNavigationProvider>
+    </UserValidationProvider>,
+  );
+}
 
 describe("TopBar Open dirty guard (WR-01)", () => {
   beforeEach(() => {
@@ -31,7 +49,7 @@ describe("TopBar Open dirty guard (WR-01)", () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     const importSpy = vi.spyOn(projectService, "importProject");
 
-    const { container } = render(<TopBar />);
+    const { container } = renderTopBar();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     fireEvent.change(input, {
@@ -61,7 +79,7 @@ describe("TopBar Open dirty guard (WR-01)", () => {
       warnings: [],
     });
 
-    const { container } = render(<TopBar />);
+    const { container } = renderTopBar();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
     fireEvent.change(input, {
@@ -99,7 +117,7 @@ describe("TopBar Save conditional markSaved (WR-03)", () => {
     });
     vi.spyOn(projectService, "exportProject").mockReturnValue(true);
 
-    render(<TopBar />);
+    renderTopBar();
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     expect(useProjectStore.getState().isDirty).toBe(false);
@@ -112,7 +130,7 @@ describe("TopBar Save conditional markSaved (WR-03)", () => {
     });
     vi.spyOn(projectService, "exportProject").mockReturnValue(false);
 
-    render(<TopBar />);
+    renderTopBar();
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     expect(useProjectStore.getState().isDirty).toBe(true);
@@ -145,7 +163,7 @@ describe("TopBar warning banner detail (IN-02)", () => {
       ],
     });
 
-    render(<TopBar />);
+    renderTopBar();
 
     expect(screen.getByText("metadata.createdAt")).toBeInTheDocument();
     expect(screen.getByText("metadata.updatedAt")).toBeInTheDocument();
@@ -166,7 +184,7 @@ describe("TopBar warning banner detail (IN-02)", () => {
       ],
     });
 
-    render(<TopBar />);
+    renderTopBar();
 
     expect(screen.getByText(/and 2 more/i)).toBeInTheDocument();
   });
@@ -188,32 +206,50 @@ describe("Export YAML button", () => {
     vi.restoreAllMocks();
   });
 
-  it("is disabled on a fresh project with D-12 tooltip on wrapper span", () => {
-    useProjectStore.getState().newProject("Test");
-    render(<TopBar />);
+  it("is natively disabled with no project loaded", () => {
+    renderTopBar();
 
     const exportBtn = screen.getByRole("button", { name: /export yaml/i });
     expect(exportBtn).toBeDisabled();
+    expect(exportBtn).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("uses aria-disabled on a fresh project missing hostname", () => {
+    useProjectStore.getState().newProject("Test");
+    renderTopBar();
+
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).not.toBeDisabled();
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
 
     const wrapper = exportBtn.closest("span");
-    expect(wrapper).toHaveAttribute("title");
     expect(wrapper?.getAttribute("title")).toContain("Cannot export yet");
     expect(wrapper?.getAttribute("title")).toContain("1 validation error");
   });
 
   it("enables after updateIdentity sets hostname", () => {
     useProjectStore.getState().newProject("Test");
-    const { rerender } = render(<TopBar />);
+    const { rerender } = renderTopBar();
 
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
     });
-    rerender(<TopBar />);
+    rerender(
+      <UserValidationProvider>
+        <EditorNavigationProvider
+          activeSection="identity"
+          setActiveSection={vi.fn()}
+        >
+          <TopBar />
+        </EditorNavigationProvider>
+      </UserValidationProvider>,
+    );
 
-    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  it("calls exportCloudInitYaml without markSaved", async () => {
+  it("calls exportCloudInitYaml without markSaved when valid", async () => {
     useProjectStore.getState().newProject("Test");
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
@@ -222,13 +258,23 @@ describe("Export YAML button", () => {
       .spyOn(yamlService, "exportCloudInitYaml")
       .mockReturnValue(true);
 
-    render(<TopBar />);
+    renderTopBar();
     expect(useProjectStore.getState().isDirty).toBe(true);
 
     await userEvent.click(screen.getByRole("button", { name: /export yaml/i }));
 
     expect(exportSpy).toHaveBeenCalledWith(useProjectStore.getState().project);
     expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+
+  it("does not call exportCloudInitYaml on blocked activation", async () => {
+    useProjectStore.getState().newProject("Test");
+    const exportSpy = vi.spyOn(yamlService, "exportCloudInitYaml");
+
+    renderTopBar();
+    await userEvent.click(screen.getByRole("button", { name: /export yaml/i }));
+
+    expect(exportSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -262,7 +308,7 @@ describe("Copy YAML button", () => {
     });
     writeTextMock.mockResolvedValue(undefined);
 
-    render(<TopBar />);
+    renderTopBar();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
     });
@@ -283,7 +329,7 @@ describe("Copy YAML button", () => {
     });
     writeTextMock.mockRejectedValue(new Error("clipboard denied"));
 
-    render(<TopBar />);
+    renderTopBar();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
     });
@@ -316,7 +362,7 @@ describe("TopBar typography", () => {
   });
 
   it("uses font-semibold not font-bold for the title", () => {
-    render(<TopBar />);
+    renderTopBar();
     const heading = screen.getByRole("heading", {
       level: 1,
       name: /cloud-init builder/i,
@@ -326,7 +372,7 @@ describe("TopBar typography", () => {
   });
 });
 
-describe("TopBar Phase 4 scope fence", () => {
+describe("TopBar export gating", () => {
   beforeEach(() => {
     useProjectStore.setState({
       project: null,
@@ -342,7 +388,9 @@ describe("TopBar Phase 4 scope fence", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps export enabled for duplicate and blank usernames when identity is valid", () => {
+  it("blocks export for duplicate usernames with count-aware user copy", () => {
+    const validSsh =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
     useProjectStore.getState().newProject("Test");
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
@@ -352,17 +400,64 @@ describe("TopBar Phase 4 scope fence", () => {
           users: {
             preserveDefault: true,
             entries: [
-              { id: "dup-a", name: "shared", shell: "/bin/bash" },
-              { id: "dup-b", name: "shared", shell: "/bin/bash" },
-              { id: "blank", shell: "/bin/bash" },
+              {
+                id: "dup-a",
+                name: "shared",
+                shell: "/bin/bash",
+                ssh_authorized_keys: [{ id: "k1", value: validSsh }],
+              },
+              {
+                id: "dup-b",
+                name: "shared",
+                shell: "/bin/bash",
+                ssh_authorized_keys: [{ id: "k2", value: validSsh }],
+              },
             ],
           },
         },
       });
     });
 
-    render(<TopBar />);
-    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /copy yaml/i })).toBeEnabled();
+    renderTopBar();
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+    expect(exportBtn.closest("span")?.getAttribute("title")).toContain(
+      "2 user validation errors",
+    );
   });
+
+  it("allows warning-only uppercase usernames to export", async () => {
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          users: {
+            preserveDefault: true,
+            entries: [
+              {
+                id: "upper-a",
+                name: "Deploy",
+                shell: "/bin/bash",
+                passwd: "$6$rounds=5000$somesalt$JE8633wNOuGQ0Nr6YpvNR5shWgI3A0T.UrBxMhUaNJW4n5FZn1eX2g09dZ3gB1lZg2y0NnQlD3za5FyCzrE7mA",
+                lock_passwd: false,
+              },
+            ],
+          },
+        },
+      });
+    });
+    const exportSpy = vi
+      .spyOn(yamlService, "exportCloudInitYaml")
+      .mockReturnValue(true);
+
+    renderTopBar();
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).not.toHaveAttribute("aria-disabled", "true");
+
+    await userEvent.click(exportBtn);
+    expect(exportSpy).toHaveBeenCalledOnce();
+  });
+
 });

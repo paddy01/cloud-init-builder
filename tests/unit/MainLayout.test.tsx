@@ -9,6 +9,7 @@ import {
 import { MainLayout } from "../../src/layouts/MainLayout.tsx";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { importProject } from "../../src/services/projectService.ts";
+import * as yamlService from "../../src/services/yamlService.ts";
 import validProjectUsersFull from "../fixtures/valid-project-users-full.cib.json?raw";
 import {
   createBlankUser,
@@ -16,6 +17,7 @@ import {
   SUDO_PASSWORDLESS,
 } from "../../src/models/users.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
+import { validateConfig } from "../../src/validators/validateConfig.ts";
 import usersDefaultOnly from "../fixtures/users-default-only.yaml?raw";
 import usersNone from "../fixtures/users-none.yaml?raw";
 import usersCommon from "../fixtures/users-common.yaml?raw";
@@ -469,11 +471,15 @@ describe("MainLayout reopened project workflow", () => {
     fireEvent.change(blankInput, { target: { value: "later" } });
     expect(blankInput).toHaveValue("later");
     expect(screen.getAllByDisplayValue("deploy").length).toBeGreaterThan(1);
-    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
   });
 });
 
-describe("MainLayout Phase 4 scope fence", () => {
+describe("MainLayout export gating", () => {
+  const VALID_SSH_KEY =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+
   beforeEach(() => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
@@ -481,6 +487,7 @@ describe("MainLayout Phase 4 scope fence", () => {
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
     });
+    vi.spyOn(window, "confirm");
   });
 
   afterEach(() => {
@@ -488,7 +495,8 @@ describe("MainLayout Phase 4 scope fence", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps blank and duplicate usernames editable without new export blockers", () => {
+  it("blocks export for duplicate usernames and reveals the Users summary on activation", async () => {
+    vi.useRealTimers();
     const first = createBlankUser("dup-a");
     const second = createBlankUser("dup-b");
     const projectBefore = useProjectStore.getState().project;
@@ -502,9 +510,62 @@ describe("MainLayout Phase 4 scope fence", () => {
         users: {
           preserveDefault: true,
           entries: [
-            { ...first, name: "shared" },
-            { ...second, name: "shared" },
-            createBlankUser("blank-card"),
+            {
+              ...first,
+              name: "shared",
+              ssh_authorized_keys: [{ id: "k1", value: VALID_SSH_KEY }],
+            },
+            {
+              ...second,
+              name: "shared",
+              ssh_authorized_keys: [{ id: "k2", value: VALID_SSH_KEY }],
+            },
+          ],
+        },
+      },
+    });
+
+    const exportSpy = vi.spyOn(yamlService, "exportCloudInitYaml");
+
+    render(<MainLayout />);
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(exportBtn);
+
+    expect(exportSpy).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Users" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Users need attention")).toBeInTheDocument();
+    expect(
+      document.getElementById("users-validation-summary-heading"),
+    ).toHaveFocus();
+    expect(
+      screen.getAllByText(
+        "Export is blocked. Review the highlighted user errors.",
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("blocks export for unsupported password draft when SSH auth is otherwise valid", () => {
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        users: {
+          preserveDefault: true,
+          entries: [
+            {
+              id: "ssh-user",
+              name: "deploy",
+              shell: "/bin/bash",
+              ssh_authorized_keys: [{ id: "key-1", value: VALID_SSH_KEY }],
+            },
           ],
         },
       },
@@ -513,18 +574,75 @@ describe("MainLayout Phase 4 scope fence", () => {
     render(<MainLayout />);
     fireEvent.click(screen.getByRole("button", { name: "Users" }));
 
-    const blankInput = screen.getAllByLabelText("Username")[2]!;
-    fireEvent.change(blankInput, { target: { value: "maybe-later" } });
-    expect(blankInput).toHaveValue("maybe-later");
+    const passwordInput = screen.getByLabelText("Hashed password");
+    fireEvent.change(passwordInput, { target: { value: "hunter2" } });
+    fireEvent.blur(passwordInput);
 
-    expect(screen.getAllByLabelText("Username")).toHaveLength(3);
-    expect(screen.getAllByLabelText("Hashed password")).toHaveLength(3);
-    expect(screen.getAllByRole("button", { name: "Add SSH key" })).toHaveLength(
-      3,
-    );
-    expect(screen.queryByText(/duplicate user/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/invalid username/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+
+    fireEvent.click(exportBtn);
+
+    expect(screen.getByText("Users need attention")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Export blocked: enter a supported password hash/i)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      document.getElementById("users-validation-summary-heading"),
+    ).toHaveFocus();
   });
 
+  it("recovers export without moving focus when errors clear", async () => {
+    const blank = createBlankUser("fix-name");
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        users: {
+          preserveDefault: true,
+          entries: [
+            {
+              ...blank,
+              gecos: "Configured without username",
+              ssh_authorized_keys: [{ id: "k1", value: VALID_SSH_KEY }],
+            },
+          ],
+        },
+      },
+    });
+
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    fireEvent.click(exportBtn);
+
+    const summaryHeading = document.getElementById(
+      "users-validation-summary-heading",
+    );
+    expect(summaryHeading).toHaveFocus();
+
+    act(() => {
+      useProjectStore.getState().updateUser("fix-name", { name: "deploy" });
+    });
+
+    expect(
+      validateConfig(useProjectStore.getState().project).filter(
+        (issue) => issue.severity === "error",
+      ),
+    ).toEqual([]);
+
+    await vi.waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /export yaml/i }),
+      ).not.toHaveAttribute("aria-disabled", "true");
+    });
+    expect(screen.queryByText("Users need attention")).toBeNull();
+    expect(document.activeElement).not.toBe(exportBtn);
+  });
 });

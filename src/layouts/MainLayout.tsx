@@ -10,6 +10,7 @@ import {
   useUserValidation,
 } from "../components/users/UserValidationContext.tsx";
 import { UsersSection } from "../components/users/UsersSection.tsx";
+import { EditorNavigationProvider } from "./EditorNavigationContext.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
 
@@ -30,7 +31,10 @@ function MainLayoutContent() {
   const [activeSection, setActiveSection] = useState<EditorSection>("identity");
 
   return (
-    <>
+    <EditorNavigationProvider
+      activeSection={activeSection}
+      setActiveSection={setActiveSection}
+    >
       <BlockedExportAnnouncement />
       <div className="flex h-screen flex-col">
         <TopBar />
@@ -49,7 +53,9 @@ function MainLayoutContent() {
                   <UsersSection />
                 )}
               </div>
-              <div className={view === "preview" ? "block lg:hidden" : "hidden"}>
+              <div
+                className={view === "preview" ? "block lg:hidden" : "hidden"}
+              >
                 <PreviewPanel />
               </div>
             </div>
@@ -59,7 +65,7 @@ function MainLayoutContent() {
           </aside>
         </div>
       </div>
-    </>
+    </EditorNavigationProvider>
   );
 }
 
