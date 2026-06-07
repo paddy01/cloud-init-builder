@@ -55,6 +55,30 @@ export function getShellChoice(shell: string | undefined): ShellPreset | "other"
   return "other";
 }
 
+export const SUDO_PASSWORDLESS = "ALL=(ALL) NOPASSWD:ALL";
+export const SUDO_REQUIRE_PASSWORD = "ALL=(ALL) ALL";
+
+export type SudoPresetChoice =
+  | "none"
+  | "passwordless"
+  | "require-password"
+  | "custom";
+
+export function getSudoPresetChoice(
+  sudo: BuilderUser["sudo"],
+): SudoPresetChoice {
+  if (sudo === undefined || sudo === false) {
+    return "none";
+  }
+  if (sudo === SUDO_PASSWORDLESS) {
+    return "passwordless";
+  }
+  if (sudo === SUDO_REQUIRE_PASSWORD) {
+    return "require-password";
+  }
+  return "custom";
+}
+
 let userIdCounter = 0;
 
 export function createUserId(): string {
@@ -236,11 +260,11 @@ export function getUserHeaderMetadata(user: BuilderUser): {
     badges.push("Custom shell");
   }
 
-  if (user.sudo === "ALL=(ALL) NOPASSWD:ALL") {
+  if (user.sudo === SUDO_PASSWORDLESS) {
     badges.push("sudo");
-  } else if (user.sudo === "ALL=(ALL) ALL") {
+  } else if (user.sudo === SUDO_REQUIRE_PASSWORD) {
     badges.push("sudo (password)");
-  } else if (user.sudo !== undefined && user.sudo !== false && user.sudo !== null) {
+  } else if (user.sudo !== undefined && user.sudo !== false) {
     badges.push("Custom sudo");
   }
 

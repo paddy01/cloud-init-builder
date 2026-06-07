@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { UserCard } from "../../../../src/components/users/UserCard.tsx";
 import {
   createBlankUser,
+  isUsersConfig,
   type BuilderUser,
 } from "../../../../src/models/users.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
@@ -12,13 +13,17 @@ const initialState = {
   project: null,
   lastSavedProject: null,
   isDirty: false,
-  importWarnings: [] as { path: string; msg: string }[],
+  importWarnings: [] as { path: string; message: string }[],
 };
 
 function StoreBackedUserCard({ userId }: { userId: string }) {
-  const user = useProjectStore((state) =>
-    state.project?.users.entries.find((entry) => entry.id === userId),
-  );
+  const user = useProjectStore((state) => {
+    const users = state.project?.users;
+    if (!isUsersConfig(users)) {
+      return undefined;
+    }
+    return users.entries.find((entry) => entry.id === userId);
+  });
   if (!user) {
     return null;
   }
@@ -44,6 +49,14 @@ function seedProject(users: BuilderUser[]) {
   });
 }
 
+function getStoreUser(userId: string): BuilderUser | undefined {
+  const users = useProjectStore.getState().project?.users;
+  if (!isUsersConfig(users)) {
+    return undefined;
+  }
+  return users.entries.find((candidate) => candidate.id === userId);
+}
+
 describe("CommonUserFields groups", () => {
   beforeEach(() => {
     useProjectStore.setState(initialState);
@@ -53,31 +66,34 @@ describe("CommonUserFields groups", () => {
   it("commits groups on Enter, comma, comma paste, and blur with exact dedupe", async () => {
     const user = createBlankUser("groups-user");
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     const groupsInput = screen.getByLabelText("Additional groups");
     await userEvent.type(groupsInput, "docker{Enter}");
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.groups,
-    ).toEqual(["docker"]);
+    expect(getStoreUser(user.id)?.groups).toEqual(["docker"]);
 
     await userEvent.type(groupsInput, "wheel,");
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.groups,
-    ).toEqual(["docker", "wheel"]);
+    expect(getStoreUser(user.id)?.groups).toEqual(["docker", "wheel"]);
 
     fireEvent.paste(groupsInput, {
       clipboardData: { getData: () => "admins, docker, Admins" },
     });
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.groups,
-    ).toEqual(["docker", "wheel", "admins", "Admins"]);
+    expect(getStoreUser(user.id)?.groups).toEqual([
+      "docker",
+      "wheel",
+      "admins",
+      "Admins",
+    ]);
 
     await userEvent.type(groupsInput, "beta");
     fireEvent.blur(groupsInput);
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.groups,
-    ).toEqual(["docker", "wheel", "admins", "Admins", "beta"]);
+    expect(getStoreUser(user.id)?.groups).toEqual([
+      "docker",
+      "wheel",
+      "admins",
+      "Admins",
+      "beta",
+    ]);
 
     expect(screen.getByText("docker, wheel, admins, Admins, beta")).toBeInTheDocument();
     expect(
@@ -89,18 +105,16 @@ describe("CommonUserFields groups", () => {
     const user = createBlankUser("remove-group");
     user.groups = ["docker", "wheel"];
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     fireEvent.click(screen.getByRole("button", { name: "Remove group docker" }));
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.groups,
-    ).toEqual(["wheel"]);
+    expect(getStoreUser(user.id)?.groups).toEqual(["wheel"]);
   });
 
   it("shows exact groups copy and No groups header fallback", () => {
     const user = createBlankUser("groups-copy");
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     expect(screen.getByLabelText("Additional groups")).toHaveAttribute(
       "placeholder",
@@ -124,7 +138,7 @@ describe("CommonUserFields shell", () => {
   it("renders shell presets and help copy verbatim", () => {
     const user = createBlankUser("shell-copy");
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     const shellSelect = screen.getByLabelText("Shell");
     expect(shellSelect).toBeInTheDocument();
@@ -146,7 +160,7 @@ describe("CommonUserFields shell", () => {
   it("reveals custom shell path when Other is selected", async () => {
     const user = createBlankUser("shell-other");
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     await userEvent.selectOptions(screen.getByLabelText("Shell"), "other");
     expect(screen.getByLabelText("Custom shell path")).toBeInTheDocument();
@@ -160,7 +174,7 @@ describe("CommonUserFields shell", () => {
     const user = createBlankUser("shell-custom");
     user.shell = "/usr/local/bin/fish";
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     expect(screen.getByLabelText("Shell")).toHaveValue("other");
     expect(screen.getByLabelText("Custom shell path")).toHaveValue(
@@ -169,9 +183,7 @@ describe("CommonUserFields shell", () => {
     expect(screen.getByText("Custom shell")).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText("Username"), "deploy");
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.shell,
-    ).toBe("/usr/local/bin/fish");
+    expect(getStoreUser(user.id)?.shell).toBe("/usr/local/bin/fish");
     expect(screen.getByLabelText("Custom shell path")).toHaveValue(
       "/usr/local/bin/fish",
     );
@@ -181,7 +193,7 @@ describe("CommonUserFields shell", () => {
     const user = createBlankUser("shell-nologin");
     user.shell = "/usr/sbin/nologin";
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     expect(screen.getByText("nologin")).toBeInTheDocument();
     expect(screen.queryByText("Custom shell")).toBeNull();
@@ -197,7 +209,7 @@ describe("CommonUserFields sudo", () => {
   it("renders guided sudo presets with exact copy", () => {
     const user = createBlankUser("sudo-copy");
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     expect(screen.getByLabelText("Sudo rule")).toBeInTheDocument();
     expect(
@@ -220,52 +232,44 @@ describe("CommonUserFields sudo", () => {
   it("maps guided presets to exact stored values and omits No sudo", async () => {
     const user = createBlankUser("sudo-guided");
     seedProject([user]);
-    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+    renderUserCard(user);
 
     await userEvent.selectOptions(
       screen.getByLabelText("Sudo rule"),
       "passwordless",
     );
-    expect(useProjectStore.getState().project?.users.entries[0]?.sudo).toBe(
-      "ALL=(ALL) NOPASSWD:ALL",
-    );
+    expect(getStoreUser(user.id)?.sudo).toBe("ALL=(ALL) NOPASSWD:ALL");
     expect(screen.getByText("sudo")).toBeInTheDocument();
 
     await userEvent.selectOptions(
       screen.getByLabelText("Sudo rule"),
       "require-password",
     );
-    expect(useProjectStore.getState().project?.users.entries[0]?.sudo).toBe(
-      "ALL=(ALL) ALL",
-    );
+    expect(getStoreUser(user.id)?.sudo).toBe("ALL=(ALL) ALL");
     expect(screen.getByText("sudo (password)")).toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByLabelText("Sudo rule"), "none");
-    expect(
-      useProjectStore.getState().project?.users.entries[0]?.sudo,
-    ).toBeUndefined();
+    expect(getStoreUser(user.id)?.sudo).toBeUndefined();
   });
 
   it.each([
     ["string", "deploy ALL=(ALL) NOPASSWD:/usr/bin/systemctl"],
-    ["array", ["deploy ALL=(ALL) ALL", null]],
+    ["array", ["deploy ALL=(ALL) ALL", null] as (string | null)[]],
     ["null", null],
     ["boolean", true],
-  ] as const)(
+  ])(
     "preserves imported custom sudo (%s) across render and unrelated edits",
     async (_label, sudoValue) => {
       const user = createBlankUser(`sudo-custom-${_label}`);
-      user.sudo = sudoValue;
+      user.sudo = sudoValue as BuilderUser["sudo"];
       seedProject([user]);
-      renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+      renderUserCard(user);
 
       expect(screen.getByText("Custom sudo")).toBeInTheDocument();
       expect(screen.getByLabelText("Sudo rule")).toHaveValue("custom");
 
       await userEvent.type(screen.getByLabelText("Username"), "deploy");
-      expect(useProjectStore.getState().project?.users.entries[0]?.sudo).toEqual(
-        sudoValue,
-      );
+      expect(getStoreUser(user.id)?.sudo).toEqual(user.sudo);
     },
   );
 });

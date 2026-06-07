@@ -4,6 +4,7 @@ import { getUserHeaderMetadata } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { GroupsInput } from "./GroupsInput.tsx";
 import { ShellSelector } from "./ShellSelector.tsx";
+import { SudoRuleSelector } from "./SudoRuleSelector.tsx";
 
 const inputClassName =
   "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
@@ -159,6 +160,12 @@ export function UserCard({
               shell: shell === "" ? undefined : shell,
             })
           }
+        />
+
+        <SudoRuleSelector
+          id={`user-sudo-${user.id}`}
+          sudo={user.sudo}
+          onChange={(sudo) => updateUser(user.id, { sudo })}
         />
       </div>
     </article>

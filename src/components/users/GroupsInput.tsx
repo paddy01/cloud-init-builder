@@ -1,9 +1,5 @@
 import { useState } from "react";
 
-const inputClassName =
-  "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
-
 const chipClassName =
   "inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
 

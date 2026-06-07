@@ -96,13 +96,16 @@ describe("buildCloudInitUsers", () => {
     ["passwordless", "ALL=(ALL) NOPASSWD:ALL"],
     ["require-password", "ALL=(ALL) ALL"],
     ["custom-string", "deploy ALL=(ALL) NOPASSWD:/usr/bin/systemctl"],
-    ["custom-array", ["deploy ALL=(ALL) ALL", null]],
+    ["custom-array", ["deploy ALL=(ALL) ALL", null] as (string | null)[]],
     ["custom-null", null],
     ["custom-boolean", true],
-  ] as const)(
+  ])(
     "preserves exact sudo value (%s) through generation without input mutation",
-    (label, sudoValue) => {
-      const user = userWith({ name: "deploy", sudo: sudoValue });
+    (_label, sudoValue) => {
+      const user = userWith({
+        name: "deploy",
+        sudo: sudoValue as BuilderUser["sudo"],
+      });
       const before = structuredClone(user);
       const mapped = mapBuilderUser(user);
       expect(user).toEqual(before);
