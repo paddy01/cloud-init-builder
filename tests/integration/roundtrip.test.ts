@@ -11,7 +11,15 @@ import {
   createDefaultProject,
 } from "../../src/models/project.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
+import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { importProject } from "../../src/services/projectService.ts";
+
+const BCRYPT_HASH =
+  "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+const SSH_KEY_A =
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+const SSH_KEY_B = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host";
+const LEGACY_SSH = "ssh-rsa AAAA...";
 
 function fileFromJson(json: string, name = "roundtrip.cib.json"): File {
   return new File([json], name, { type: "application/json" });
@@ -182,6 +190,12 @@ describe("users project round-trip", () => {
           sudo: "ALL=(ALL) NOPASSWD:ALL",
           primary_group: "deploy",
           homedir: "/srv/deploy",
+          lock_passwd: false,
+          passwd: BCRYPT_HASH,
+          ssh_authorized_keys: [
+            { id: "key-deploy-a", value: SSH_KEY_A },
+            { id: "key-deploy-b", value: SSH_KEY_B },
+          ],
         },
         {
           id: "user-stable-ops",
@@ -191,8 +205,12 @@ describe("users project round-trip", () => {
           sudo: "ALL=(ALL) ALL",
           no_create_home: true,
           primary_group: "ops",
+          lock_passwd: true,
         },
       ],
+    });
+    expect(firstImport.project).toMatchObject({
+      futureFeature: { enabled: true },
     });
 
     const exportedOnce = JSON.stringify(firstImport.project, null, 2);
@@ -202,9 +220,14 @@ describe("users project round-trip", () => {
 
     expect(secondImport.project.users).toEqual(firstImport.project.users);
     expect(thirdImport.project.users).toEqual(firstImport.project.users);
+    expect(thirdImport.project).toMatchObject({
+      futureFeature: { enabled: true },
+    });
+    expect(JSON.stringify(thirdImport.project)).not.toContain("plain_text_passwd");
+    expect(JSON.stringify(thirdImport.project)).not.toContain("hunter2");
   });
 
-  it("normalizes legacy user arrays with warnings and preserves supported fields", async () => {
+  it("normalizes legacy user arrays with warnings and preserves editable SSH rows", async () => {
     const result = await importProject(
       fileFromJson(
         legacyProjectUsersArray,
@@ -214,7 +237,9 @@ describe("users project round-trip", () => {
 
     const warningText = JSON.stringify(result.warnings);
     expect(warningText).toContain("plain_text_passwd");
-    expect(warningText).toContain("ssh_authorized_keys");
+    expect(warningText).not.toContain(
+      "Unsupported user fields were omitted during import: ssh_authorized_keys",
+    );
     expect(isUsersConfig(result.project.users)).toBe(true);
     if (!isUsersConfig(result.project.users)) {
       throw new Error("expected canonical users");
@@ -222,7 +247,12 @@ describe("users project round-trip", () => {
 
     expect(result.project.users.preserveDefault).toBe(true);
     expect(result.project.users.entries).toHaveLength(2);
-    expect(result.project.users.entries[0]).toMatchObject({
+
+    const legacyEntry = result.project.users.entries[0];
+    if (!legacyEntry) {
+      throw new Error("expected legacy user entry");
+    }
+    expect(legacyEntry).toMatchObject({
       name: "legacy",
       gecos: "Legacy User",
       groups: ["adm"],
@@ -230,24 +260,59 @@ describe("users project round-trip", () => {
       sudo: "ALL=(ALL) NOPASSWD:ALL",
       primary_group: "legacy",
       homedir: "/home/legacy",
+      lock_passwd: true,
     });
-    expect(result.project.users.entries[0]).not.toHaveProperty(
-      "plain_text_passwd",
-    );
-    expect(result.project.users.entries[0]).not.toHaveProperty(
-      "ssh_authorized_keys",
-    );
+    expect(legacyEntry).not.toHaveProperty("plain_text_passwd");
+    expect(legacyEntry).not.toHaveProperty("passwd");
+    expect(legacyEntry.ssh_authorized_keys).toHaveLength(1);
+    expect(legacyEntry.ssh_authorized_keys?.[0]).toMatchObject({
+      value: LEGACY_SSH,
+    });
+    expect(typeof legacyEntry.ssh_authorized_keys?.[0]?.id).toBe("string");
+
     expect(result.project.users.entries[1]).toMatchObject({
       name: "daemon",
       system: true,
       shell: "/usr/sbin/nologin",
       homedir: "/var/lib/daemon",
+      lock_passwd: true,
     });
 
     const exported = JSON.stringify(result.project, null, 2);
     const secondImport = await importProject(fileFromJson(exported));
     expect(secondImport.project.users).toEqual(result.project.users);
     expect(secondImport.warnings).toEqual([]);
+    expect(JSON.stringify(secondImport.project)).not.toContain("plain_text_passwd");
+  });
+
+  it("generates users-safety-valid YAML without builder IDs after round-trip", async () => {
+    const firstImport = await importProject(
+      fileFromJson(
+        validProjectUsersFull,
+        "valid-project-users-full.cib.json",
+      ),
+    );
+
+    const safetyProject = {
+      users: isUsersConfig(firstImport.project.users)
+        ? firstImport.project.users
+        : undefined,
+    };
+
+    const yaml = generateCloudInit(safetyProject).yaml;
+    expect(yaml).not.toContain("key-deploy-a");
+    expect(yaml).not.toContain("user-stable-deploy");
+    expect(yaml).not.toContain("plain_text_passwd");
+
+    const exported = JSON.stringify(firstImport.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exported));
+    const roundTrippedYaml = generateCloudInit({
+      users: isUsersConfig(secondImport.project.users)
+        ? secondImport.project.users
+        : undefined,
+    }).yaml;
+
+    expect(roundTrippedYaml).toBe(yaml);
   });
 });
 

@@ -2,11 +2,43 @@ import { describe, expect, it } from "vitest";
 import identityEmptyAdvanced from "../../fixtures/identity-empty-advanced.yaml?raw";
 import identityFull from "../../fixtures/identity-full.yaml?raw";
 import identityMinimal from "../../fixtures/identity-minimal.yaml?raw";
+import usersSafetyValid from "../../fixtures/users-safety-valid.yaml?raw";
 import {
   CLOUD_CONFIG_HEADER,
   CLOUD_CONFIG_ORDER,
   generateCloudInit,
 } from "../../../src/generators/generateCloudInit.ts";
+import type { UsersConfig } from "../../../src/models/users.ts";
+
+const BCRYPT_HASH =
+  "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+const SSH_KEY_A =
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+const SSH_KEY_B = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host";
+
+const SAFETY_USERS_CONFIG: UsersConfig = {
+  preserveDefault: true,
+  entries: [
+    {
+      id: "user-unlocked",
+      name: "deploy",
+      shell: "/bin/bash",
+      lock_passwd: false,
+      passwd: BCRYPT_HASH,
+      ssh_authorized_keys: [
+        { id: "key-a", value: SSH_KEY_A },
+        { id: "key-b", value: SSH_KEY_B },
+      ],
+    },
+    {
+      id: "user-locked",
+      name: "ops",
+      shell: "/bin/bash",
+      lock_passwd: true,
+      ssh_authorized_keys: [{ id: "key-c", value: SSH_KEY_A }],
+    },
+  ],
+};
 
 describe("generateCloudInit", () => {
   it("matches identity-minimal golden fixture", () => {
@@ -135,5 +167,14 @@ describe("generateCloudInit", () => {
       expect(yaml).not.toContain("null");
       expect(yaml).not.toContain("identity:");
     }
+  });
+
+  it("matches users-safety-valid golden fixture byte-for-byte", () => {
+    const result = generateCloudInit({ users: SAFETY_USERS_CONFIG });
+    expect(result.yaml).toBe(usersSafetyValid);
+    expect(result.yaml.endsWith("\n")).toBe(true);
+    expect(result.yaml).not.toContain("key-a");
+    expect(result.yaml).not.toContain("key-b");
+    expect(result.yaml).not.toContain("key-c");
   });
 });

@@ -304,11 +304,13 @@ describe("users credential normalization", () => {
     if (!isUsersConfig(result.project.users)) {
       throw new Error("expected canonical users");
     }
-    expect(result.project.users.entries[0]).not.toHaveProperty("passwd");
-    expect(result.project.users.entries[0]).not.toHaveProperty(
-      "plain_text_passwd",
-    );
-    expect(result.project.users.entries[0].lock_passwd).toBe(true);
+    const forbiddenEntry = result.project.users.entries[0];
+    if (!forbiddenEntry) {
+      throw new Error("expected imported user entry");
+    }
+    expect(forbiddenEntry).not.toHaveProperty("passwd");
+    expect(forbiddenEntry).not.toHaveProperty("plain_text_passwd");
+    expect(forbiddenEntry.lock_passwd).toBe(true);
   });
 
   it("converts legacy ssh_authorized_keys strings to stable rows and preserves canonical IDs", async () => {
@@ -339,6 +341,9 @@ describe("users credential normalization", () => {
     }
 
     const legacyEntry = result.project.users.entries[0];
+    if (!legacyEntry) {
+      throw new Error("expected legacy user entry");
+    }
     expect(legacyEntry.ssh_authorized_keys).toHaveLength(1);
     expect(legacyEntry.ssh_authorized_keys?.[0]).toMatchObject({
       value: LEGACY_SSH,
@@ -346,6 +351,9 @@ describe("users credential normalization", () => {
     expect(typeof legacyEntry.ssh_authorized_keys?.[0]?.id).toBe("string");
 
     const canonicalEntry = result.project.users.entries[1];
+    if (!canonicalEntry) {
+      throw new Error("expected canonical user entry");
+    }
     expect(canonicalEntry.ssh_authorized_keys).toEqual([
       { id: "key-stable", value: LEGACY_SSH },
     ]);

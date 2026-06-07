@@ -254,4 +254,18 @@ describe("buildCloudInitUsers", () => {
       "ssh_authorized_keys",
     ]);
   });
+
+  it("preserves explicit lock_passwd false for locked users without passwd", () => {
+    const mapped = mapBuilderUser(
+      userWith({
+        name: "deploy",
+        lock_passwd: false,
+      }),
+    );
+    expect(mapped).toMatchObject({
+      name: "deploy",
+      lock_passwd: false,
+    });
+    expect(mapped).not.toHaveProperty("passwd");
+  });
 });
