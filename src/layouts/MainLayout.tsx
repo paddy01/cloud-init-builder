@@ -5,22 +5,33 @@ import {
   type EditorPreviewView,
 } from "../components/preview/EditorPreviewTabs.tsx";
 import { PreviewPanel } from "../components/preview/PreviewPanel.tsx";
+import { UsersSection } from "../components/users/UsersSection.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
 
+export type EditorSection = "identity" | "users";
+
 export function MainLayout() {
   const [view, setView] = useState<EditorPreviewView>("editor");
+  const [activeSection, setActiveSection] = useState<EditorSection>("identity");
 
   return (
     <div className="flex h-screen flex-col">
       <TopBar />
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        <Sidebar
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+        />
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <EditorPreviewTabs view={view} onChange={setView} />
           <div className="flex-1 overflow-y-auto p-6">
             <div className={view === "editor" ? "block" : "hidden lg:block"}>
-              <IdentityForm />
+              {activeSection === "identity" ? (
+                <IdentityForm />
+              ) : (
+                <UsersSection />
+              )}
             </div>
             <div className={view === "preview" ? "block lg:hidden" : "hidden"}>
               <PreviewPanel />

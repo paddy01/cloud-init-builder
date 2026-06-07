@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { IdentityConfig } from "../models/identity.ts";
 import { createDefaultProject, type ProjectFile } from "../models/project.ts";
+import { isUsersConfig, type UsersConfig } from "../models/users.ts";
 import type { ImportWarning } from "../services/projectService.ts";
 
 const EMPTY_STRING_NORMALIZED_KEYS = [
@@ -39,6 +40,7 @@ export interface ProjectState {
   loadProject: (project: ProjectFile, warnings?: ImportWarning[]) => void;
   updateMetadata: (name: string) => void;
   updateIdentity: (patch: Partial<IdentityConfig>) => void;
+  setPreserveDefault: (enabled: boolean) => void;
   markSaved: () => void;
   clearWarnings: () => void;
 }
@@ -98,6 +100,28 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       project: {
         ...project,
         identity: mergedIdentity,
+        metadata: {
+          ...project.metadata,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      isDirty: true,
+    });
+  },
+
+  setPreserveDefault: (enabled) => {
+    const { project } = get();
+    if (!project?.users || !isUsersConfig(project.users)) return;
+
+    const users: UsersConfig = {
+      ...project.users,
+      preserveDefault: enabled,
+    };
+
+    set({
+      project: {
+        ...project,
+        users,
         metadata: {
           ...project.metadata,
           updatedAt: new Date().toISOString(),
