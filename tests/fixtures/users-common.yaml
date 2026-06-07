@@ -7,3 +7,4 @@ users:
       - admins
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
+    lock_passwd: true

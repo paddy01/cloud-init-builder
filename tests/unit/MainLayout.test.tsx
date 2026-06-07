@@ -518,8 +518,10 @@ describe("MainLayout Phase 4 scope fence", () => {
     expect(blankInput).toHaveValue("maybe-later");
 
     expect(screen.getAllByLabelText("Username")).toHaveLength(3);
-    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/ssh/i)).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("Hashed password")).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Add SSH key" })).toHaveLength(
+      3,
+    );
     expect(screen.queryByText(/duplicate user/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/invalid username/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();

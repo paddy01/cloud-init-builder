@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultProject } from "../../src/models/project.ts";
 import {
   createBlankSshAuthorizedKey,
-  createBlankUser,
   isSemanticallyBlankUser,
   isUsersConfig,
 } from "../../src/models/users.ts";

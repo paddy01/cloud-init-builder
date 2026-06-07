@@ -250,6 +250,7 @@ describe("AdvancedUserOptions golden fixture", () => {
         name: "service",
         primary_group: "service",
         shell: "/bin/bash",
+        lock_passwd: true,
         homedir: "/srv/service",
         no_create_home: true,
       },
@@ -257,6 +258,7 @@ describe("AdvancedUserOptions golden fixture", () => {
         name: "daemon",
         primary_group: "daemon",
         shell: "/usr/sbin/nologin",
+        lock_passwd: true,
         system: true,
       },
     ]);

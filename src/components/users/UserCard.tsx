@@ -1,10 +1,12 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { BuilderUser } from "../../models/users.ts";
 import { getUserHeaderMetadata } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { AdvancedUserOptions } from "./AdvancedUserOptions.tsx";
 import { GroupsInput } from "./GroupsInput.tsx";
 import { ShellSelector } from "./ShellSelector.tsx";
+import { PasswordHashField } from "./PasswordHashField.tsx";
+import { SshAuthorizedKeysInput } from "./SshAuthorizedKeysInput.tsx";
 import { SudoRuleSelector } from "./SudoRuleSelector.tsx";
 
 const inputClassName =
@@ -26,6 +28,9 @@ export function UserCard({
 }: UserCardProps) {
   const updateUser = useProjectStore((state) => state.updateUser);
   const usernameRef = useRef<HTMLInputElement>(null);
+  const [pendingSshFocusId, setPendingSshFocusId] = useState<string | null>(
+    null,
+  );
   const { title, secondary, badges } = getUserHeaderMetadata(user);
 
   useLayoutEffect(() => {
@@ -168,6 +173,32 @@ export function UserCard({
           sudo={user.sudo}
           onChange={(sudo) => updateUser(user.id, { sudo })}
         />
+
+        <div className="space-y-4 border-t border-gray-200 pt-4">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900">
+              Authentication
+            </h4>
+            <p className="mt-1 text-xs text-gray-500">
+              Regular login users need a supported password hash or at least one
+              valid SSH key.
+            </p>
+          </div>
+
+          <PasswordHashField
+            userId={user.id}
+            passwd={user.passwd}
+            lockPasswd={user.lock_passwd}
+          />
+
+          <SshAuthorizedKeysInput
+            userId={user.id}
+            rows={user.ssh_authorized_keys ?? []}
+            focusRowId={pendingSshFocusId}
+            onFocused={() => setPendingSshFocusId(null)}
+            onRowAdded={(rowId) => setPendingSshFocusId(rowId)}
+          />
+        </div>
 
         <AdvancedUserOptions user={user} />
       </div>

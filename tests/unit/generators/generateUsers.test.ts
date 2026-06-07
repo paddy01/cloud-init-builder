@@ -5,7 +5,16 @@ import {
   mapBuilderUser,
 } from "../../../src/generators/generateUsers.ts";
 import type { BuilderUser, UsersConfig } from "../../../src/models/users.ts";
-import { createBlankUser } from "../../../src/models/users.ts";
+import {
+  createBlankSshAuthorizedKey,
+  createBlankUser,
+} from "../../../src/models/users.ts";
+
+const BCRYPT_HASH =
+  "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
+const SSH_KEY =
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
 
 function userWith(
   patch: Partial<BuilderUser>,
@@ -33,6 +42,7 @@ describe("mapBuilderUser", () => {
       gecos: "Deploy User",
       groups: ["wheel", "docker", "docker"],
       shell: "/bin/bash",
+      lock_passwd: true,
     });
     expect(Object.keys(mapped!)).toEqual(
       USER_KEY_ORDER.filter((key) => key in mapped!),
@@ -57,6 +67,58 @@ describe("mapBuilderUser", () => {
     expect(mapped).not.toHaveProperty("id");
     expect(Object.keys(mapped ?? {})).not.toContain("id");
   });
+
+  it("emits passwd only for unlocked users with supported hashes", () => {
+    const locked = mapBuilderUser(
+      userWith({ name: "deploy", passwd: BCRYPT_HASH, lock_passwd: true }),
+    );
+    expect(locked).toMatchObject({
+      name: "deploy",
+      lock_passwd: true,
+    });
+    expect(locked).not.toHaveProperty("passwd");
+
+    const unlocked = mapBuilderUser(
+      userWith({ name: "deploy", passwd: BCRYPT_HASH, lock_passwd: false }),
+    );
+    expect(unlocked).toEqual({
+      name: "deploy",
+      shell: "/bin/bash",
+      lock_passwd: false,
+      passwd: BCRYPT_HASH,
+    });
+  });
+
+  it("omits unsupported password material from YAML output", () => {
+    const mapped = mapBuilderUser(
+      userWith({
+        name: "deploy",
+        passwd: "hunter2",
+        lock_passwd: false,
+      }),
+    );
+    expect(mapped).toMatchObject({
+      name: "deploy",
+      lock_passwd: false,
+    });
+    expect(mapped).not.toHaveProperty("passwd");
+  });
+
+  it("maps nonblank SSH rows to ordered strings without builder IDs", () => {
+    const mapped = mapBuilderUser(
+      userWith({
+        name: "deploy",
+        ssh_authorized_keys: [
+          createBlankSshAuthorizedKey("key-a"),
+          { id: "key-b", value: SSH_KEY },
+          { id: "key-c", value: "   " },
+        ],
+      }),
+    );
+    expect(mapped?.ssh_authorized_keys).toEqual([SSH_KEY]);
+    expect(mapped).not.toHaveProperty("id");
+    expect(JSON.stringify(mapped)).not.toContain("key-b");
+  });
 });
 
 describe("buildCloudInitUsers", () => {
@@ -75,11 +137,13 @@ describe("buildCloudInitUsers", () => {
         name: "second",
         groups: ["beta"],
         shell: "/bin/bash",
+        lock_passwd: true,
       },
       {
         name: "first",
         groups: ["alpha"],
         shell: "/bin/bash",
+        lock_passwd: true,
       },
     ]);
   });
@@ -129,6 +193,7 @@ describe("buildCloudInitUsers", () => {
     expect(mapped).toEqual({
       name: "service",
       shell: "/bin/bash",
+      lock_passwd: true,
       homedir: "/srv/service",
       no_create_home: true,
     });
@@ -149,6 +214,7 @@ describe("buildCloudInitUsers", () => {
       name: "daemon",
       primary_group: "daemon",
       shell: "/usr/sbin/nologin",
+      lock_passwd: true,
       system: true,
     });
     expect(Object.keys(mapped!)).toEqual(
@@ -167,6 +233,25 @@ describe("buildCloudInitUsers", () => {
     const restored = { ...user, system: undefined };
     expect(mapBuilderUser(restored)).toMatchObject({
       homedir: "/var/lib/daemon",
+      lock_passwd: true,
     });
+  });
+
+  it("preserves credential field order in generated user mappings", () => {
+    const mapped = mapBuilderUser(
+      userWith({
+        name: "deploy",
+        passwd: BCRYPT_HASH,
+        lock_passwd: false,
+        ssh_authorized_keys: [{ id: "key-a", value: SSH_KEY }],
+      }),
+    );
+    expect(Object.keys(mapped!)).toEqual([
+      "name",
+      "shell",
+      "lock_passwd",
+      "passwd",
+      "ssh_authorized_keys",
+    ]);
   });
 });

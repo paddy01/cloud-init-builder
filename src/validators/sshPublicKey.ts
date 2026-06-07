@@ -57,8 +57,10 @@ export function parseSshPublicKey(
     return undefined;
   }
 
-  const [type, payload, ...commentParts] = parts;
-  if (!isSupportedType(type)) {
+  const type = parts[0];
+  const payload = parts[1];
+  const commentParts = parts.slice(2);
+  if (type === undefined || payload === undefined || !isSupportedType(type)) {
     return undefined;
   }
 
