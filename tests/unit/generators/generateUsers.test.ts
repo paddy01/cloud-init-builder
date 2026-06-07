@@ -91,4 +91,31 @@ describe("buildCloudInitUsers", () => {
     };
     expect(buildCloudInitUsers(config)).toEqual([]);
   });
+
+  it.each([
+    ["passwordless", "ALL=(ALL) NOPASSWD:ALL"],
+    ["require-password", "ALL=(ALL) ALL"],
+    ["custom-string", "deploy ALL=(ALL) NOPASSWD:/usr/bin/systemctl"],
+    ["custom-array", ["deploy ALL=(ALL) ALL", null]],
+    ["custom-null", null],
+    ["custom-boolean", true],
+  ] as const)(
+    "preserves exact sudo value (%s) through generation without input mutation",
+    (label, sudoValue) => {
+      const user = userWith({ name: "deploy", sudo: sudoValue });
+      const before = structuredClone(user);
+      const mapped = mapBuilderUser(user);
+      expect(user).toEqual(before);
+      if (sudoValue === "ALL=(ALL) NOPASSWD:ALL" || sudoValue === "ALL=(ALL) ALL") {
+        expect(mapped?.sudo).toBe(sudoValue);
+        return;
+      }
+      expect(mapped?.sudo).toEqual(sudoValue);
+    },
+  );
+
+  it("omits sudo for newly authored No sudo state", () => {
+    const mapped = mapBuilderUser(userWith({ name: "deploy" }));
+    expect(mapped).not.toHaveProperty("sudo");
+  });
 });

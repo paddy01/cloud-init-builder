@@ -187,3 +187,85 @@ describe("CommonUserFields shell", () => {
     expect(screen.queryByText("Custom shell")).toBeNull();
   });
 });
+
+describe("CommonUserFields sudo", () => {
+  beforeEach(() => {
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Test");
+  });
+
+  it("renders guided sudo presets with exact copy", () => {
+    const user = createBlankUser("sudo-copy");
+    seedProject([user]);
+    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+
+    expect(screen.getByLabelText("Sudo rule")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Use a guided preset for the common cloud-init sudo patterns in this phase.",
+      ),
+    ).toBeInTheDocument();
+
+    const options = within(screen.getByLabelText("Sudo rule")).getAllByRole(
+      "option",
+    );
+    expect(options.map((option) => option.textContent)).toEqual([
+      "No sudo",
+      "Passwordless sudo",
+      "Require password",
+    ]);
+    expect(screen.queryByRole("textbox", { name: /sudo/i })).toBeNull();
+  });
+
+  it("maps guided presets to exact stored values and omits No sudo", async () => {
+    const user = createBlankUser("sudo-guided");
+    seedProject([user]);
+    renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+
+    await userEvent.selectOptions(
+      screen.getByLabelText("Sudo rule"),
+      "passwordless",
+    );
+    expect(useProjectStore.getState().project?.users.entries[0]?.sudo).toBe(
+      "ALL=(ALL) NOPASSWD:ALL",
+    );
+    expect(screen.getByText("sudo")).toBeInTheDocument();
+
+    await userEvent.selectOptions(
+      screen.getByLabelText("Sudo rule"),
+      "require-password",
+    );
+    expect(useProjectStore.getState().project?.users.entries[0]?.sudo).toBe(
+      "ALL=(ALL) ALL",
+    );
+    expect(screen.getByText("sudo (password)")).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText("Sudo rule"), "none");
+    expect(
+      useProjectStore.getState().project?.users.entries[0]?.sudo,
+    ).toBeUndefined();
+  });
+
+  it.each([
+    ["string", "deploy ALL=(ALL) NOPASSWD:/usr/bin/systemctl"],
+    ["array", ["deploy ALL=(ALL) ALL", null]],
+    ["null", null],
+    ["boolean", true],
+  ] as const)(
+    "preserves imported custom sudo (%s) across render and unrelated edits",
+    async (_label, sudoValue) => {
+      const user = createBlankUser(`sudo-custom-${_label}`);
+      user.sudo = sudoValue;
+      seedProject([user]);
+      renderUserCard(useProjectStore.getState().project!.users.entries[0]!);
+
+      expect(screen.getByText("Custom sudo")).toBeInTheDocument();
+      expect(screen.getByLabelText("Sudo rule")).toHaveValue("custom");
+
+      await userEvent.type(screen.getByLabelText("Username"), "deploy");
+      expect(useProjectStore.getState().project?.users.entries[0]?.sudo).toEqual(
+        sudoValue,
+      );
+    },
+  );
+});
