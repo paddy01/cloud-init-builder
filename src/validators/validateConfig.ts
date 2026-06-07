@@ -2,9 +2,12 @@ import {
   MANAGE_ETC_HOSTS_VALUES,
   type IdentityConfig,
 } from "../models/identity.ts";
+import type { ProjectFile } from "../models/project.ts";
+import { isUsersConfig } from "../models/users.ts";
 import { isValidFqdn, isValidHostname } from "./hostname.ts";
 import { isValidLocale } from "./locale.ts";
 import { isValidTimezone } from "./timezone.ts";
+import { validateUsers } from "./validateUsers.ts";
 
 export interface ValidationIssue {
   path: string;
@@ -89,4 +92,15 @@ export function validateIdentity(
   }
 
   return issues;
+}
+
+export function validateConfig(
+  project: ProjectFile | null,
+): ValidationIssue[] {
+  return [
+    ...validateIdentity(project?.identity),
+    ...validateUsers(
+      isUsersConfig(project?.users) ? project.users : undefined,
+    ),
+  ];
 }

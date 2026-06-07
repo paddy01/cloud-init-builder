@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { validateIdentity } from "../../../src/validators/validateConfig.ts";
+import { createDefaultProject } from "../../../src/models/project.ts";
+import { createBlankUser } from "../../../src/models/users.ts";
+import {
+  validateConfig,
+  validateIdentity,
+} from "../../../src/validators/validateConfig.ts";
 
 const HOSTNAME_REQUIRED = {
   path: "identity.hostname",
@@ -102,5 +107,41 @@ describe("validateIdentity", () => {
       TIMEZONE_INVALID,
       LOCALE_INVALID,
     ]);
+  });
+});
+
+describe("validateConfig", () => {
+  it("concatenates identity issues before user issues", () => {
+    const project = createDefaultProject("Test");
+    project.identity = { hostname: "-bad" };
+    const user = createBlankUser("user-a");
+    user.name = "deploy";
+    project.users = { preserveDefault: true, entries: [user] };
+
+    const issues = validateConfig(project);
+    expect(issues[0]?.path.startsWith("identity.")).toBe(true);
+    expect(issues.some((issue) => issue.path.includes("user-a"))).toBe(true);
+    expect(issues.find((issue) => issue.code === "USER_AUTH_REQUIRED")).toBeTruthy();
+  });
+
+  it("returns only identity issues when users config is absent", () => {
+    const project = createDefaultProject("Test");
+    project.identity = { hostname: "web01" };
+    project.users = undefined;
+
+    expect(validateConfig(project)).toEqual([]);
+  });
+
+  it("returns HOSTNAME_REQUIRED plus user issues for invalid projects", () => {
+    const project = createDefaultProject("Test");
+    const user = createBlankUser("user-a");
+    user.gecos = "Configured";
+    project.users = { preserveDefault: true, entries: [user] };
+
+    const issues = validateConfig(project);
+    expect(issues[0]?.code).toBe("HOSTNAME_REQUIRED");
+    expect(issues.some((issue) => issue.code === "USER_NAME_REQUIRED")).toBe(
+      true,
+    );
   });
 });
