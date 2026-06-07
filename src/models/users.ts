@@ -200,14 +200,6 @@ export interface UsersNormalizationResult {
   warnings: UsersImportWarning[];
 }
 
-const UNSUPPORTED_USER_FIELDS = [
-  "passwd",
-  "plain_text_passwd",
-  "lock_passwd",
-  "ssh_authorized_keys",
-  "ssh_import_id",
-] as const;
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -218,42 +210,174 @@ function isSupportedLegacyUserRecord(
   return isPlainObject(entry) && typeof entry.name === "string";
 }
 
-function collectUnsupportedFieldWarnings(
-  record: Record<string, unknown>,
-): UsersImportWarning[] {
-  const warnings: UsersImportWarning[] = [];
-  const dropped: string[] = [];
+function isCanonicalSshRow(
+  value: unknown,
+): value is BuilderSshAuthorizedKey {
+  return (
+    isPlainObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.value === "string"
+  );
+}
 
-  for (const field of UNSUPPORTED_USER_FIELDS) {
-    if (field in record) {
-      dropped.push(field);
+function dedupeWarnings(
+  warnings: UsersImportWarning[],
+): UsersImportWarning[] {
+  const seen = new Set<string>();
+  return warnings.filter((warning) => {
+    const key = `${warning.path}:${warning.message}`;
+    if (seen.has(key)) {
+      return false;
     }
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeSshAuthorizedKeys(
+  raw: unknown,
+  warnings: UsersImportWarning[],
+): BuilderSshAuthorizedKey[] | undefined {
+  if (raw === undefined) {
+    return undefined;
   }
 
-  if (dropped.length > 0) {
+  if (!Array.isArray(raw)) {
     warnings.push({
       path: "users",
-      message: `Unsupported user fields were omitted during import: ${dropped.join(", ")}.`,
+      message: "Invalid ssh_authorized_keys was omitted during import.",
+    });
+    return undefined;
+  }
+
+  const rows: BuilderSshAuthorizedKey[] = [];
+
+  for (const item of raw) {
+    if (typeof item === "string") {
+      rows.push({ id: createSshKeyId(), value: item });
+      continue;
+    }
+
+    if (isCanonicalSshRow(item)) {
+      rows.push({ id: item.id, value: item.value });
+      continue;
+    }
+
+    warnings.push({
+      path: "users",
+      message: "Invalid SSH key entry was omitted during import.",
     });
   }
 
-  return warnings;
+  return rows.length > 0 ? rows : undefined;
 }
 
-function normalizeLegacyUser(record: Record<string, unknown>): {
-  user: BuilderUser;
-  warnings: UsersImportWarning[];
-} {
-  const warnings = collectUnsupportedFieldWarnings(record);
+function normalizePasswordFields(
+  record: Record<string, unknown>,
+  warnings: UsersImportWarning[],
+): Pick<BuilderUser, "lock_passwd" | "passwd"> {
+  let explicitLock: boolean | undefined;
+  if (typeof record.lock_passwd === "boolean") {
+    explicitLock = record.lock_passwd;
+  }
+
+  let supportedHash: string | undefined;
+
+  if (typeof record.passwd === "string") {
+    if (isSupportedPasswordHash(record.passwd)) {
+      supportedHash = record.passwd;
+    } else {
+      warnings.push({
+        path: "users",
+        message: "Unsupported passwd value was omitted during import.",
+      });
+    }
+  } else if (record.passwd !== undefined) {
+    warnings.push({
+      path: "users",
+      message: "Invalid passwd value was omitted during import.",
+    });
+  }
+
+  if (typeof record.hashed_passwd === "string") {
+    if (isSupportedPasswordHash(record.hashed_passwd)) {
+      if (supportedHash === undefined) {
+        supportedHash = record.hashed_passwd;
+        warnings.push({
+          path: "users",
+          message: "hashed_passwd was canonicalized to passwd during import.",
+        });
+      }
+    } else {
+      warnings.push({
+        path: "users",
+        message: "Unsupported hashed_passwd value was omitted during import.",
+      });
+    }
+  } else if (record.hashed_passwd !== undefined) {
+    warnings.push({
+      path: "users",
+      message: "Invalid hashed_passwd value was omitted during import.",
+    });
+  }
+
+  if ("plain_text_passwd" in record) {
+    warnings.push({
+      path: "users",
+      message: "plain_text_passwd was omitted during import.",
+    });
+  }
+
+  const result: Pick<BuilderUser, "lock_passwd" | "passwd"> = {};
+
+  if (supportedHash !== undefined) {
+    result.passwd = supportedHash;
+  }
+
+  if (explicitLock !== undefined) {
+    result.lock_passwd = explicitLock;
+  } else if (supportedHash !== undefined) {
+    result.lock_passwd = false;
+  } else {
+    result.lock_passwd = true;
+  }
+
+  return result;
+}
+
+function normalizeUserRecord(
+  record: Record<string, unknown>,
+  options: { legacy?: boolean },
+): { user: BuilderUser; warnings: UsersImportWarning[] } {
+  const warnings: UsersImportWarning[] = [];
+
+  if ("ssh_import_id" in record) {
+    warnings.push({
+      path: "users",
+      message:
+        "Unsupported user fields were omitted during import: ssh_import_id.",
+    });
+  }
+
+  const passwordFields = normalizePasswordFields(record, warnings);
+  const sshKeys = normalizeSshAuthorizedKeys(
+    record.ssh_authorized_keys,
+    warnings,
+  );
 
   const user: BuilderUser = {
-    id: createUserId(),
-    name: record.name as string,
+    id: typeof record.id === "string" ? record.id : createUserId(),
+    name: typeof record.name === "string" ? record.name : undefined,
     gecos: typeof record.gecos === "string" ? record.gecos : undefined,
     groups: Array.isArray(record.groups)
       ? record.groups.filter((group): group is string => typeof group === "string")
       : undefined,
-    shell: typeof record.shell === "string" ? record.shell : "/bin/bash",
+    shell:
+      typeof record.shell === "string"
+        ? record.shell
+        : options.legacy
+          ? "/bin/bash"
+          : undefined,
     sudo: record.sudo as BuilderUser["sudo"],
     primary_group:
       typeof record.primary_group === "string"
@@ -265,6 +389,8 @@ function normalizeLegacyUser(record: Record<string, unknown>): {
         : undefined,
     homedir: typeof record.homedir === "string" ? record.homedir : undefined,
     system: typeof record.system === "boolean" ? record.system : undefined,
+    ...passwordFields,
+    ...(sshKeys !== undefined ? { ssh_authorized_keys: sshKeys } : {}),
   };
 
   return { user, warnings };
@@ -281,9 +407,23 @@ export function normalizeUsersSection(
   }
 
   if (isUsersConfig(rawUsers)) {
+    const entries: BuilderUser[] = [];
+    const warnings: UsersImportWarning[] = [];
+
+    for (const entry of rawUsers.entries) {
+      if (isPlainObject(entry)) {
+        const normalized = normalizeUserRecord(entry, { legacy: false });
+        entries.push(normalized.user);
+        warnings.push(...normalized.warnings);
+      }
+    }
+
     return {
-      users: structuredClone(rawUsers),
-      warnings: [],
+      users: {
+        preserveDefault: rawUsers.preserveDefault,
+        entries,
+      },
+      warnings: dedupeWarnings(warnings),
     };
   }
 
@@ -299,7 +439,7 @@ export function normalizeUsersSection(
       }
 
       if (isSupportedLegacyUserRecord(entry)) {
-        const normalized = normalizeLegacyUser(entry);
+        const normalized = normalizeUserRecord(entry, { legacy: true });
         entries.push(normalized.user);
         warnings.push(...normalized.warnings);
       }
@@ -307,7 +447,7 @@ export function normalizeUsersSection(
 
     return {
       users: { preserveDefault, entries },
-      warnings,
+      warnings: dedupeWarnings(warnings),
     };
   }
 

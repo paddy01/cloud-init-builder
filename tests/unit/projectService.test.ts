@@ -197,6 +197,213 @@ describe("importProject", () => {
   });
 });
 
+describe("users credential normalization", () => {
+  const BCRYPT_HASH =
+    "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+  const LEGACY_SSH = "ssh-rsa AAAA...";
+
+  function importJson(payload: Record<string, unknown>) {
+    return importProject(
+      fixtureFile(JSON.stringify(payload), "credential-import.cib.json"),
+    );
+  }
+
+  it("preserves supported passwd and explicit lock_passwd false on canonical import", async () => {
+    const result = await importJson({
+      formatVersion: 1,
+      metadata: {
+        name: "Canonical Creds",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: {
+        preserveDefault: false,
+        entries: [
+          {
+            id: "user-unlocked",
+            name: "deploy",
+            lock_passwd: false,
+            passwd: BCRYPT_HASH,
+          },
+        ],
+      },
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.entries[0]).toMatchObject({
+      id: "user-unlocked",
+      name: "deploy",
+      lock_passwd: false,
+      passwd: BCRYPT_HASH,
+    });
+  });
+
+  it("canonicalizes supported hashed_passwd to passwd with a warning", async () => {
+    const result = await importJson({
+      formatVersion: 1,
+      metadata: {
+        name: "Hashed Passwd",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: {
+        preserveDefault: false,
+        entries: [{ id: "user-1", name: "deploy", hashed_passwd: BCRYPT_HASH }],
+      },
+    });
+
+    expect(result.warnings).toEqual([
+      {
+        path: "users",
+        message: "hashed_passwd was canonicalized to passwd during import.",
+      },
+    ]);
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.entries[0]).toMatchObject({
+      passwd: BCRYPT_HASH,
+      lock_passwd: false,
+    });
+    expect(result.project.users.entries[0]).not.toHaveProperty("hashed_passwd");
+  });
+
+  it("drops plain_text_passwd and unsupported passwd values with warnings", async () => {
+    const result = await importJson({
+      formatVersion: 1,
+      metadata: {
+        name: "Forbidden Passwords",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: {
+        preserveDefault: false,
+        entries: [
+          {
+            id: "user-1",
+            name: "deploy",
+            plain_text_passwd: "hunter2",
+            passwd: "hunter2",
+          },
+        ],
+      },
+    });
+
+    const warningText = JSON.stringify(result.warnings);
+    expect(warningText).toContain("plain_text_passwd");
+    expect(warningText).toContain("Unsupported passwd");
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.entries[0]).not.toHaveProperty("passwd");
+    expect(result.project.users.entries[0]).not.toHaveProperty(
+      "plain_text_passwd",
+    );
+    expect(result.project.users.entries[0].lock_passwd).toBe(true);
+  });
+
+  it("converts legacy ssh_authorized_keys strings to stable rows and preserves canonical IDs", async () => {
+    const result = await importJson({
+      formatVersion: 1,
+      metadata: {
+        name: "SSH Rows",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: [
+        {
+          name: "legacy",
+          ssh_authorized_keys: [LEGACY_SSH],
+        },
+        {
+          id: "user-canonical",
+          name: "canonical",
+          ssh_authorized_keys: [{ id: "key-stable", value: LEGACY_SSH }],
+        },
+      ],
+    });
+
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+
+    const legacyEntry = result.project.users.entries[0];
+    expect(legacyEntry.ssh_authorized_keys).toHaveLength(1);
+    expect(legacyEntry.ssh_authorized_keys?.[0]).toMatchObject({
+      value: LEGACY_SSH,
+    });
+    expect(typeof legacyEntry.ssh_authorized_keys?.[0]?.id).toBe("string");
+
+    const canonicalEntry = result.project.users.entries[1];
+    expect(canonicalEntry.ssh_authorized_keys).toEqual([
+      { id: "key-stable", value: LEGACY_SSH },
+    ]);
+  });
+
+  it("preserves unknown top-level keys and CURRENT_FORMAT_VERSION 1", async () => {
+    const result = await importJson({
+      formatVersion: 1,
+      metadata: {
+        name: "Extras",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      futureFeature: { enabled: true },
+      users: {
+        preserveDefault: false,
+        entries: [{ id: "user-1", name: "deploy" }],
+      },
+    });
+
+    expect(result.project.formatVersion).toBe(1);
+    expect(result.project).toMatchObject({
+      futureFeature: { enabled: true },
+    });
+  });
+
+  it("applies normalized users on lenient fallback when metadata is invalid", async () => {
+    const result = await importJson({
+      formatVersion: 1,
+      metadata: {
+        name: "Broken",
+      },
+      users: {
+        preserveDefault: false,
+        entries: [
+          {
+            id: "user-1",
+            name: "deploy",
+            lock_passwd: false,
+            passwd: BCRYPT_HASH,
+          },
+        ],
+      },
+    });
+
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+    expect(result.project.users.entries[0]).toMatchObject({
+      lock_passwd: false,
+      passwd: BCRYPT_HASH,
+    });
+  });
+});
+
 describe("exportProject", () => {
   const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:mock-url");
   const revokeObjectURL = vi.fn();

@@ -21,7 +21,13 @@
         "shell": "/usr/local/bin/fish",
         "sudo": "ALL=(ALL) NOPASSWD:ALL",
         "primary_group": "deploy",
-        "homedir": "/srv/deploy"
+        "homedir": "/srv/deploy",
+        "lock_passwd": false,
+        "passwd": "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+        "ssh_authorized_keys": [
+          { "id": "key-deploy-a", "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host" },
+          { "id": "key-deploy-b", "value": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host" }
+        ]
       },
       {
         "id": "user-stable-ops",
@@ -30,8 +36,12 @@
         "shell": "/bin/sh",
         "sudo": "ALL=(ALL) ALL",
         "no_create_home": true,
-        "primary_group": "ops"
+        "primary_group": "ops",
+        "lock_passwd": true
       }
     ]
+  },
+  "futureFeature": {
+    "enabled": true
   }
 }
