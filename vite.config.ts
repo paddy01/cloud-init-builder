@@ -11,5 +11,10 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     passWithNoTests: true,
+    server: {
+      deps: {
+        inline: ["html-encoding-sniffer", "@exodus/bytes"],
+      },
+    },
   },
 });

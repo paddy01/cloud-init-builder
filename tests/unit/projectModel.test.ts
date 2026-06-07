@@ -71,5 +71,9 @@ describe("createDefaultProject", () => {
     expect(new Date(project.metadata.updatedAt).toISOString()).toBe(
       project.metadata.updatedAt,
     );
+    expect(project.users).toEqual({
+      preserveDefault: true,
+      entries: [],
+    });
   });
 });

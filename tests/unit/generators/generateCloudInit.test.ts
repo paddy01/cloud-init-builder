@@ -92,7 +92,9 @@ describe("generateCloudInit", () => {
       .trim()
       .split("\n")
       .map((line) => line.split(":")[0]);
-    expect(keys).toEqual([...CLOUD_CONFIG_ORDER]);
+    expect(keys).toEqual(
+      [...CLOUD_CONFIG_ORDER].filter((key) => key !== "users"),
+    );
   });
 
   it("ends with exactly one trailing newline", () => {

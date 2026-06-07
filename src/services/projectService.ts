@@ -18,6 +18,19 @@ export interface ImportResult {
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+async function readFileText(file: File): Promise<string> {
+  if (typeof file.text === "function") {
+    return file.text();
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file."));
+    reader.readAsText(file);
+  });
+}
+
 function migrateProject(raw: Record<string, unknown>): Record<string, unknown> {
   const version =
     typeof raw.formatVersion === "number" ? raw.formatVersion : 0;
@@ -66,7 +79,7 @@ export async function importProject(file: File): Promise<ImportResult> {
 
   let raw: unknown;
   try {
-    const text = await file.text();
+    const text = await readFileText(file);
     raw = JSON.parse(text);
   } catch {
     throw new Error("Failed to parse project file as JSON.");

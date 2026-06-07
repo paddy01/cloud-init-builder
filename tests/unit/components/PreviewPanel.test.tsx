@@ -31,27 +31,38 @@ describe("PreviewPanel empty state", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows empty state when identity is {}", () => {
+  it("shows users YAML when identity is empty but default user is preserved", () => {
     const project = createDefaultProject("Test");
     project.identity = {};
     useProjectStore.setState({ ...initialState, project });
 
-    render(<PreviewPanel />);
+    const { container } = render(<PreviewPanel />);
 
-    expect(screen.getByText("No identity yet")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    const code = container.querySelector("pre code");
+    expect(code?.textContent).toContain("users:");
+    expect(code?.textContent).toContain("- default");
+    expect(screen.queryByText("No identity yet")).not.toBeInTheDocument();
   });
 
-  it("shows empty state when identity has hostname: undefined", () => {
+  it("shows users YAML when identity has hostname: undefined", () => {
     const project = createDefaultProject("Test");
     project.identity = { hostname: undefined };
     useProjectStore.setState({ ...initialState, project });
 
-    render(<PreviewPanel />);
+    const { container } = render(<PreviewPanel />);
 
-    expect(screen.getByText("No identity yet")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(container.querySelector("pre code")?.textContent).toContain("- default");
   });
 
-  it("shows empty state when identity has only cleared optional fields", () => {
+  it("shows users YAML when identity has only cleared optional fields", () => {
     const project = createDefaultProject("Test");
     project.identity = {
       fqdn: "",
@@ -60,9 +71,13 @@ describe("PreviewPanel empty state", () => {
     };
     useProjectStore.setState({ ...initialState, project });
 
-    render(<PreviewPanel />);
+    const { container } = render(<PreviewPanel />);
 
-    expect(screen.getByText("No identity yet")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(container.querySelector("pre code")?.textContent).toContain("- default");
   });
 });
 

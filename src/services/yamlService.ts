@@ -1,7 +1,18 @@
-import { generateCloudInit } from "../generators/generateCloudInit.ts";
+import {
+  generateCloudInit,
+  type GenerateProjectInput,
+} from "../generators/generateCloudInit.ts";
 import type { ProjectFile } from "../models/project.ts";
+import { isUsersConfig } from "../models/users.ts";
 import { slugify } from "../utils/slugify.ts";
 import { validateIdentity } from "../validators/validateConfig.ts";
+
+function toGenerateInput(project: ProjectFile): GenerateProjectInput {
+  return {
+    identity: project.identity,
+    users: isUsersConfig(project.users) ? project.users : undefined,
+  };
+}
 
 export function exportCloudInitYaml(project: ProjectFile): boolean {
   const issues = validateIdentity(project.identity);
@@ -10,7 +21,7 @@ export function exportCloudInitYaml(project: ProjectFile): boolean {
   }
 
   try {
-    const result = generateCloudInit(project);
+    const result = generateCloudInit(toGenerateInput(project));
     const blob = new Blob([result.yaml], { type: "text/yaml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
 
@@ -34,7 +45,7 @@ export function exportCloudInitYaml(project: ProjectFile): boolean {
 }
 
 export async function copyCloudInitYaml(project: ProjectFile): Promise<boolean> {
-  const result = generateCloudInit(project);
+  const result = generateCloudInit(toGenerateInput(project));
 
   try {
     await navigator.clipboard.writeText(result.yaml);
