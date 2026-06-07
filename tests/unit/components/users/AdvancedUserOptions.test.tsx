@@ -20,7 +20,7 @@ const initialState = {
   project: null,
   lastSavedProject: null,
   isDirty: false,
-  importWarnings: [] as { path: string; msg: string }[],
+  importWarnings: [] as { path: string; message: string }[],
 };
 
 function StoreBackedUserCard({ userId }: { userId: string }) {

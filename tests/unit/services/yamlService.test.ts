@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectFile } from "../../../src/models/project.ts";
-import { generateCloudInit } from "../../../src/generators/generateCloudInit.ts";
-import { SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
+import {
+  generateCloudInit,
+  type GenerateProjectInput,
+} from "../../../src/generators/generateCloudInit.ts";
+import { isUsersConfig, SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
 import {
   copyCloudInitYaml,
   exportCloudInitYaml,
@@ -22,6 +25,13 @@ function validProject(overrides: Partial<ProjectFile> = {}): ProjectFile {
     metadata: { name: "Test Server Template", ...baseMetadata },
     identity: { hostname: "web01" },
     ...overrides,
+  };
+}
+
+function toGenerateInput(project: ProjectFile): GenerateProjectInput {
+  return {
+    identity: project.identity,
+    users: isUsersConfig(project.users) ? project.users : undefined,
   };
 }
 
@@ -233,8 +243,12 @@ describe("yamlService users export parity", () => {
       },
     });
 
-    expect(generateCloudInit(commonProject).yaml).toBe(usersCommon);
-    expect(generateCloudInit(combinedProject).yaml).toBe(identityUsersFull);
+    expect(generateCloudInit(toGenerateInput(commonProject)).yaml).toBe(
+      usersCommon,
+    );
+    expect(generateCloudInit(toGenerateInput(combinedProject)).yaml).toBe(
+      identityUsersFull,
+    );
 
     await copyCloudInitYaml(commonProject);
     const [commonCopied] = writeText.mock.calls[0] ?? [];

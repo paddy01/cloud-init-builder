@@ -26,7 +26,7 @@ const initialState = {
   project: null,
   lastSavedProject: null,
   isDirty: false,
-  importWarnings: [] as { path: string; msg: string }[],
+  importWarnings: [] as { path: string; message: string }[],
 };
 
 const DISABLE_DEFAULT_CONFIRM =
