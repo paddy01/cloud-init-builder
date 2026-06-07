@@ -33,6 +33,28 @@ export const DEFAULT_USERS_CONFIG: UsersConfig = {
   entries: [],
 };
 
+export const SHELL_PRESETS = [
+  "/bin/bash",
+  "/bin/sh",
+  "/usr/sbin/nologin",
+] as const;
+
+export type ShellPreset = (typeof SHELL_PRESETS)[number];
+
+export function isShellPreset(shell: string | undefined): shell is ShellPreset {
+  return (
+    shell !== undefined &&
+    (SHELL_PRESETS as readonly string[]).includes(shell)
+  );
+}
+
+export function getShellChoice(shell: string | undefined): ShellPreset | "other" {
+  if (isShellPreset(shell)) {
+    return shell;
+  }
+  return "other";
+}
+
 let userIdCounter = 0;
 
 export function createUserId(): string {

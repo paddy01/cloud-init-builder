@@ -15,12 +15,18 @@ const initialState = {
   importWarnings: [] as { path: string; msg: string }[],
 };
 
-function renderUserCard(user: BuilderUser) {
-  const onRemove = vi.fn();
-  render(
-    <UserCard user={user} onRemove={onRemove} />,
+function StoreBackedUserCard({ userId }: { userId: string }) {
+  const user = useProjectStore((state) =>
+    state.project?.users.entries.find((entry) => entry.id === userId),
   );
-  return { onRemove };
+  if (!user) {
+    return null;
+  }
+  return <UserCard user={user} onRemove={() => undefined} />;
+}
+
+function renderUserCard(user: BuilderUser) {
+  render(<StoreBackedUserCard userId={user.id} />);
 }
 
 function seedProject(users: BuilderUser[]) {

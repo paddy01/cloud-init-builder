@@ -27,7 +27,9 @@ function normalizeGroups(groups: string[] | undefined): string[] | undefined {
   return normalized.length === 0 ? undefined : normalized;
 }
 
-function mapBuilderUser(user: BuilderUser): Record<string, unknown> | undefined {
+export function mapBuilderUser(
+  user: BuilderUser,
+): Record<string, unknown> | undefined {
   const name = trimOptional(user.name);
   if (!name) return undefined;
 

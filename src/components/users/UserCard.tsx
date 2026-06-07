@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef } from "react";
 import type { BuilderUser } from "../../models/users.ts";
 import { getUserHeaderMetadata } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { GroupsInput } from "./GroupsInput.tsx";
+import { ShellSelector } from "./ShellSelector.tsx";
 
 const inputClassName =
   "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
@@ -63,14 +65,22 @@ export function UserCard({
           </div>
           {badges.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {badges.map((badge) => (
-                <span
-                  key={`${user.id}-${badge}`}
-                  className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"
-                >
-                  {badge}
-                </span>
-              ))}
+              {badges.map((badge) => {
+                const isAttention =
+                  badge === "Custom shell" || badge === "Custom sudo";
+                return (
+                  <span
+                    key={`${user.id}-${badge}`}
+                    className={
+                      isAttention
+                        ? "inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800"
+                        : "inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                    }
+                  >
+                    {badge}
+                  </span>
+                );
+              })}
             </div>
           ) : null}
         </div>
@@ -129,6 +139,27 @@ export function UserCard({
             Optional. Written to cloud-init as the user&apos;s GECOS value.
           </p>
         </div>
+
+        <GroupsInput
+          id={`user-groups-${user.id}`}
+          groups={user.groups ?? []}
+          onChange={(groups) =>
+            updateUser(user.id, {
+              groups: groups.length === 0 ? undefined : groups,
+            })
+          }
+        />
+
+        <ShellSelector
+          shellId={`user-shell-${user.id}`}
+          customShellId={`user-custom-shell-${user.id}`}
+          shell={user.shell}
+          onChange={(shell) =>
+            updateUser(user.id, {
+              shell: shell === "" ? undefined : shell,
+            })
+          }
+        />
       </div>
     </article>
   );
