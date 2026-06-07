@@ -8,6 +8,9 @@ import { useProjectStore } from "../../src/state/projectStore.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import * as projectService from "../../src/services/projectService.ts";
 import * as yamlService from "../../src/services/yamlService.ts";
+import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
+import { isUsersConfig } from "../../src/models/users.ts";
+import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 
 function renderTopBar(
   activeSection: "identity" | "users" = "identity",
@@ -460,4 +463,133 @@ describe("TopBar export gating", () => {
     expect(exportSpy).toHaveBeenCalledOnce();
   });
 
+  it("navigates to Users and blocks export for reserved usernames", async () => {
+    const validSsh =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+    const setActiveSection = vi.fn();
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          users: {
+            preserveDefault: true,
+            entries: [
+              {
+                id: "root-user",
+                name: "root",
+                shell: "/bin/bash",
+                ssh_authorized_keys: [{ id: "k1", value: validSsh }],
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    const exportSpy = vi.spyOn(yamlService, "exportCloudInitYaml");
+    renderTopBar("identity", setActiveSection);
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+
+    await userEvent.click(exportBtn);
+    expect(exportSpy).not.toHaveBeenCalled();
+    expect(setActiveSection).toHaveBeenCalledWith("users");
+  });
+
+  it("allows system users without authentication to export", async () => {
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          users: {
+            preserveDefault: false,
+            entries: [
+              {
+                id: "system-user",
+                name: "svc",
+                system: true,
+                shell: "/usr/sbin/nologin",
+                homedir: "/var/lib/svc",
+                lock_passwd: true,
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    const exportSpy = vi
+      .spyOn(yamlService, "exportCloudInitYaml")
+      .mockReturnValue(true);
+    renderTopBar();
+    await userEvent.click(screen.getByRole("button", { name: /export yaml/i }));
+    expect(exportSpy).toHaveBeenCalledOnce();
+  });
+
+  it("copies YAML that matches direct generation for the safety fixture", async () => {
+    const BCRYPT_HASH =
+      "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+    const SSH_KEY_A =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+    const SSH_KEY_B = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host";
+
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          identity: {
+            hostname: "web01",
+            fqdn: "web01.lan.example.com",
+            prefer_fqdn_over_hostname: true,
+            manage_etc_hosts: "localhost",
+            timezone: "Europe/Stockholm",
+            locale: "en_US.UTF-8",
+          },
+          users: {
+            preserveDefault: true,
+            entries: [
+              {
+                id: "user-unlocked",
+                name: "deploy",
+                shell: "/bin/bash",
+                lock_passwd: false,
+                passwd: BCRYPT_HASH,
+                ssh_authorized_keys: [
+                  { id: "key-a", value: SSH_KEY_A },
+                  { id: "key-b", value: SSH_KEY_B },
+                ],
+              },
+              {
+                id: "user-locked",
+                name: "ops",
+                shell: "/bin/bash",
+                lock_passwd: true,
+                ssh_authorized_keys: [{ id: "key-c", value: SSH_KEY_A }],
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    const project = useProjectStore.getState().project!;
+    const expectedYaml = generateCloudInit({
+      identity: project.identity,
+      users: isUsersConfig(project.users) ? project.users : undefined,
+    }).yaml;
+    expect(expectedYaml).toBe(identityUsersSafetyValid);
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText: writeTextMock } });
+
+    renderTopBar();
+    await userEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
+    expect(writeTextMock).toHaveBeenCalledWith(expectedYaml);
+    expect(screen.queryByText(/export succeeded/i)).toBeNull();
+  });
 });

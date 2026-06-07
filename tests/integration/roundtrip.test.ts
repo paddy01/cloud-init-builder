@@ -13,6 +13,8 @@ import {
 import { isUsersConfig } from "../../src/models/users.ts";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { importProject } from "../../src/services/projectService.ts";
+import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
+import usersSafetyValid from "../fixtures/users-safety-valid.yaml?raw";
 
 const BCRYPT_HASH =
   "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -306,13 +308,137 @@ describe("users project round-trip", () => {
 
     const exported = JSON.stringify(firstImport.project, null, 2);
     const secondImport = await importProject(fileFromJson(exported));
+    const thirdImport = await importProject(
+      fileFromJson(JSON.stringify(secondImport.project, null, 2)),
+    );
     const roundTrippedYaml = generateCloudInit({
-      users: isUsersConfig(secondImport.project.users)
-        ? secondImport.project.users
+      users: isUsersConfig(thirdImport.project.users)
+        ? thirdImport.project.users
         : undefined,
     }).yaml;
 
     expect(roundTrippedYaml).toBe(yaml);
+    expect(thirdImport.project.formatVersion).toBe(1);
+  });
+
+  it("preserves lock state, supported hash, stable SSH row IDs, and key order through double round-trip", async () => {
+    const firstImport = await importProject(
+      fileFromJson(
+        validProjectUsersFull,
+        "valid-project-users-full.cib.json",
+      ),
+    );
+
+    expect(isUsersConfig(firstImport.project.users)).toBe(true);
+    if (!isUsersConfig(firstImport.project.users)) {
+      throw new Error("expected canonical users");
+    }
+
+    const deploy = firstImport.project.users.entries[0];
+    const ops = firstImport.project.users.entries[1];
+    expect(deploy?.lock_passwd).toBe(false);
+    expect(deploy?.passwd).toBe(BCRYPT_HASH);
+    expect(deploy?.ssh_authorized_keys?.map((row) => row.id)).toEqual([
+      "key-deploy-a",
+      "key-deploy-b",
+    ]);
+    expect(deploy?.ssh_authorized_keys?.map((row) => row.value)).toEqual([
+      SSH_KEY_A,
+      SSH_KEY_B,
+    ]);
+    expect(ops?.lock_passwd).toBe(true);
+    expect(ops?.passwd).toBeUndefined();
+
+    const exportedOnce = JSON.stringify(firstImport.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exportedOnce));
+    const exportedTwice = JSON.stringify(secondImport.project, null, 2);
+    const thirdImport = await importProject(fileFromJson(exportedTwice));
+
+    expect(thirdImport.project.users).toEqual(firstImport.project.users);
+    expect(thirdImport.project).toMatchObject({
+      futureFeature: { enabled: true },
+    });
+    expect(JSON.stringify(thirdImport.project)).not.toContain("plain_text_passwd");
+    expect(JSON.stringify(thirdImport.project)).not.toContain("hunter2");
+  });
+
+  it("double round-trips safety fixtures without forbidden password material", async () => {
+    const safetyProject = {
+      formatVersion: 1,
+      metadata: {
+        name: "Safety Roundtrip",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      identity: {
+        hostname: "web01",
+        fqdn: "web01.lan.example.com",
+        prefer_fqdn_over_hostname: true,
+        manage_etc_hosts: "localhost" as const,
+        timezone: "Europe/Stockholm",
+        locale: "en_US.UTF-8",
+      },
+      users: {
+        preserveDefault: true,
+        entries: [
+          {
+            id: "user-unlocked",
+            name: "deploy",
+            shell: "/bin/bash",
+            lock_passwd: false,
+            passwd: BCRYPT_HASH,
+            ssh_authorized_keys: [
+              { id: "key-a", value: SSH_KEY_A },
+              { id: "key-b", value: SSH_KEY_B },
+            ],
+          },
+          {
+            id: "user-locked",
+            name: "ops",
+            shell: "/bin/bash",
+            lock_passwd: true,
+            ssh_authorized_keys: [{ id: "key-c", value: SSH_KEY_A }],
+          },
+        ],
+      },
+      futureFeature: { enabled: true },
+    };
+
+    const usersYaml = generateCloudInit({ users: safetyProject.users }).yaml;
+    expect(usersYaml).toBe(usersSafetyValid);
+
+    const combinedYaml = generateCloudInit({
+      identity: safetyProject.identity,
+      users: safetyProject.users,
+    }).yaml;
+    expect(combinedYaml).toBe(identityUsersSafetyValid);
+
+    const firstImport = await importProject(
+      fileFromJson(JSON.stringify(safetyProject, null, 2)),
+    );
+    const secondImport = await importProject(
+      fileFromJson(JSON.stringify(firstImport.project, null, 2)),
+    );
+    const thirdImport = await importProject(
+      fileFromJson(JSON.stringify(secondImport.project, null, 2)),
+    );
+
+    expect(thirdImport.project.users).toEqual(safetyProject.users);
+    expect(thirdImport.project.identity).toEqual(safetyProject.identity);
+    expect(thirdImport.project).toMatchObject({
+      futureFeature: { enabled: true },
+    });
+    expect(thirdImport.project.formatVersion).toBe(1);
+
+    const roundTrippedYaml = generateCloudInit({
+      identity: thirdImport.project.identity,
+      users: isUsersConfig(thirdImport.project.users)
+        ? thirdImport.project.users
+        : undefined,
+    }).yaml;
+    expect(roundTrippedYaml).toBe(identityUsersSafetyValid);
+    expect(JSON.stringify(thirdImport.project)).not.toContain("plain_text_passwd");
   });
 });
 
@@ -325,5 +451,21 @@ describe("Phase 3 dependency fence", () => {
       "zod",
       "zustand",
     ]);
+  });
+});
+
+describe("Phase 4 dependency and format fence", () => {
+  it("keeps package manifests free of new Phase 4 runtime dependencies", () => {
+    expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "react",
+      "react-dom",
+      "yaml",
+      "zod",
+      "zustand",
+    ]);
+  });
+
+  it("keeps builder format version at 1", () => {
+    expect(CURRENT_FORMAT_VERSION).toBe(1);
   });
 });

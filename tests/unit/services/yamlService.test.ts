@@ -11,7 +11,15 @@ import {
 } from "../../../src/services/yamlService.ts";
 import * as validateConfig from "../../../src/validators/validateConfig.ts";
 import identityUsersFull from "../../fixtures/identity-users-full.yaml?raw";
+import identityUsersSafetyValid from "../../fixtures/identity-users-safety-valid.yaml?raw";
 import usersCommon from "../../fixtures/users-common.yaml?raw";
+import usersSafetyValid from "../../fixtures/users-safety-valid.yaml?raw";
+
+const BCRYPT_HASH =
+  "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+const SSH_KEY_A =
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+const SSH_KEY_B = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host";
 
 const baseMetadata = {
   createdAt: "2026-06-01T10:00:00.000Z",
@@ -34,6 +42,47 @@ function toGenerateInput(project: ProjectFile): GenerateProjectInput {
     users: isUsersConfig(project.users) ? project.users : undefined,
   };
 }
+
+const SAFETY_USERS_PROJECT = validProject({
+  identity: undefined,
+  users: {
+    preserveDefault: true,
+    entries: [
+      {
+        id: "user-unlocked",
+        name: "deploy",
+        shell: "/bin/bash",
+        lock_passwd: false,
+        passwd: BCRYPT_HASH,
+        ssh_authorized_keys: [
+          { id: "key-a", value: SSH_KEY_A },
+          { id: "key-b", value: SSH_KEY_B },
+        ],
+      },
+      {
+        id: "user-locked",
+        name: "ops",
+        shell: "/bin/bash",
+        lock_passwd: true,
+        ssh_authorized_keys: [{ id: "key-c", value: SSH_KEY_A }],
+      },
+    ],
+  },
+});
+
+const SAFETY_COMBINED_PROJECT = validProject({
+  identity: {
+    hostname: "web01",
+    fqdn: "web01.lan.example.com",
+    prefer_fqdn_over_hostname: true,
+    manage_etc_hosts: "localhost",
+    timezone: "Europe/Stockholm",
+    locale: "en_US.UTF-8",
+  },
+  users: isUsersConfig(SAFETY_USERS_PROJECT.users)
+    ? SAFETY_USERS_PROJECT.users
+    : undefined,
+});
 
 describe("exportCloudInitYaml", () => {
   const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:mock-url");
@@ -381,6 +430,50 @@ describe("yamlService users export parity", () => {
     });
 
     expect(exportCloudInitYaml(project)).toBe(true);
+    expect(createObjectURL).toHaveBeenCalled();
+  });
+
+  it("matches direct generation for users-safety-valid and identity-users-safety-valid", async () => {
+    expect(generateCloudInit(toGenerateInput(SAFETY_USERS_PROJECT)).yaml).toBe(
+      usersSafetyValid,
+    );
+    expect(
+      generateCloudInit(toGenerateInput(SAFETY_COMBINED_PROJECT)).yaml,
+    ).toBe(identityUsersSafetyValid);
+
+    await copyCloudInitYaml(SAFETY_COMBINED_PROJECT);
+    const [copiedYaml] =
+      writeText.mock.calls[writeText.mock.calls.length - 1] ?? [];
+    expect(copiedYaml).toBe(identityUsersSafetyValid);
+
+    expect(exportCloudInitYaml(SAFETY_COMBINED_PROJECT)).toBe(true);
+    const [blobArg] =
+      createObjectURL.mock.calls[createObjectURL.mock.calls.length - 1] ?? [];
+    expect(blobArg).toBeInstanceOf(Blob);
+    if (blobArg instanceof Blob && typeof blobArg.arrayBuffer === "function") {
+      const exportedText = new TextDecoder().decode(await blobArg.arrayBuffer());
+      expect(exportedText).toBe(identityUsersSafetyValid);
+    }
+  });
+
+  it("allows system and nologin users without authentication methods", () => {
+    const systemProject = validProject({
+      users: {
+        preserveDefault: false,
+        entries: [
+          {
+            id: "system-user",
+            name: "svc",
+            system: true,
+            shell: "/usr/sbin/nologin",
+            homedir: "/var/lib/svc",
+            lock_passwd: true,
+          },
+        ],
+      },
+    });
+
+    expect(exportCloudInitYaml(systemProject)).toBe(true);
     expect(createObjectURL).toHaveBeenCalled();
   });
 });

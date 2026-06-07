@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import identityEmptyAdvanced from "../../fixtures/identity-empty-advanced.yaml?raw";
 import identityFull from "../../fixtures/identity-full.yaml?raw";
 import identityMinimal from "../../fixtures/identity-minimal.yaml?raw";
+import identityUsersSafetyValid from "../../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../../fixtures/users-safety-valid.yaml?raw";
 import {
   CLOUD_CONFIG_HEADER,
@@ -15,6 +16,15 @@ const BCRYPT_HASH =
 const SSH_KEY_A =
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
 const SSH_KEY_B = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host";
+
+const SAFETY_IDENTITY = {
+  hostname: "web01",
+  fqdn: "web01.lan.example.com",
+  prefer_fqdn_over_hostname: true,
+  manage_etc_hosts: "localhost" as const,
+  timezone: "Europe/Stockholm",
+  locale: "en_US.UTF-8",
+};
 
 const SAFETY_USERS_CONFIG: UsersConfig = {
   preserveDefault: true,
@@ -176,5 +186,19 @@ describe("generateCloudInit", () => {
     expect(result.yaml).not.toContain("key-a");
     expect(result.yaml).not.toContain("key-b");
     expect(result.yaml).not.toContain("key-c");
+    expect(result.yaml).not.toMatch(/\r/);
+  });
+
+  it("matches identity-users-safety-valid golden fixture byte-for-byte", () => {
+    const result = generateCloudInit({
+      identity: SAFETY_IDENTITY,
+      users: SAFETY_USERS_CONFIG,
+    });
+    expect(result.yaml).toBe(identityUsersSafetyValid);
+    expect(result.yaml.endsWith("\n")).toBe(true);
+    expect(result.yaml.endsWith("\n\n")).toBe(false);
+    expect(result.yaml).not.toContain("key-a");
+    expect(result.yaml).not.toContain("user-unlocked");
+    expect(result.yaml).not.toMatch(/\r/);
   });
 });

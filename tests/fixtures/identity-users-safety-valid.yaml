@@ -1,0 +1,21 @@
+#cloud-config
+hostname: web01
+fqdn: web01.lan.example.com
+prefer_fqdn_over_hostname: true
+manage_etc_hosts: localhost
+timezone: Europe/Stockholm
+locale: en_US.UTF-8
+users:
+  - default
+  - name: deploy
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: $2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host
+  - name: ops
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host

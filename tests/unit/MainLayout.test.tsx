@@ -23,6 +23,9 @@ import usersNone from "../fixtures/users-none.yaml?raw";
 import usersCommon from "../fixtures/users-common.yaml?raw";
 import usersAdvanced from "../fixtures/users-advanced.yaml?raw";
 import identityUsersFull from "../fixtures/identity-users-full.yaml?raw";
+import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
+import { CURRENT_FORMAT_VERSION } from "../../src/models/project.ts";
+import { copyCloudInitYaml } from "../../src/services/yamlService.ts";
 
 const initialState = {
   project: null,
@@ -644,5 +647,268 @@ describe("MainLayout export gating", () => {
     });
     expect(screen.queryByText("Users need attention")).toBeNull();
     expect(document.activeElement).not.toBe(exportBtn);
+  });
+});
+
+describe("MainLayout Phase 4 regression hardening", () => {
+  const BCRYPT_HASH =
+    "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+  const SSH_KEY_A =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+  const SSH_KEY_B = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB deploy@host";
+  const writeTextMock = vi.fn();
+
+  function seedSafetyProject() {
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        formatVersion: CURRENT_FORMAT_VERSION,
+        identity: {
+          hostname: "web01",
+          fqdn: "web01.lan.example.com",
+          prefer_fqdn_over_hostname: true,
+          manage_etc_hosts: "localhost",
+          timezone: "Europe/Stockholm",
+          locale: "en_US.UTF-8",
+        },
+        users: {
+          preserveDefault: true,
+          entries: [
+            {
+              id: "user-unlocked",
+              name: "deploy",
+              shell: "/bin/bash",
+              lock_passwd: false,
+              passwd: BCRYPT_HASH,
+              ssh_authorized_keys: [
+                { id: "key-a", value: SSH_KEY_A },
+                { id: "key-b", value: SSH_KEY_B },
+              ],
+            },
+            {
+              id: "user-locked",
+              name: "ops",
+              shell: "/bin/bash",
+              lock_passwd: true,
+              ssh_authorized_keys: [{ id: "key-c", value: SSH_KEY_A }],
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Test");
+    seedSafetyProject();
+    vi.spyOn(window, "confirm");
+    writeTextMock.mockReset();
+    vi.stubGlobal("navigator", { clipboard: { writeText: writeTextMock } });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("matches preview and copy output to direct generation for safety fixtures", async () => {
+    const project = useProjectStore.getState().project!;
+    const expectedYaml = generateCloudInit({
+      identity: project.identity,
+      users: isUsersConfig(project.users) ? project.users : undefined,
+    }).yaml;
+    expect(expectedYaml).toBe(identityUsersSafetyValid);
+
+    const { container } = render(<MainLayout />);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    const previewCode = container.querySelector("aside pre code");
+    expect(previewCode?.textContent).toBe(expectedYaml);
+
+    writeTextMock.mockResolvedValue(undefined);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
+    });
+    const [copiedYaml] = writeTextMock.mock.calls[0] ?? [];
+    expect(copiedYaml).toBe(expectedYaml);
+
+    const copiedViaService = await copyCloudInitYaml(project);
+    expect(copiedViaService).toBe(true);
+    const lastCopyCall =
+      writeTextMock.mock.calls[writeTextMock.mock.calls.length - 1];
+    expect(lastCopyCall?.[0]).toBe(expectedYaml);
+  });
+
+  it("blocks reserved usernames and reveals the summary with focus on activation", async () => {
+    vi.useRealTimers();
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        users: {
+          preserveDefault: true,
+          entries: [
+            {
+              id: "root-user",
+              name: "root",
+              shell: "/bin/bash",
+              ssh_authorized_keys: [{ id: "k1", value: SSH_KEY_A }],
+            },
+          ],
+        },
+      },
+    });
+
+    const exportSpy = vi.spyOn(yamlService, "exportCloudInitYaml");
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(exportBtn);
+    expect(exportSpy).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Users need attention")).toBeInTheDocument();
+    });
+    expect(
+      document.getElementById("users-validation-summary-heading"),
+    ).toHaveFocus();
+    expect(screen.queryByText(/export succeeded/i)).toBeNull();
+  });
+
+  it("allows system and nologin users to export without authentication methods", async () => {
+    vi.useRealTimers();
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        users: {
+          preserveDefault: false,
+          entries: [
+            {
+              id: "system-user",
+              name: "svc",
+              system: true,
+              shell: "/usr/sbin/nologin",
+              homedir: "/var/lib/svc",
+              lock_passwd: true,
+            },
+          ],
+        },
+      },
+    });
+
+    const exportSpy = vi
+      .spyOn(yamlService, "exportCloudInitYaml")
+      .mockReturnValue(true);
+
+    render(<MainLayout />);
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(exportBtn);
+    expect(exportSpy).toHaveBeenCalledOnce();
+  });
+
+  it("reveals configured-nameless and auth-required errors without aria-invalid on warnings", async () => {
+    vi.useRealTimers();
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        users: {
+          preserveDefault: true,
+          entries: [
+            {
+              id: "no-auth",
+              name: "deploy",
+              shell: "/bin/bash",
+              lock_passwd: true,
+            },
+            {
+              id: "nameless",
+              gecos: "Configured without username",
+              shell: "/bin/bash",
+              ssh_authorized_keys: [{ id: "k1", value: SSH_KEY_A }],
+            },
+          ],
+        },
+      },
+    });
+
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+    fireEvent.click(screen.getByRole("button", { name: /export yaml/i }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Users need attention")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(
+        "Export blocked: add a supported password hash or at least one valid SSH key for this login user.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Export blocked: enter a username or clear the other fields to omit this card.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps aria-invalid off warning-only uppercase usernames", () => {
+    vi.useRealTimers();
+    const projectBefore = useProjectStore.getState().project;
+    if (!projectBefore?.users || !isUsersConfig(projectBefore.users)) {
+      throw new Error("expected users config");
+    }
+
+    useProjectStore.setState({
+      project: {
+        ...projectBefore,
+        users: {
+          preserveDefault: true,
+          entries: [
+            {
+              id: "upper-warning",
+              name: "Deploy",
+              shell: "/bin/bash",
+              passwd: BCRYPT_HASH,
+              lock_passwd: false,
+            },
+          ],
+        },
+      },
+    });
+
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+    const usernameInput = screen.getByLabelText("Username");
+    fireEvent.blur(usernameInput);
+    expect(usernameInput).not.toHaveAttribute("aria-invalid");
+    expect(
+      screen.getByText(/Warning: Lowercase usernames are recommended/i),
+    ).toBeInTheDocument();
   });
 });
