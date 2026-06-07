@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { BuilderUser } from "../../models/users.ts";
 import { getUserHeaderMetadata } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
@@ -10,6 +10,10 @@ import { ShellSelector } from "./ShellSelector.tsx";
 import { SshAuthorizedKeysInput } from "./SshAuthorizedKeysInput.tsx";
 import { SudoRuleSelector } from "./SudoRuleSelector.tsx";
 import { UserAuthStatus } from "./UserAuthStatus.tsx";
+import {
+  getSshRowIdFromPath,
+  pathToFocusTargetId,
+} from "./userValidationPaths.ts";
 import { useUserValidation } from "./UserValidationContext.tsx";
 
 const inputDefaultClassName =
@@ -26,13 +30,34 @@ interface UserCardProps {
   user: BuilderUser;
   shouldFocusUsername?: boolean;
   onFocused?: () => void;
+  focusRequestPath?: string | null;
+  onFocusRequestHandled?: () => void;
   onRemove: (id: string) => void;
+}
+
+function scrollCardIntoView(cardRef: RefObject<HTMLElement | null>): void {
+  const card = cardRef.current;
+  if (!card) {
+    return;
+  }
+
+  const prefersReducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  if (typeof card.scrollIntoView === "function") {
+    card.scrollIntoView({
+      block: "center",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }
 }
 
 export function UserCard({
   user,
   shouldFocusUsername = false,
   onFocused,
+  focusRequestPath = null,
+  onFocusRequestHandled,
   onRemove,
 }: UserCardProps) {
   const updateUser = useProjectStore((state) => state.updateUser);
@@ -41,7 +66,9 @@ export function UserCard({
     getVisibleIssuesForPath,
     hasVisibleErrorForPath,
     getFieldMessageId,
+    getCardIssueCounts,
   } = useUserValidation();
+  const cardRef = useRef<HTMLElement>(null);
   const usernameRef = useRef<HTMLInputElement>(null);
   const [pendingSshFocusId, setPendingSshFocusId] = useState<string | null>(
     null,
@@ -56,6 +83,24 @@ export function UserCard({
     (issue) => issue.severity === "warning",
   );
   const hasUsernameError = hasVisibleErrorForPath(usernamePath);
+  const { errors: cardErrors, warnings: cardWarnings } = getCardIssueCounts(
+    user.id,
+  );
+  const cardStatusBadge =
+    cardErrors > 0
+      ? {
+          label: cardErrors === 1 ? "1 error" : `${cardErrors} errors`,
+          className:
+            "inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs text-red-700",
+        }
+      : cardWarnings > 0
+        ? {
+            label:
+              cardWarnings === 1 ? "1 warning" : `${cardWarnings} warnings`,
+            className:
+              "inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800",
+          }
+        : null;
 
   const usernameDescribedBy = [
     `user-username-help-${user.id}`,
@@ -69,6 +114,33 @@ export function UserCard({
     usernameRef.current?.focus({ preventScroll: true });
     onFocused?.();
   }, [shouldFocusUsername, onFocused]);
+
+  useLayoutEffect(() => {
+    if (!focusRequestPath?.startsWith(`users.entries.${user.id}.`)) {
+      return;
+    }
+
+    scrollCardIntoView(cardRef);
+
+    const focusTarget = () => {
+      const sshRowId = getSshRowIdFromPath(focusRequestPath);
+      if (sshRowId) {
+        document
+          .getElementById(`user-ssh-key-${user.id}-${sshRowId}`)
+          ?.focus({ preventScroll: true });
+      } else if (focusRequestPath.endsWith(".name")) {
+        usernameRef.current?.focus({ preventScroll: true });
+      } else {
+        const targetId = pathToFocusTargetId(focusRequestPath);
+        if (targetId) {
+          document.getElementById(targetId)?.focus({ preventScroll: true });
+        }
+      }
+      onFocusRequestHandled?.();
+    };
+
+    queueMicrotask(focusTarget);
+  }, [focusRequestPath, onFocusRequestHandled, user.id]);
 
   const handleRemove = () => {
     if (
@@ -89,18 +161,26 @@ export function UserCard({
 
   return (
     <article
+      ref={cardRef}
       aria-labelledby={`user-card-title-${user.id}`}
       className="rounded-lg border border-gray-200 bg-white p-6"
     >
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="space-y-2">
           <div>
-            <p
-              id={`user-card-title-${user.id}`}
-              className="text-sm font-semibold text-gray-900"
-            >
-              {title}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p
+                id={`user-card-title-${user.id}`}
+                className="text-sm font-semibold text-gray-900"
+              >
+                {title}
+              </p>
+              {cardStatusBadge ? (
+                <span className={cardStatusBadge.className}>
+                  {cardStatusBadge.label}
+                </span>
+              ) : null}
+            </div>
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
               {secondary.map((line) => (
                 <span key={`${user.id}-${line}`}>{line}</span>

@@ -94,7 +94,7 @@ describe("exportCloudInitYaml", () => {
   });
 
   it("falls back to project-name slug when hostname is empty", () => {
-    vi.spyOn(validateConfig, "validateIdentity").mockReturnValue([]);
+    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
 
     exportCloudInitYaml(
       validProject({
@@ -254,7 +254,32 @@ describe("yamlService users export parity", () => {
     const [commonCopied] = writeText.mock.calls[0] ?? [];
     expect(commonCopied).toBe(usersCommon);
 
-    expect(exportCloudInitYaml(combinedProject)).toBe(true);
+    const combinedEntry = isUsersConfig(combinedProject.users)
+      ? combinedProject.users.entries[0]
+      : undefined;
+    if (!combinedEntry) {
+      throw new Error("expected combined user entry");
+    }
+
+    const exportableCombined = validProject({
+      identity: combinedProject.identity,
+      users: {
+        preserveDefault: true,
+        entries: [
+          {
+            ...combinedEntry,
+            ssh_authorized_keys: [
+              {
+                id: "key-deploy-a",
+                value:
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(exportCloudInitYaml(exportableCombined)).toBe(true);
     const [blobArg] = createObjectURL.mock.calls[0] ?? [];
     expect(blobArg).toBeInstanceOf(Blob);
     if (blobArg instanceof Blob && typeof blobArg.arrayBuffer === "function") {
@@ -263,19 +288,99 @@ describe("yamlService users export parity", () => {
     }
   });
 
-  it("does not block export for duplicate or blank custom usernames", () => {
+  it("blocks duplicate usernames before any browser side effects", () => {
     const duplicateUsersProject = validProject({
       users: {
         preserveDefault: true,
         entries: [
           { id: "dup-a", name: "shared", shell: "/bin/bash" },
           { id: "dup-b", name: "shared", shell: "/bin/bash" },
-          { id: "blank", shell: "/bin/bash" },
         ],
       },
     });
 
-    expect(exportCloudInitYaml(duplicateUsersProject)).toBe(true);
+    expect(exportCloudInitYaml(duplicateUsersProject)).toBe(false);
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("blocks configured nameless users before side effects", () => {
+    const project = validProject({
+      users: {
+        preserveDefault: true,
+        entries: [{ id: "blank", gecos: "Configured", shell: "/bin/bash" }],
+      },
+    });
+
+    expect(exportCloudInitYaml(project)).toBe(false);
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("blocks reserved usernames before side effects", () => {
+    const project = validProject({
+      users: {
+        preserveDefault: true,
+        entries: [{ id: "root-user", name: "root", shell: "/bin/bash" }],
+      },
+    });
+
+    expect(exportCloudInitYaml(project)).toBe(false);
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("blocks invalid SSH keys before side effects", () => {
+    const project = validProject({
+      users: {
+        preserveDefault: true,
+        entries: [
+          {
+            id: "bad-ssh",
+            name: "deploy",
+            shell: "/bin/bash",
+            ssh_authorized_keys: [
+              {
+                id: "key-1",
+                value: "ssh-ed25519 not!!!valid!!! deploy@host",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(exportCloudInitYaml(project)).toBe(false);
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("blocks login users without authentication before side effects", () => {
+    const project = validProject({
+      users: {
+        preserveDefault: true,
+        entries: [{ id: "no-auth", name: "deploy", shell: "/bin/bash" }],
+      },
+    });
+
+    expect(exportCloudInitYaml(project)).toBe(false);
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("allows warning-only uppercase usernames to download", () => {
+    const project = validProject({
+      users: {
+        preserveDefault: true,
+        entries: [
+          {
+            id: "upper",
+            name: "Deploy",
+            shell: "/bin/bash",
+            passwd:
+              "$6$rounds=5000$somesalt$JE8633wNOuGQ0Nr6YpvNR5shWgI3A0T.UrBxMhUaNJW4n5FZn1eX2g09dZ3gB1lZg2y0NnQlD3za5FyCzrE7mA",
+            lock_passwd: false,
+          },
+        ],
+      },
+    });
+
+    expect(exportCloudInitYaml(project)).toBe(true);
     expect(createObjectURL).toHaveBeenCalled();
   });
 });

@@ -5,19 +5,33 @@ import {
   type EditorPreviewView,
 } from "../components/preview/EditorPreviewTabs.tsx";
 import { PreviewPanel } from "../components/preview/PreviewPanel.tsx";
-import { UserValidationProvider } from "../components/users/UserValidationContext.tsx";
+import {
+  UserValidationProvider,
+  useUserValidation,
+} from "../components/users/UserValidationContext.tsx";
 import { UsersSection } from "../components/users/UsersSection.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
 
 export type EditorSection = "identity" | "users";
 
-export function MainLayout() {
+function BlockedExportAnnouncement() {
+  const { blockedExportAnnouncement } = useUserValidation();
+
+  return (
+    <div aria-live="assertive" aria-atomic="true" className="sr-only">
+      {blockedExportAnnouncement}
+    </div>
+  );
+}
+
+function MainLayoutContent() {
   const [view, setView] = useState<EditorPreviewView>("editor");
   const [activeSection, setActiveSection] = useState<EditorSection>("identity");
 
   return (
-    <UserValidationProvider>
+    <>
+      <BlockedExportAnnouncement />
       <div className="flex h-screen flex-col">
         <TopBar />
         <div className="flex min-h-0 flex-1">
@@ -45,6 +59,14 @@ export function MainLayout() {
           </aside>
         </div>
       </div>
+    </>
+  );
+}
+
+export function MainLayout() {
+  return (
+    <UserValidationProvider>
+      <MainLayoutContent />
     </UserValidationProvider>
   );
 }

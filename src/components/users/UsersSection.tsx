@@ -1,6 +1,7 @@
 import { isUsersConfig } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { UserCardList } from "./UserCardList.tsx";
+import { UserValidationSummary } from "./UserValidationSummary.tsx";
 
 const DISABLE_DEFAULT_CONFIRM =
   "Turn off default user? Cloud-init will omit `- default` unless you add your own users.";
@@ -104,6 +105,7 @@ export function UsersSection() {
         </div>
       ) : null}
 
+      <UserValidationSummary />
       <UserCardList entries={users.entries} />
     </section>
   );

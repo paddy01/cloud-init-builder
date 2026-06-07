@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { BuilderUser } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { UserCard } from "./UserCard.tsx";
+import { useUserValidation } from "./UserValidationContext.tsx";
 
 interface UserCardListProps {
   entries: BuilderUser[];
@@ -10,8 +11,12 @@ interface UserCardListProps {
 export function UserCardList({ entries }: UserCardListProps) {
   const addUser = useProjectStore((state) => state.addUser);
   const removeUser = useProjectStore((state) => state.removeUser);
+  const { focusRequestPath, consumeFocusRequest } = useUserValidation();
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const clearPendingFocus = useCallback(() => setPendingFocusId(null), []);
+  const handleFocusRequestHandled = useCallback(() => {
+    consumeFocusRequest();
+  }, [consumeFocusRequest]);
 
   const handleAddUser = () => {
     const id = addUser();
@@ -28,6 +33,12 @@ export function UserCardList({ entries }: UserCardListProps) {
           user={user}
           shouldFocusUsername={pendingFocusId === user.id}
           onFocused={clearPendingFocus}
+          focusRequestPath={
+            focusRequestPath?.startsWith(`users.entries.${user.id}.`)
+              ? focusRequestPath
+              : null
+          }
+          onFocusRequestHandled={handleFocusRequestHandled}
           onRemove={removeUser}
         />
       ))}

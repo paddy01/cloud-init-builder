@@ -255,8 +255,9 @@ describe("UsersWorkflow validation interaction boundaries", () => {
     fireEvent.change(passwordInput, { target: { value: "hunter2" } });
     fireEvent.blur(passwordInput);
     expect(
-      screen.getByText(/Export blocked: enter a supported password hash/i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Export blocked: enter a supported password hash/i)
+        .length,
+    ).toBeGreaterThan(0);
 
     useProjectStore.getState().newProject("Fresh");
     fireEvent.click(screen.getByRole("button", { name: "Users" }));

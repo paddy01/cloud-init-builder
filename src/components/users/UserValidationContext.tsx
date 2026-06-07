@@ -16,6 +16,7 @@ import {
 } from "../../validators/validateConfig.ts";
 import { USER_VALIDATION_MESSAGES } from "../../validators/validateUsers.ts";
 import { isUsersConfig } from "../../models/users.ts";
+import { isUserIssuePath } from "./userValidationPaths.ts";
 
 interface UserValidationContextValue {
   mergedIssues: ValidationIssue[];
@@ -28,6 +29,7 @@ interface UserValidationContextValue {
   markAuthTouched: (userId: string) => void;
   revealAllUserValidation: () => void;
   requestFocus: (path: string) => void;
+  focusRequestPath: string | null;
   consumeFocusRequest: () => string | null;
   resetValidationInteraction: () => void;
   getVisibleIssuesForPath: (path: string) => ValidationIssue[];
@@ -35,6 +37,10 @@ interface UserValidationContextValue {
   hasVisibleErrorForPath: (path: string) => boolean;
   getFieldMessageId: (path: string, code: string) => string;
   clearBlockedExportAnnouncement: () => void;
+  getVisibleUserSummaryIssues: () => ValidationIssue[];
+  getCardIssueCounts: (
+    userId: string,
+  ) => { errors: number; warnings: number };
 }
 
 const UserValidationContext = createContext<UserValidationContextValue | null>(
@@ -276,6 +282,34 @@ export function UserValidationProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const getVisibleUserSummaryIssues = useCallback(() => {
+    return mergedIssues.filter(
+      (issue) => isUserIssuePath(issue.path) && isPathVisible(issue.path),
+    );
+  }, [isPathVisible, mergedIssues]);
+
+  const getCardIssueCounts = useCallback(
+    (userId: string) => {
+      const prefix = `users.entries.${userId}.`;
+      let errors = 0;
+      let warnings = 0;
+
+      for (const issue of mergedIssues) {
+        if (!issue.path.startsWith(prefix)) {
+          continue;
+        }
+        if (issue.severity === "error") {
+          errors += 1;
+        } else {
+          warnings += 1;
+        }
+      }
+
+      return { errors, warnings };
+    },
+    [mergedIssues],
+  );
+
   const value = useMemo(
     () => ({
       mergedIssues,
@@ -288,6 +322,7 @@ export function UserValidationProvider({ children }: { children: ReactNode }) {
       markAuthTouched,
       revealAllUserValidation,
       requestFocus,
+      focusRequestPath,
       consumeFocusRequest,
       resetValidationInteraction,
       getVisibleIssuesForPath,
@@ -295,6 +330,8 @@ export function UserValidationProvider({ children }: { children: ReactNode }) {
       hasVisibleErrorForPath,
       getFieldMessageId,
       clearBlockedExportAnnouncement,
+      getVisibleUserSummaryIssues,
+      getCardIssueCounts,
     }),
     [
       mergedIssues,
@@ -307,6 +344,7 @@ export function UserValidationProvider({ children }: { children: ReactNode }) {
       markAuthTouched,
       revealAllUserValidation,
       requestFocus,
+      focusRequestPath,
       consumeFocusRequest,
       resetValidationInteraction,
       getVisibleIssuesForPath,
@@ -314,6 +352,8 @@ export function UserValidationProvider({ children }: { children: ReactNode }) {
       hasVisibleErrorForPath,
       getFieldMessageId,
       clearBlockedExportAnnouncement,
+      getVisibleUserSummaryIssues,
+      getCardIssueCounts,
     ],
   );
 
@@ -335,6 +375,7 @@ const noopValidation: UserValidationContextValue = {
   markAuthTouched: () => undefined,
   revealAllUserValidation: () => undefined,
   requestFocus: () => undefined,
+  focusRequestPath: null,
   consumeFocusRequest: () => null,
   resetValidationInteraction: () => undefined,
   getVisibleIssuesForPath: () => [],
@@ -343,6 +384,8 @@ const noopValidation: UserValidationContextValue = {
   getFieldMessageId: (path, code) =>
     `${path.replace(/\./g, "-")}-${code}`.toLowerCase(),
   clearBlockedExportAnnouncement: () => undefined,
+  getVisibleUserSummaryIssues: () => [],
+  getCardIssueCounts: () => ({ errors: 0, warnings: 0 }),
 };
 
 export function useUserValidation(): UserValidationContextValue {

@@ -23,11 +23,14 @@ export function UserAuthStatus({ userId }: UserAuthStatusProps) {
 
   return (
     <div
-      id={getFieldMessageId(authPath, error.code)}
-      role="alert"
-      className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900"
+      id={`user-auth-${userId}`}
+      tabIndex={-1}
+      data-field-message-id={getFieldMessageId(authPath, error.code)}
+      className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
-      {error.message}
+      <span id={getFieldMessageId(authPath, error.code)} role="alert">
+        {error.message}
+      </span>
     </div>
   );
 }
