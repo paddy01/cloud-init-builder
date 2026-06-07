@@ -1,0 +1,9 @@
+#cloud-config
+users:
+  - name: deploy
+    gecos: Deploy User
+    groups:
+      - docker
+      - admins
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash

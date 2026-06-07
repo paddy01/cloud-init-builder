@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectFile } from "../../../src/models/project.ts";
+import { generateCloudInit } from "../../../src/generators/generateCloudInit.ts";
+import { SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
 import {
   copyCloudInitYaml,
   exportCloudInitYaml,
 } from "../../../src/services/yamlService.ts";
 import * as validateConfig from "../../../src/validators/validateConfig.ts";
+import identityUsersFull from "../../fixtures/identity-users-full.yaml?raw";
+import usersCommon from "../../fixtures/users-common.yaml?raw";
 
 const baseMetadata = {
   createdAt: "2026-06-01T10:00:00.000Z",
@@ -146,5 +150,118 @@ describe("copyCloudInitYaml", () => {
 
     const success = await copyCloudInitYaml(validProject());
     expect(success).toBe(false);
+  });
+});
+
+describe("yamlService users export parity", () => {
+  const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:mock-url");
+  const writeText = vi.fn().mockResolvedValue(undefined);
+
+  beforeEach(() => {
+    vi.stubGlobal("URL", {
+      createObjectURL,
+      revokeObjectURL: vi.fn(),
+    });
+    vi.stubGlobal("navigator", {
+      clipboard: { writeText },
+    });
+    vi.spyOn(document, "createElement").mockImplementation((tagName) => {
+      if (tagName === "a") {
+        return {
+          href: "",
+          download: "",
+          click: vi.fn(),
+        } as unknown as HTMLAnchorElement;
+      }
+      return document.createElement(tagName);
+    });
+    vi.spyOn(document.body, "appendChild").mockImplementation(
+      (node) => node as Node,
+    );
+    vi.spyOn(document.body, "removeChild").mockImplementation(
+      (node) => node as Node,
+    );
+    createObjectURL.mockClear();
+    writeText.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("matches direct generation for common and combined fixtures", async () => {
+    const commonProject = validProject({
+      identity: undefined,
+      users: {
+        preserveDefault: false,
+        entries: [
+          {
+            id: "common-1",
+            name: "deploy",
+            gecos: "Deploy User",
+            groups: ["docker", "admins"],
+            shell: "/bin/bash",
+            sudo: SUDO_PASSWORDLESS,
+          },
+        ],
+      },
+    });
+    const combinedProject = validProject({
+      identity: {
+        hostname: "web01",
+        fqdn: "web01.lan.example.com",
+        prefer_fqdn_over_hostname: true,
+        manage_etc_hosts: "localhost",
+        timezone: "Europe/Stockholm",
+        locale: "en_US.UTF-8",
+      },
+      users: {
+        preserveDefault: true,
+        entries: [
+          {
+            id: "full-1",
+            name: "deploy",
+            gecos: "Deploy User",
+            groups: ["docker"],
+            shell: "/bin/bash",
+            sudo: SUDO_PASSWORDLESS,
+            primary_group: "deploy",
+            homedir: "/srv/deploy",
+          },
+        ],
+      },
+    });
+
+    expect(generateCloudInit(commonProject).yaml).toBe(usersCommon);
+    expect(generateCloudInit(combinedProject).yaml).toBe(identityUsersFull);
+
+    await copyCloudInitYaml(commonProject);
+    const [commonCopied] = writeText.mock.calls[0] ?? [];
+    expect(commonCopied).toBe(usersCommon);
+
+    expect(exportCloudInitYaml(combinedProject)).toBe(true);
+    const [blobArg] = createObjectURL.mock.calls[0] ?? [];
+    expect(blobArg).toBeInstanceOf(Blob);
+    if (blobArg instanceof Blob && typeof blobArg.arrayBuffer === "function") {
+      const exportedText = new TextDecoder().decode(await blobArg.arrayBuffer());
+      expect(exportedText).toBe(identityUsersFull);
+    }
+  });
+
+  it("does not block export for duplicate or blank custom usernames", () => {
+    const duplicateUsersProject = validProject({
+      users: {
+        preserveDefault: true,
+        entries: [
+          { id: "dup-a", name: "shared", shell: "/bin/bash" },
+          { id: "dup-b", name: "shared", shell: "/bin/bash" },
+          { id: "blank", shell: "/bin/bash" },
+        ],
+      },
+    });
+
+    expect(exportCloudInitYaml(duplicateUsersProject)).toBe(true);
+    expect(createObjectURL).toHaveBeenCalled();
   });
 });

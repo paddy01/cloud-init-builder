@@ -325,3 +325,44 @@ describe("TopBar typography", () => {
     expect(heading.className).not.toContain("font-bold");
   });
 });
+
+describe("TopBar Phase 4 scope fence", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+    vi.spyOn(window, "confirm");
+    vi.spyOn(window, "alert");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps export enabled for duplicate and blank usernames when identity is valid", () => {
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          users: {
+            preserveDefault: true,
+            entries: [
+              { id: "dup-a", name: "shared", shell: "/bin/bash" },
+              { id: "dup-b", name: "shared", shell: "/bin/bash" },
+              { id: "blank", shell: "/bin/bash" },
+            ],
+          },
+        },
+      });
+    });
+
+    render(<TopBar />);
+    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /copy yaml/i })).toBeEnabled();
+  });
+});
