@@ -233,3 +233,37 @@ describe("UsersWorkflow remove", () => {
     expect(screen.getByText("No groups")).toBeInTheDocument();
   });
 });
+
+describe("UsersWorkflow validation interaction boundaries", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Test");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("clears transient password draft feedback after starting a new project", async () => {
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+    const passwordInput = screen.getByLabelText("Hashed password");
+    fireEvent.change(passwordInput, { target: { value: "hunter2" } });
+    fireEvent.blur(passwordInput);
+    expect(
+      screen.getByText(/Export blocked: enter a supported password hash/i),
+    ).toBeInTheDocument();
+
+    useProjectStore.getState().newProject("Fresh");
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+    expect(
+      screen.queryByText(/Export blocked: enter a supported password hash/i),
+    ).not.toBeInTheDocument();
+  });
+});

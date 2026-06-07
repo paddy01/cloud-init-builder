@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UserCard } from "../../../../src/components/users/UserCard.tsx";
+import { UserValidationProvider } from "../../../../src/components/users/UserValidationContext.tsx";
 import { buildCloudInitUsers } from "../../../../src/generators/generateUsers.ts";
 import {
   createBlankUser,
@@ -22,6 +23,14 @@ const initialState = {
   isDirty: false,
   importWarnings: [],
 };
+
+function renderUserCard(userId: string) {
+  return render(
+    <UserValidationProvider>
+      <StoreBackedUserCard userId={userId} />
+    </UserValidationProvider>,
+  );
+}
 
 function StoreBackedUserCard({ userId }: { userId: string }) {
   const user = useProjectStore((state) => {
@@ -84,7 +93,7 @@ describe("UserSafetyFields authentication controls", () => {
     const user = createBlankUser("safety-user");
     user.name = "deploy";
     seedProject([user]);
-    render(<StoreBackedUserCard userId={user.id} />);
+    renderUserCard(user.id);
 
     expect(screen.getByRole("heading", { name: "Authentication" })).toBeInTheDocument();
     expect(
@@ -111,7 +120,7 @@ describe("UserSafetyFields authentication controls", () => {
     const user = createBlankUser("password-user");
     user.name = "deploy";
     seedProject([user]);
-    render(<StoreBackedUserCard userId={user.id} />);
+    renderUserCard(user.id);
 
     const passwordInput = screen.getByLabelText("Hashed password");
     await userEvent.type(passwordInput, "hunter2");
@@ -130,13 +139,34 @@ describe("UserSafetyFields authentication controls", () => {
     expect(getGeneratedYamlForUser()).toContain('"lock_passwd":false');
   });
 
+  it("shows unsupported password draft errors inline without persisting them", async () => {
+    const user = createBlankUser("draft-user");
+    user.name = "deploy";
+    seedProject([user]);
+    renderUserCard(user.id);
+
+    const passwordInput = screen.getByLabelText("Hashed password");
+    expect(
+      screen.queryByText(/Export blocked: enter a supported password hash/i),
+    ).not.toBeInTheDocument();
+
+    await userEvent.type(passwordInput, "hunter2");
+    fireEvent.blur(passwordInput);
+
+    expect(
+      screen.getByText(/Export blocked: enter a supported password hash/i),
+    ).toBeInTheDocument();
+    expect(getStoreUser(user.id)?.passwd).toBeUndefined();
+    expect(passwordInput).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("relocks the user and removes passwd from YAML when the hash is cleared", async () => {
     const user = createBlankUser("clear-password");
     user.name = "deploy";
     user.passwd = BCRYPT_HASH;
     user.lock_passwd = false;
     seedProject([user]);
-    render(<StoreBackedUserCard userId={user.id} />);
+    renderUserCard(user.id);
 
     const passwordInput = screen.getByLabelText("Hashed password");
     fireEvent.change(passwordInput, { target: { value: "" } });
@@ -152,7 +182,7 @@ describe("UserSafetyFields authentication controls", () => {
     const user = createBlankUser("ssh-user");
     user.name = "deploy";
     seedProject([user]);
-    render(<StoreBackedUserCard userId={user.id} />);
+    renderUserCard(user.id);
 
     await userEvent.click(screen.getByRole("button", { name: "Add SSH key" }));
 
@@ -174,7 +204,7 @@ describe("UserSafetyFields authentication controls", () => {
     const user = createBlankUser("toggle-password");
     user.name = "deploy";
     seedProject([user]);
-    render(<StoreBackedUserCard userId={user.id} />);
+    renderUserCard(user.id);
 
     const passwordInput = screen.getByLabelText("Hashed password");
     expect(passwordInput).toHaveAttribute("type", "password");
@@ -184,5 +214,95 @@ describe("UserSafetyFields authentication controls", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Hide hash" }));
     expect(passwordInput).toHaveAttribute("type", "password");
+  });
+});
+
+describe("UserSafetyFields inline validation feedback", () => {
+  beforeEach(() => {
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Test");
+  });
+
+  it("keeps untouched blank username quiet and reveals errors after blur", () => {
+    const user = createBlankUser("username-user");
+    user.name = "deploy";
+    user.gecos = "Deploy User";
+    seedProject([user]);
+    renderUserCard(user.id);
+
+    const usernameInput = screen.getByLabelText("Username");
+    expect(
+      screen.queryByText(/Export blocked: enter a username or clear the other fields/i),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(usernameInput, { target: { value: "" } });
+    fireEvent.blur(usernameInput);
+
+    expect(
+      screen.getByText(/Export blocked: enter a username or clear the other fields/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows uppercase username warnings without aria-invalid", () => {
+    const user = createBlankUser("upper-user");
+    user.name = "Deploy";
+    seedProject([user]);
+    renderUserCard(user.id);
+
+    fireEvent.blur(screen.getByLabelText("Username"));
+
+    expect(
+      screen.getByText(/Warning: Lowercase usernames are recommended/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Username")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("shows authentication errors after an authentication control is blurred", async () => {
+    const user = createBlankUser("auth-user");
+    user.name = "deploy";
+    seedProject([user]);
+    renderUserCard(user.id);
+
+    expect(
+      screen.queryByText(/Export blocked: add a supported password hash or at least one valid SSH key/i),
+    ).not.toBeInTheDocument();
+
+    fireEvent.blur(screen.getByLabelText("Hashed password"));
+
+    expect(
+      screen.getByText(/Export blocked: add a supported password hash or at least one valid SSH key/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show authentication errors for exempt system users", () => {
+    const user = createBlankUser("system-user");
+    user.name = "svc";
+    user.system = true;
+    seedProject([user]);
+    renderUserCard(user.id);
+
+    fireEvent.blur(screen.getByLabelText("Hashed password"));
+
+    expect(
+      screen.queryByText(/Export blocked: add a supported password hash or at least one valid SSH key/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clears inline feedback live after correction without another blur", () => {
+    const user = createBlankUser("live-user");
+    user.name = "-bad";
+    seedProject([user]);
+    renderUserCard(user.id);
+
+    const usernameInput = screen.getByLabelText("Username");
+    fireEvent.blur(usernameInput);
+    expect(
+      screen.getByText(/Export blocked: use 1-32 letters, numbers, underscores, or hyphens/i),
+    ).toBeInTheDocument();
+
+    fireEvent.change(usernameInput, { target: { value: "deploy" } });
+    expect(
+      screen.queryByText(/Export blocked: use 1-32 letters, numbers, underscores, or hyphens/i),
+    ).not.toBeInTheDocument();
   });
 });

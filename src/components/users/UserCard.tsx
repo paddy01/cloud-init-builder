@@ -3,14 +3,23 @@ import type { BuilderUser } from "../../models/users.ts";
 import { getUserHeaderMetadata } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { AdvancedUserOptions } from "./AdvancedUserOptions.tsx";
+import { FieldMessage } from "./FieldMessage.tsx";
 import { GroupsInput } from "./GroupsInput.tsx";
-import { ShellSelector } from "./ShellSelector.tsx";
 import { PasswordHashField } from "./PasswordHashField.tsx";
+import { ShellSelector } from "./ShellSelector.tsx";
 import { SshAuthorizedKeysInput } from "./SshAuthorizedKeysInput.tsx";
 import { SudoRuleSelector } from "./SudoRuleSelector.tsx";
+import { UserAuthStatus } from "./UserAuthStatus.tsx";
+import { useUserValidation } from "./UserValidationContext.tsx";
 
-const inputClassName =
+const inputDefaultClassName =
   "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
+  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+const inputErrorClassName =
+  "border border-red-300 rounded px-3 py-2 text-sm bg-white " +
+  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+const inputWarningClassName =
+  "border border-amber-300 rounded px-3 py-2 text-sm bg-white " +
   "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
 
 interface UserCardProps {
@@ -27,11 +36,33 @@ export function UserCard({
   onRemove,
 }: UserCardProps) {
   const updateUser = useProjectStore((state) => state.updateUser);
+  const {
+    markTouched,
+    getVisibleIssuesForPath,
+    hasVisibleErrorForPath,
+    getFieldMessageId,
+  } = useUserValidation();
   const usernameRef = useRef<HTMLInputElement>(null);
   const [pendingSshFocusId, setPendingSshFocusId] = useState<string | null>(
     null,
   );
   const { title, secondary, badges } = getUserHeaderMetadata(user);
+  const usernamePath = `users.entries.${user.id}.name`;
+  const usernameIssues = getVisibleIssuesForPath(usernamePath);
+  const usernameErrors = usernameIssues.filter(
+    (issue) => issue.severity === "error",
+  );
+  const usernameWarnings = usernameIssues.filter(
+    (issue) => issue.severity === "warning",
+  );
+  const hasUsernameError = hasVisibleErrorForPath(usernamePath);
+
+  const usernameDescribedBy = [
+    `user-username-help-${user.id}`,
+    ...usernameIssues.map((issue) =>
+      getFieldMessageId(usernamePath, issue.code),
+    ),
+  ].join(" ");
 
   useLayoutEffect(() => {
     if (!shouldFocusUsername) return;
@@ -49,6 +80,12 @@ export function UserCard({
     }
     onRemove(user.id);
   };
+
+  const usernameInputClassName = hasUsernameError
+    ? inputErrorClassName
+    : usernameWarnings.length > 0
+      ? inputWarningClassName
+      : inputDefaultClassName;
 
   return (
     <article
@@ -114,15 +151,37 @@ export function UserCard({
             type="text"
             placeholder="e.g. deploy"
             value={user.name ?? ""}
+            aria-invalid={hasUsernameError ? true : undefined}
+            aria-describedby={usernameDescribedBy}
             onChange={(event) =>
               updateUser(user.id, { name: event.target.value })
             }
-            className={inputClassName}
+            onBlur={() => markTouched(usernamePath)}
+            className={usernameInputClassName}
           />
-          <p className="text-xs text-gray-500">
+          <p
+            id={`user-username-help-${user.id}`}
+            className="text-xs text-gray-500"
+          >
             Letters, numbers, underscores, and hyphens. Must start with a letter
             or underscore.
           </p>
+          {usernameErrors.map((issue) => (
+            <FieldMessage
+              key={issue.code}
+              id={getFieldMessageId(usernamePath, issue.code)}
+              message={issue.message}
+              severity="error"
+            />
+          ))}
+          {usernameWarnings.map((issue) => (
+            <FieldMessage
+              key={issue.code}
+              id={getFieldMessageId(usernamePath, issue.code)}
+              message={issue.message}
+              severity="warning"
+            />
+          ))}
         </div>
 
         <div className="space-y-1">
@@ -140,7 +199,7 @@ export function UserCard({
             onChange={(event) =>
               updateUser(user.id, { gecos: event.target.value })
             }
-            className={inputClassName}
+            className={inputDefaultClassName}
           />
           <p className="text-xs text-gray-500">
             Optional. Written to cloud-init as the user&apos;s GECOS value.
@@ -198,6 +257,8 @@ export function UserCard({
             onFocused={() => setPendingSshFocusId(null)}
             onRowAdded={(rowId) => setPendingSshFocusId(rowId)}
           />
+
+          <UserAuthStatus userId={user.id} />
         </div>
 
         <AdvancedUserOptions user={user} />
