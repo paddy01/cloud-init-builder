@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import packageJson from "../../package.json";
 import futureProjectV99 from "../fixtures/future-project-v99.cib.json?raw";
 import invalidProjectBadMetadata from "../fixtures/invalid-project-bad-metadata.cib.json?raw";
+import legacyProjectUsersArray from "../fixtures/legacy-project-users-array.cib.json?raw";
 import validProjectIdentityFull from "../fixtures/valid-project-identity-full.cib.json?raw";
+import validProjectUsersFull from "../fixtures/valid-project-users-full.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
   CURRENT_FORMAT_VERSION,
@@ -149,5 +152,113 @@ describe("version handling integration", () => {
         fileFromJson(futureProjectV99, "future-project-v99.cib.json"),
       ),
     ).rejects.toThrow(/format version 99.*supports up to/i);
+  });
+});
+
+describe("users project round-trip", () => {
+  it("preserves canonical full users through double round-trip", async () => {
+    const firstImport = await importProject(
+      fileFromJson(
+        validProjectUsersFull,
+        "valid-project-users-full.cib.json",
+      ),
+    );
+
+    expect(firstImport.warnings).toEqual([]);
+    expect(isUsersConfig(firstImport.project.users)).toBe(true);
+    if (!isUsersConfig(firstImport.project.users)) {
+      throw new Error("expected canonical users");
+    }
+
+    expect(firstImport.project.users).toEqual({
+      preserveDefault: true,
+      entries: [
+        {
+          id: "user-stable-deploy",
+          name: "deploy",
+          gecos: "Deploy User",
+          groups: ["docker", "admins"],
+          shell: "/usr/local/bin/fish",
+          sudo: "ALL=(ALL) NOPASSWD:ALL",
+          primary_group: "deploy",
+          homedir: "/srv/deploy",
+        },
+        {
+          id: "user-stable-ops",
+          name: "ops",
+          groups: ["wheel"],
+          shell: "/bin/sh",
+          sudo: "ALL=(ALL) ALL",
+          no_create_home: true,
+          primary_group: "ops",
+        },
+      ],
+    });
+
+    const exportedOnce = JSON.stringify(firstImport.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exportedOnce));
+    const exportedTwice = JSON.stringify(secondImport.project, null, 2);
+    const thirdImport = await importProject(fileFromJson(exportedTwice));
+
+    expect(secondImport.project.users).toEqual(firstImport.project.users);
+    expect(thirdImport.project.users).toEqual(firstImport.project.users);
+  });
+
+  it("normalizes legacy user arrays with warnings and preserves supported fields", async () => {
+    const result = await importProject(
+      fileFromJson(
+        legacyProjectUsersArray,
+        "legacy-project-users-array.cib.json",
+      ),
+    );
+
+    const warningText = JSON.stringify(result.warnings);
+    expect(warningText).toContain("plain_text_passwd");
+    expect(warningText).toContain("ssh_authorized_keys");
+    expect(isUsersConfig(result.project.users)).toBe(true);
+    if (!isUsersConfig(result.project.users)) {
+      throw new Error("expected canonical users");
+    }
+
+    expect(result.project.users.preserveDefault).toBe(true);
+    expect(result.project.users.entries).toHaveLength(2);
+    expect(result.project.users.entries[0]).toMatchObject({
+      name: "legacy",
+      gecos: "Legacy User",
+      groups: ["adm"],
+      shell: "/bin/bash",
+      sudo: "ALL=(ALL) NOPASSWD:ALL",
+      primary_group: "legacy",
+      homedir: "/home/legacy",
+    });
+    expect(result.project.users.entries[0]).not.toHaveProperty(
+      "plain_text_passwd",
+    );
+    expect(result.project.users.entries[0]).not.toHaveProperty(
+      "ssh_authorized_keys",
+    );
+    expect(result.project.users.entries[1]).toMatchObject({
+      name: "daemon",
+      system: true,
+      shell: "/usr/sbin/nologin",
+      homedir: "/var/lib/daemon",
+    });
+
+    const exported = JSON.stringify(result.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exported));
+    expect(secondImport.project.users).toEqual(result.project.users);
+    expect(secondImport.warnings).toEqual([]);
+  });
+});
+
+describe("Phase 3 dependency fence", () => {
+  it("keeps package manifests free of new Phase 3 runtime dependencies", () => {
+    expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "react",
+      "react-dom",
+      "yaml",
+      "zod",
+      "zustand",
+    ]);
   });
 });

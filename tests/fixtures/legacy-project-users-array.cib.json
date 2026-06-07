@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "metadata": {
+    "name": "Legacy Users Array",
+    "createdAt": "2026-06-01T10:00:00.000Z",
+    "updatedAt": "2026-06-01T12:30:00.000Z",
+    "appVersion": "0.1.0"
+  },
+  "identity": {
+    "hostname": "legacy-host"
+  },
+  "users": [
+    "default",
+    {
+      "name": "legacy",
+      "gecos": "Legacy User",
+      "groups": ["adm"],
+      "shell": "/bin/bash",
+      "sudo": "ALL=(ALL) NOPASSWD:ALL",
+      "primary_group": "legacy",
+      "homedir": "/home/legacy",
+      "plain_text_passwd": "not-supported",
+      "ssh_authorized_keys": ["ssh-rsa AAAA..."]
+    },
+    {
+      "name": "daemon",
+      "system": true,
+      "shell": "/usr/sbin/nologin",
+      "homedir": "/var/lib/daemon"
+    }
+  ]
+}

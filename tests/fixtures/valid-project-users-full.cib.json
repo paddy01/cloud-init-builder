@@ -1,0 +1,37 @@
+{
+  "formatVersion": 1,
+  "metadata": {
+    "name": "Users Full Template",
+    "createdAt": "2026-06-01T10:00:00.000Z",
+    "updatedAt": "2026-06-01T12:30:00.000Z",
+    "appVersion": "0.1.0"
+  },
+  "identity": {
+    "hostname": "web01",
+    "fqdn": "web01.lan.example.com"
+  },
+  "users": {
+    "preserveDefault": true,
+    "entries": [
+      {
+        "id": "user-stable-deploy",
+        "name": "deploy",
+        "gecos": "Deploy User",
+        "groups": ["docker", "admins"],
+        "shell": "/usr/local/bin/fish",
+        "sudo": "ALL=(ALL) NOPASSWD:ALL",
+        "primary_group": "deploy",
+        "homedir": "/srv/deploy"
+      },
+      {
+        "id": "user-stable-ops",
+        "name": "ops",
+        "groups": ["wheel"],
+        "shell": "/bin/sh",
+        "sudo": "ALL=(ALL) ALL",
+        "no_create_home": true,
+        "primary_group": "ops"
+      }
+    ]
+  }
+}

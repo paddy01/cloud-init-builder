@@ -8,6 +8,8 @@ import {
 } from "@testing-library/react";
 import { MainLayout } from "../../src/layouts/MainLayout.tsx";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
+import { importProject } from "../../src/services/projectService.ts";
+import validProjectUsersFull from "../fixtures/valid-project-users-full.cib.json?raw";
 import {
   createBlankUser,
   isUsersConfig,
@@ -423,6 +425,54 @@ describe("MainLayout full Phase 3 workflow", () => {
   });
 });
 
+describe("MainLayout reopened project workflow", () => {
+  beforeEach(() => {
+    useProjectStore.setState(initialState);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps reopened blank and duplicate names editable without new export blockers", async () => {
+    const imported = await importProject(
+      new File([validProjectUsersFull], "valid-project-users-full.cib.json", {
+        type: "application/json",
+      }),
+    );
+    useProjectStore.getState().loadProject(imported.project);
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    const project = useProjectStore.getState().project;
+    if (!project?.users || !isUsersConfig(project.users)) {
+      throw new Error("expected users config");
+    }
+    useProjectStore.setState({
+      project: {
+        ...project,
+        users: {
+          ...project.users,
+          entries: [
+            ...project.users.entries,
+            createBlankUser("reopened-blank"),
+            { ...createBlankUser("reopened-dup"), name: "deploy" },
+          ],
+        },
+      },
+    });
+
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+
+    const blankInput = document.getElementById(
+      "user-username-reopened-blank",
+    ) as HTMLInputElement;
+    fireEvent.change(blankInput, { target: { value: "later" } });
+    expect(blankInput).toHaveValue("later");
+    expect(screen.getAllByDisplayValue("deploy").length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
+  });
+});
+
 describe("MainLayout Phase 4 scope fence", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -474,4 +524,5 @@ describe("MainLayout Phase 4 scope fence", () => {
     expect(screen.queryByText(/invalid username/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /export yaml/i })).toBeEnabled();
   });
+
 });
