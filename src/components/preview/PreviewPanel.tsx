@@ -6,14 +6,17 @@ import {
 import { isUsersConfig } from "../../models/users.ts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
-import { validateIdentity } from "../../validators/validateConfig.ts";
+import { validateConfig } from "../../validators/validateConfig.ts";
 import { PreviewBanner } from "./PreviewBanner.tsx";
 
 export function PreviewPanel() {
   const project = useProjectStore((s) => s.project);
   const debouncedProject = useDebouncedValue(project, 300);
-  const identity = project?.identity;
-  const issues = useMemo(() => validateIdentity(identity), [identity]);
+  const issues = useMemo(() => validateConfig(project), [project]);
+  const blockingErrors = useMemo(
+    () => issues.filter((issue) => issue.severity === "error"),
+    [issues],
+  );
   const result = useMemo(
     () =>
       generateCloudInit({
@@ -39,7 +42,7 @@ export function PreviewPanel() {
   if (result.yaml === CLOUD_CONFIG_HEADER) {
     return (
       <>
-        <PreviewBanner issues={issues} />
+        <PreviewBanner issues={blockingErrors} />
         <div className="p-4 text-center">
           <p className="text-sm font-semibold text-gray-900">No identity yet</p>
           <p className="text-sm text-gray-500">
@@ -56,7 +59,7 @@ export function PreviewPanel() {
 
   return (
     <>
-      <PreviewBanner issues={issues} />
+      <PreviewBanner issues={blockingErrors} />
       <pre className="overflow-auto px-4 py-3">
         <code className="font-mono text-xs leading-5 whitespace-pre text-gray-900">
           {result.yaml}

@@ -5,7 +5,7 @@ import {
 import type { ProjectFile } from "../models/project.ts";
 import { isUsersConfig } from "../models/users.ts";
 import { slugify } from "../utils/slugify.ts";
-import { validateIdentity } from "../validators/validateConfig.ts";
+import { validateConfig } from "../validators/validateConfig.ts";
 
 function toGenerateInput(project: ProjectFile): GenerateProjectInput {
   return {
@@ -15,7 +15,7 @@ function toGenerateInput(project: ProjectFile): GenerateProjectInput {
 }
 
 export function exportCloudInitYaml(project: ProjectFile): boolean {
-  const issues = validateIdentity(project.identity);
+  const issues = validateConfig(project);
   if (issues.some((issue) => issue.severity === "error")) {
     return false;
   }

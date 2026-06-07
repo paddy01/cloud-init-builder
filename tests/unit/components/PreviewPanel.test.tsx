@@ -133,6 +133,52 @@ describe("PreviewPanel debounce and validation", () => {
 
     expect(screen.getByText("1 validation error")).toBeInTheDocument();
   });
+
+  it("shows user validation errors immediately while YAML stays debounced", () => {
+    const validSsh =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+    const project = useProjectStore.getState().project;
+    if (!project) throw new Error("expected project");
+
+    const { container } = render(<PreviewPanel />);
+
+    act(() => {
+      useProjectStore.setState({
+        project: {
+          ...project,
+          identity: { hostname: "web01" },
+          users: {
+            preserveDefault: true,
+            entries: [
+              {
+                id: "dup-a",
+                name: "shared",
+                shell: "/bin/bash",
+                ssh_authorized_keys: [{ id: "k1", value: validSsh }],
+              },
+              {
+                id: "dup-b",
+                name: "shared",
+                shell: "/bin/bash",
+                ssh_authorized_keys: [{ id: "k2", value: validSsh }],
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    expect(screen.getByText("2 validation errors")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/name: Export blocked: username conflicts/i),
+    ).toHaveLength(2);
+
+    act(() => {
+      vi.advanceTimersByTime(299);
+    });
+    const code = container.querySelector("pre code");
+    expect(code?.textContent).not.toContain("name: shared");
+  });
 });
 
 describe("PreviewPanel security", () => {

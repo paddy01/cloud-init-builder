@@ -1,7 +1,14 @@
 import type { ValidationIssue } from "../../validators/validateConfig.ts";
 
-function pathSuffix(path: string): string {
-  return path.startsWith("identity.") ? path.slice("identity.".length) : path;
+function formatIssuePath(path: string): string {
+  if (path.startsWith("identity.")) {
+    return path.slice("identity.".length);
+  }
+  if (path.startsWith("users.entries.")) {
+    const match = /^users\.entries\.[^.]+\.(.+)$/.exec(path);
+    return match?.[1] ?? path;
+  }
+  return path;
 }
 
 export function PreviewBanner({ issues }: { issues: ValidationIssue[] }) {
@@ -22,7 +29,7 @@ export function PreviewBanner({ issues }: { issues: ValidationIssue[] }) {
       <ul className="mt-1 list-disc pl-5 text-xs">
         {issues.slice(0, 3).map((issue, index) => (
           <li key={`${issue.path}-${index}`} role="alert">
-            {pathSuffix(issue.path)}: {issue.message}
+            {formatIssuePath(issue.path)}: {issue.message}
           </li>
         ))}
         {issues.length > 3 && (
