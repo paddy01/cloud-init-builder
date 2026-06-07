@@ -121,4 +121,52 @@ describe("buildCloudInitUsers", () => {
     const mapped = mapBuilderUser(userWith({ name: "deploy" }));
     expect(mapped).not.toHaveProperty("sudo");
   });
+
+  it("emits no_create_home only when create home is unchecked", () => {
+    const mapped = mapBuilderUser(
+      userWith({ name: "service", no_create_home: true, homedir: "/srv/service" }),
+    );
+    expect(mapped).toEqual({
+      name: "service",
+      shell: "/bin/bash",
+      homedir: "/srv/service",
+      no_create_home: true,
+    });
+  });
+
+  it("omits contradictory home fields for system users while retaining order", () => {
+    const mapped = mapBuilderUser(
+      userWith({
+        name: "daemon",
+        primary_group: "daemon",
+        homedir: "/var/lib/daemon",
+        no_create_home: true,
+        system: true,
+        shell: "/usr/sbin/nologin",
+      }),
+    );
+    expect(mapped).toEqual({
+      name: "daemon",
+      primary_group: "daemon",
+      shell: "/usr/sbin/nologin",
+      system: true,
+    });
+    expect(Object.keys(mapped!)).toEqual(
+      USER_KEY_ORDER.filter((key) => key in mapped!),
+    );
+  });
+
+  it("re-emits retained homedir after system is cleared", () => {
+    const user = userWith({
+      name: "daemon",
+      homedir: "/var/lib/daemon",
+      system: true,
+    });
+    expect(mapBuilderUser(user)).not.toHaveProperty("homedir");
+
+    const restored = { ...user, system: undefined };
+    expect(mapBuilderUser(restored)).toMatchObject({
+      homedir: "/var/lib/daemon",
+    });
+  });
 });

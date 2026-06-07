@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import type { BuilderUser } from "../../models/users.ts";
 import { getUserHeaderMetadata } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { AdvancedUserOptions } from "./AdvancedUserOptions.tsx";
 import { GroupsInput } from "./GroupsInput.tsx";
 import { ShellSelector } from "./ShellSelector.tsx";
 import { SudoRuleSelector } from "./SudoRuleSelector.tsx";
@@ -167,6 +168,8 @@ export function UserCard({
           sudo={user.sudo}
           onChange={(sudo) => updateUser(user.id, { sudo })}
         />
+
+        <AdvancedUserOptions user={user} />
       </div>
     </article>
   );

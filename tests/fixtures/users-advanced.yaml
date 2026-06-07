@@ -1,0 +1,11 @@
+#cloud-config
+users:
+  - name: service
+    primary_group: service
+    shell: /bin/bash
+    homedir: /srv/service
+    no_create_home: true
+  - name: daemon
+    primary_group: daemon
+    shell: /usr/sbin/nologin
+    system: true
