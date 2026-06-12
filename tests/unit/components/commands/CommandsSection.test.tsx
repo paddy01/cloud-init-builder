@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   fireEvent,
   render,
   screen,
   within,
 } from "@testing-library/react";
 import { CommandsSection } from "../../../../src/components/commands/CommandsSection.tsx";
+import { PreviewPanel } from "../../../../src/components/preview/PreviewPanel.tsx";
 import { isCommandsConfig } from "../../../../src/models/commands.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
 
@@ -37,6 +39,37 @@ describe("CommandsSection", () => {
       throw new Error("expected commands config");
     }
     return project.commands;
+  }
+
+  function shellCommandValues() {
+    return screen
+      .getAllByLabelText("Command")
+      .map((input) => (input as HTMLTextAreaElement).value);
+  }
+
+  function runcmdLinesFromPreview(container: HTMLElement) {
+    const yaml = container.querySelector("pre code")?.textContent ?? "";
+    const lines = yaml.split("\n");
+    const start = lines.findIndex((line) => line === "runcmd:");
+    if (start === -1) {
+      return [];
+    }
+
+    const entries: string[] = [];
+    for (let index = start + 1; index < lines.length; index += 1) {
+      const line = lines[index] ?? "";
+      if (!line.startsWith("  - ")) {
+        break;
+      }
+      entries.push(line.slice(4));
+    }
+    return entries;
+  }
+
+  async function advancePreviewDebounce() {
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+    });
   }
 
   it("defaults to Run commands with guidance and zero counts", () => {
@@ -185,5 +218,99 @@ describe("CommandsSection", () => {
 
     expect(screen.getByDisplayValue(payload)).toBeInTheDocument();
     expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("keeps reorder controls focused, updates visible order, and syncs preview for both directions", async () => {
+    vi.useFakeTimers();
+
+    const project = useProjectStore.getState().project;
+    if (!project) {
+      throw new Error("expected project");
+    }
+    project.identity = { hostname: "cmd-host" };
+    useProjectStore.setState({ project: { ...project } });
+
+    const { container } = render(
+      <>
+        <CommandsSection />
+        <PreviewPanel />
+      </>,
+    );
+
+    const addRunCommand = (value: string) => {
+      fireEvent.click(screen.getByRole("button", { name: "Add run command" }));
+      const inputs = screen.getAllByLabelText("Command");
+      fireEvent.change(inputs[inputs.length - 1]!, {
+        target: { value },
+      });
+    };
+
+    addRunCommand("alpha-command");
+    addRunCommand("beta-command");
+    addRunCommand("gamma-command");
+
+    expect(shellCommandValues()).toEqual([
+      "alpha-command",
+      "beta-command",
+      "gamma-command",
+    ]);
+    await advancePreviewDebounce();
+    expect(runcmdLinesFromPreview(container)).toEqual([
+      "alpha-command",
+      "beta-command",
+      "gamma-command",
+    ]);
+
+    const thirdCard = screen.getAllByRole("article")[2]!;
+    fireEvent.click(
+      within(thirdCard).getByRole("button", { name: "Move up" }),
+    );
+
+    expect(shellCommandValues()).toEqual([
+      "alpha-command",
+      "gamma-command",
+      "beta-command",
+    ]);
+    expect(
+      within(screen.getAllByRole("article")[1]!).getByRole("button", {
+        name: "Move up",
+      }),
+    ).toHaveFocus();
+    expect(
+      screen.getByText("Run command moved to position 2 of 3."),
+    ).toBeInTheDocument();
+    await advancePreviewDebounce();
+    expect(runcmdLinesFromPreview(container)).toEqual([
+      "alpha-command",
+      "gamma-command",
+      "beta-command",
+    ]);
+
+    const firstCard = screen.getAllByRole("article")[0]!;
+    fireEvent.click(
+      within(firstCard).getByRole("button", { name: "Move down" }),
+    );
+
+    expect(shellCommandValues()).toEqual([
+      "gamma-command",
+      "alpha-command",
+      "beta-command",
+    ]);
+    expect(
+      within(screen.getAllByRole("article")[1]!).getByRole("button", {
+        name: "Move down",
+      }),
+    ).toHaveFocus();
+    expect(
+      screen.getByText("Run command moved to position 2 of 3."),
+    ).toBeInTheDocument();
+    await advancePreviewDebounce();
+    expect(runcmdLinesFromPreview(container)).toEqual([
+      "gamma-command",
+      "alpha-command",
+      "beta-command",
+    ]);
+
+    vi.useRealTimers();
   });
 });
