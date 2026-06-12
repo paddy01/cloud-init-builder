@@ -62,6 +62,12 @@ export function createBlankCommand(id = createCommandId()): BuilderCommand {
   return { id, form: "shell", command: "" };
 }
 
+export function createBlankArgvCommand(
+  id = createCommandId(),
+): Extract<BuilderCommand, { form: "argv" }> {
+  return { id, form: "argv", executable: "", arguments: [] };
+}
+
 export function isCommandsConfig(value: unknown): value is CommandsConfig {
   return (
     typeof value === "object" &&

@@ -1,6 +1,10 @@
-import { useLayoutEffect, useRef, type RefObject } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
-import { useProjectStore } from "../../state/projectStore.ts";
+import {
+  ArgvCommandInput,
+  type ArgvCommandInputHandle,
+} from "./ArgvCommandInput.tsx";
+import { CommandFormSelector } from "./CommandFormSelector.tsx";
 import { ShellCommandInput } from "./ShellCommandInput.tsx";
 
 const REMOVE_CONFIRM =
@@ -29,6 +33,7 @@ function prefersReducedMotion(): boolean {
   ) {
     return true;
   }
+
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
@@ -44,8 +49,15 @@ function scrollCardIntoView(cardRef: RefObject<HTMLElement | null>): void {
   });
 }
 
-function isBlankShellCommand(command: BuilderCommand): boolean {
-  return command.form === "shell" && command.command.trim() === "";
+function isBlankCommand(command: BuilderCommand): boolean {
+  if (command.form === "shell") {
+    return command.command.trim() === "";
+  }
+
+  return (
+    command.executable.trim() === "" &&
+    command.arguments.every((argument) => argument.value.trim() === "")
+  );
 }
 
 export function CommandCard({
@@ -60,6 +72,8 @@ export function CommandCard({
 }: CommandCardProps) {
   const cardRef = useRef<HTMLElement>(null);
   const commandRef = useRef<HTMLTextAreaElement>(null);
+  const argvRef = useRef<ArgvCommandInputHandle>(null);
+  const [focusArgvExecutable, setFocusArgvExecutable] = useState(false);
   const isFirst = position === 1;
   const isLast = position === total;
 
@@ -70,16 +84,33 @@ export function CommandCard({
 
     if (command.form === "shell") {
       commandRef.current?.focus({ preventScroll: true });
+    } else {
+      argvRef.current?.focusExecutable();
     }
     scrollCardIntoView(cardRef);
     onFocused?.();
   }, [shouldFocusCommand, onFocused, command.form]);
 
+  useLayoutEffect(() => {
+    if (!focusArgvExecutable) {
+      return;
+    }
+
+    argvRef.current?.focusExecutable();
+    setFocusArgvExecutable(false);
+  }, [focusArgvExecutable, command.form]);
+
   const handleRemove = () => {
-    if (!isBlankShellCommand(command) && !window.confirm(REMOVE_CONFIRM)) {
+    if (!isBlankCommand(command) && !window.confirm(REMOVE_CONFIRM)) {
       return;
     }
     onRemove(command.id);
+  };
+
+  const handleFormSwitch = (form: BuilderCommand["form"]) => {
+    if (form === "argv") {
+      setFocusArgvExecutable(true);
+    }
   };
 
   return (
@@ -125,13 +156,22 @@ export function CommandCard({
       </div>
 
       <div className="space-y-4">
+        <CommandFormSelector
+          stage={stage}
+          command={command}
+          onFormSwitch={handleFormSwitch}
+        />
+
         {command.form === "shell" ? (
           <ShellCommandInput ref={commandRef} stage={stage} command={command} />
         ) : (
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-gray-700">Executable and arguments</p>
-            <p className="font-mono text-xs text-gray-700">{command.executable}</p>
-          </div>
+          <ArgvCommandInput
+            ref={argvRef}
+            stage={stage}
+            command={command}
+            shouldFocusExecutable={focusArgvExecutable}
+            onFocused={() => setFocusArgvExecutable(false)}
+          />
         )}
       </div>
     </article>

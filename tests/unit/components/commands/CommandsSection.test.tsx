@@ -136,10 +136,11 @@ describe("CommandsSection", () => {
     fireEvent.click(
       within(cards[1]!).getByRole("button", { name: "Move up" }),
     );
-    expect(commands().runcmd.map((command) => command.command)).toEqual([
-      "apt-get update",
-      "systemctl enable qemu-guest-agent",
-    ]);
+    expect(
+      commands().runcmd.map((entry) =>
+        entry.form === "shell" ? entry.command : "",
+      ),
+    ).toEqual(["apt-get update", "systemctl enable qemu-guest-agent"]);
     expect(
       screen.getByText("Run command moved to position 1 of 2."),
     ).toBeInTheDocument();
@@ -152,9 +153,11 @@ describe("CommandsSection", () => {
     );
     expect(window.confirm).toHaveBeenCalledWith(REMOVE_CONFIRM);
     expect(commands().runcmd).toHaveLength(1);
-    expect(commands().runcmd[0]?.command).toBe(
-      "systemctl enable qemu-guest-agent",
-    );
+    const remaining = commands().runcmd[0];
+    expect(remaining?.form).toBe("shell");
+    if (remaining?.form === "shell") {
+      expect(remaining.command).toBe("systemctl enable qemu-guest-agent");
+    }
   });
 
   it("removes blank commands immediately without confirmation", () => {

@@ -3,7 +3,9 @@ import type { IdentityConfig } from "../models/identity.ts";
 import { createDefaultProject, type ProjectFile } from "../models/project.ts";
 import {
   createBlankCommand,
+  createBlankCommandArgument,
   isCommandsConfig,
+  type BuilderCommand,
   type CommandStage,
   type CommandsConfig,
 } from "../models/commands.ts";
@@ -68,6 +70,32 @@ export interface ProjectState {
     stage: CommandStage,
     commandId: string,
     value: string,
+  ) => void;
+  replaceCommand: (
+    stage: CommandStage,
+    commandId: string,
+    nextCommand: BuilderCommand,
+  ) => void;
+  updateArgvExecutable: (
+    stage: CommandStage,
+    commandId: string,
+    value: string,
+  ) => void;
+  addCommandArgument: (
+    stage: CommandStage,
+    commandId: string,
+    rowId?: string,
+  ) => string | undefined;
+  updateCommandArgument: (
+    stage: CommandStage,
+    commandId: string,
+    rowId: string,
+    value: string,
+  ) => void;
+  removeCommandArgument: (
+    stage: CommandStage,
+    commandId: string,
+    rowId: string,
   ) => void;
   removeCommand: (stage: CommandStage, commandId: string) => void;
   moveCommand: (
@@ -321,6 +349,79 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }));
   },
 
+  replaceCommand: (stage, commandId, nextCommand) => {
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].map((command) =>
+        command.id === commandId ? nextCommand : command,
+      ),
+    }));
+  },
+
+  updateArgvExecutable: (stage, commandId, value) => {
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].map((command) =>
+        command.id === commandId && command.form === "argv"
+          ? { ...command, executable: value }
+          : command,
+      ),
+    }));
+  },
+
+  addCommandArgument: (stage, commandId, rowId) => {
+    const { project } = get();
+    if (!project?.commands || !isCommandsConfig(project.commands)) {
+      return undefined;
+    }
+
+    const row = createBlankCommandArgument(rowId);
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].map((command) =>
+        command.id === commandId && command.form === "argv"
+          ? {
+              ...command,
+              arguments: [...command.arguments, row],
+            }
+          : command,
+      ),
+    }));
+    return row.id;
+  },
+
+  updateCommandArgument: (stage, commandId, rowId, value) => {
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].map((command) =>
+        command.id === commandId && command.form === "argv"
+          ? {
+              ...command,
+              arguments: command.arguments.map((argument) =>
+                argument.id === rowId ? { ...argument, value } : argument,
+              ),
+            }
+          : command,
+      ),
+    }));
+  },
+
+  removeCommandArgument: (stage, commandId, rowId) => {
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].map((command) =>
+        command.id === commandId && command.form === "argv"
+          ? {
+              ...command,
+              arguments: command.arguments.filter(
+                (argument) => argument.id !== rowId,
+              ),
+            }
+          : command,
+      ),
+    }));
+  },
+
   removeCommand: (stage, commandId) => {
     updateProjectCommands(set, get, (commands) => ({
       ...commands,
@@ -341,7 +442,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         return commands;
       }
 
-      const [moved] = entries.splice(index, 1);
+      const moved = entries.splice(index, 1)[0];
+      if (!moved) {
+        return commands;
+      }
       entries.splice(targetIndex, 0, moved);
 
       return {

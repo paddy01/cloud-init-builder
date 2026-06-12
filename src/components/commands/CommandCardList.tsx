@@ -51,11 +51,11 @@ export function CommandCardList({ stage, commands }: CommandCardListProps) {
     const nextCommand = remaining[index];
     const previousCommand = remaining[index - 1];
 
-    if (nextCommand?.form === "shell") {
+    if (nextCommand) {
       setPendingFocusId(nextCommand.id);
       return;
     }
-    if (previousCommand?.form === "shell") {
+    if (previousCommand) {
       setPendingFocusId(previousCommand.id);
       return;
     }
