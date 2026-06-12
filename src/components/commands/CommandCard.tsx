@@ -31,7 +31,9 @@ interface CommandCardProps {
   position: number;
   total: number;
   shouldFocusCommand?: boolean;
+  reorderFocusDirection?: "up" | "down" | null;
   onFocused?: () => void;
+  onReorderFocused?: () => void;
   onFocusRequestHandled?: () => void;
   onRemove: (commandId: string) => void;
   onMove: (commandId: string, direction: "up" | "down") => void;
@@ -66,7 +68,9 @@ export function CommandCard({
   position,
   total,
   shouldFocusCommand = false,
+  reorderFocusDirection = null,
   onFocused,
+  onReorderFocused,
   onFocusRequestHandled,
   onRemove,
   onMove,
@@ -78,6 +82,8 @@ export function CommandCard({
   const cardRef = useRef<HTMLElement>(null);
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const argvRef = useRef<ArgvCommandInputHandle>(null);
+  const moveUpRef = useRef<HTMLButtonElement>(null);
+  const moveDownRef = useRef<HTMLButtonElement>(null);
   const [focusArgvExecutable, setFocusArgvExecutable] = useState(false);
   const isFirst = position === 1;
   const isLast = position === total;
@@ -112,6 +118,24 @@ export function CommandCard({
     scrollCardIntoView(cardRef);
     onFocused?.();
   }, [shouldFocusCommand, onFocused, command.form]);
+
+  useLayoutEffect(() => {
+    if (!reorderFocusDirection) {
+      return;
+    }
+
+    const targetRef =
+      reorderFocusDirection === "up" ? moveUpRef : moveDownRef;
+    const button = targetRef.current;
+    if (!button || button.disabled) {
+      onReorderFocused?.();
+      return;
+    }
+
+    button.focus({ preventScroll: true });
+    scrollCardIntoView(cardRef);
+    onReorderFocused?.();
+  }, [reorderFocusDirection, onReorderFocused, isFirst, isLast]);
 
   useLayoutEffect(() => {
     if (!focusArgvExecutable) {
@@ -181,6 +205,7 @@ export function CommandCard({
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2" role="group" aria-label="Reorder command">
             <button
+              ref={moveUpRef}
               type="button"
               className={isFirst ? reorderDisabledClassName : reorderEnabledClassName}
               disabled={isFirst}
@@ -189,6 +214,7 @@ export function CommandCard({
               Move up
             </button>
             <button
+              ref={moveDownRef}
               type="button"
               className={isLast ? reorderDisabledClassName : reorderEnabledClassName}
               disabled={isLast}

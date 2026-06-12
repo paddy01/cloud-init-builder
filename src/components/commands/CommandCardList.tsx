@@ -39,8 +39,16 @@ export function CommandCardList({
   const moveCommand = useProjectStore((state) => state.moveCommand);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const [pendingReorderFocus, setPendingReorderFocus] = useState<{
+    commandId: string;
+    direction: "up" | "down";
+  } | null>(null);
   const [moveAnnouncement, setMoveAnnouncement] = useState("");
   const clearPendingFocus = useCallback(() => setPendingFocusId(null), []);
+  const clearPendingReorderFocus = useCallback(
+    () => setPendingReorderFocus(null),
+    [],
+  );
   const handleFocusRequestHandled = useCallback(() => {
     consumeFocusRequest();
     onFocusRequestHandled?.();
@@ -85,7 +93,7 @@ export function CommandCardList({
     setMoveAnnouncement(
       `${STAGE_LABEL[stage]} moved to position ${position} of ${count}.`,
     );
-    setPendingFocusId(commandId);
+    setPendingReorderFocus({ commandId, direction });
   };
 
   return (
@@ -107,8 +115,16 @@ export function CommandCardList({
             command={command}
             position={index + 1}
             total={commands.length}
-            shouldFocusCommand={pendingFocusId === command.id}
+            shouldFocusCommand={
+              pendingFocusId === command.id && pendingReorderFocus === null
+            }
+            reorderFocusDirection={
+              pendingReorderFocus?.commandId === command.id
+                ? pendingReorderFocus.direction
+                : null
+            }
             onFocused={clearPendingFocus}
+            onReorderFocused={clearPendingReorderFocus}
             onFocusRequestHandled={handleFocusRequestHandled}
             onRemove={handleRemove}
             onMove={handleMove}
