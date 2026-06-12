@@ -150,6 +150,12 @@ export function CommandValidationSummary({
       <p className="mt-2 text-xs">
         Select an issue to move to the affected command field.
       </p>
+      {!hasErrors && warnings.length > 0 ? (
+        <p className="mt-2 text-xs">
+          Warning detection is focused and incomplete. Warnings do not block
+          export.
+        </p>
+      ) : null}
       <ul className="mt-2 space-y-1">
         {visibleCommandIssues.map((issue, index) => (
           <li key={`${issue.path}-${issue.code}-${index}`}>

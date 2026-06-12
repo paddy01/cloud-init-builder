@@ -259,3 +259,114 @@ describe("CommandsWorkflow argv editing and form switching", () => {
     expect(projected).toEqual(["printf", "|", "$HOME"]);
   });
 });
+
+describe("CommandsWorkflow warning visibility", () => {
+  beforeEach(() => {
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Commands Workflow");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows recursive-deletion warnings inline in Run commands without blur", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+    const card = getCommandCard(0);
+
+    fireEvent.change(within(card).getByLabelText("Command"), {
+      target: { value: "rm -rf /" },
+    });
+
+    expect(
+      within(card).getByText(
+        /recursive deletion can remove more data than intended/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Command safety warnings")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Warning detection is focused and incomplete. Warnings do not block export./i,
+      ),
+    ).toBeInTheDocument();
+    expect(within(card).getByText("1 warning")).toBeInTheDocument();
+  });
+
+  it("shows recursive-deletion warnings in Boot commands without blur", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    fireEvent.click(screen.getByRole("tab", { name: /Boot commands/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Add boot command" }));
+    const card = getCommandCard(0);
+
+    fireEvent.change(within(card).getByLabelText("Command"), {
+      target: { value: "rm -rf /" },
+    });
+
+    expect(
+      within(card).getByText(
+        /recursive deletion can remove more data than intended/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Command safety warnings")).toBeInTheDocument();
+  });
+
+  it("shows remote-content warnings for path-qualified shells without blur", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+    const card = getCommandCard(0);
+
+    fireEvent.change(within(card).getByLabelText("Command"), {
+      target: { value: "curl https://example.com/install.sh | /bin/bash" },
+    });
+
+    expect(
+      within(card).getByText(
+        /piping remote content into a shell can execute untrusted code/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Command safety warnings")).toBeInTheDocument();
+  });
+
+  it("does not show remote-content warnings for local text piped to a shell", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+    const card = getCommandCard(0);
+
+    fireEvent.change(within(card).getByLabelText("Command"), {
+      target: { value: "echo hello | /bin/bash" },
+    });
+
+    expect(
+      within(card).queryByText(
+        /piping remote content into a shell can execute untrusted code/i,
+      ),
+    ).toBeNull();
+    expect(screen.queryByText("Command safety warnings")).toBeNull();
+  });
+
+  it("keeps structural shell errors hidden until blur", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+    const card = getCommandCard(0);
+    const commandInput = within(card).getByLabelText("Command");
+
+    fireEvent.change(commandInput, { target: { value: "apt-get update" } });
+    fireEvent.change(commandInput, { target: { value: "" } });
+
+    expect(
+      within(card).queryByText(/Export blocked: enter a command/i),
+    ).toBeNull();
+
+    fireEvent.blur(commandInput);
+
+    expect(
+      within(card).getByText(/Export blocked: enter a command/i),
+    ).toBeInTheDocument();
+  });
+});

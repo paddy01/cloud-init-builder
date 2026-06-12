@@ -329,19 +329,25 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     setBlockedExportAnnouncement("");
   }, []);
 
-  const isPathVisible = useCallback(
-    (path: string) => revealAll || touchedPaths.has(path),
+  const isIssueVisible = useCallback(
+    (issue: ValidationIssue) => {
+      if (revealAll) {
+        return true;
+      }
+      if (issue.severity === "warning" && isCommandIssuePath(issue.path)) {
+        return true;
+      }
+      return touchedPaths.has(issue.path);
+    },
     [revealAll, touchedPaths],
   );
 
   const getVisibleIssuesForPath = useCallback(
-    (path: string) => {
-      if (!isPathVisible(path)) {
-        return [];
-      }
-      return mergedIssues.filter((issue) => issue.path === path);
-    },
-    [isPathVisible, mergedIssues],
+    (path: string) =>
+      mergedIssues.filter(
+        (issue) => issue.path === path && isIssueVisible(issue),
+      ),
+    [isIssueVisible, mergedIssues],
   );
 
   const shouldShowAuthStatus = useCallback(
@@ -366,9 +372,9 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
 
   const getVisibleUserSummaryIssues = useCallback(() => {
     return mergedIssues.filter(
-      (issue) => isUserIssuePath(issue.path) && isPathVisible(issue.path),
+      (issue) => isUserIssuePath(issue.path) && isIssueVisible(issue),
     );
-  }, [isPathVisible, mergedIssues]);
+  }, [isIssueVisible, mergedIssues]);
 
   const getVisibleCommandSummaryIssues = useCallback(
     (activeStage: CommandStage) => {
@@ -378,12 +384,12 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
           : { bootcmd: [], runcmd: [] };
 
       const visible = mergedIssues.filter(
-        (issue) => isCommandIssuePath(issue.path) && isPathVisible(issue.path),
+        (issue) => isCommandIssuePath(issue.path) && isIssueVisible(issue),
       );
 
       return sortCommandSummaryIssues(visible, activeStage, commands);
     },
-    [isPathVisible, mergedIssues, project],
+    [isIssueVisible, mergedIssues, project],
   );
 
   const getCardIssueCounts = useCallback(
@@ -393,7 +399,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       let warnings = 0;
 
       for (const issue of mergedIssues) {
-        if (!issue.path.startsWith(prefix)) {
+        if (!issue.path.startsWith(prefix) || !isIssueVisible(issue)) {
           continue;
         }
         if (issue.severity === "error") {
@@ -405,7 +411,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
 
       return { errors, warnings };
     },
-    [mergedIssues],
+    [isIssueVisible, mergedIssues],
   );
 
   const getCommandCardIssueCounts = useCallback(
@@ -415,7 +421,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       let warnings = 0;
 
       for (const issue of mergedIssues) {
-        if (!issue.path.startsWith(prefix)) {
+        if (!issue.path.startsWith(prefix) || !isIssueVisible(issue)) {
           continue;
         }
         if (issue.severity === "error") {
@@ -427,7 +433,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
 
       return { errors, warnings };
     },
-    [mergedIssues],
+    [isIssueVisible, mergedIssues],
   );
 
   const getFirstBlockingIssueSection = useCallback((): "identity" | "users" | "commands" => {
