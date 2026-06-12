@@ -343,6 +343,10 @@ describe("Blocked export announcement surface", () => {
   });
 
   it("announces the exact blocked-export copy assertively", async () => {
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    const blank = createBlankUser("announce-user");
+    seedUsers([{ ...blank, gecos: "Configured without username" }]);
+
     render(
       <UserValidationProvider>
         <AssertiveLiveRegion />
