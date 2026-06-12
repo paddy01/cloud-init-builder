@@ -4,6 +4,7 @@ import futureProjectV99 from "../fixtures/future-project-v99.cib.json?raw";
 import invalidProjectBadMetadata from "../fixtures/invalid-project-bad-metadata.cib.json?raw";
 import legacyProjectUsersArray from "../fixtures/legacy-project-users-array.cib.json?raw";
 import validProjectIdentityFull from "../fixtures/valid-project-identity-full.cib.json?raw";
+import validProjectCommandsFull from "../fixtures/valid-project-commands-full.cib.json?raw";
 import validProjectUsersFull from "../fixtures/valid-project-users-full.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
@@ -17,7 +18,6 @@ import { importProject } from "../../src/services/projectService.ts";
 import identityUsersCommandsFull from "../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../fixtures/users-safety-valid.yaml?raw";
-import { SUDO_PASSWORDLESS } from "../../src/models/users.ts";
 
 const BCRYPT_HASH =
   "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -457,40 +457,22 @@ describe("Phase 3 dependency fence", () => {
   });
 });
 
-describe("commands generation parity", () => {
-  const commandsProject = {
-    formatVersion: 1,
-    metadata: {
-      name: "Commands Roundtrip",
-      createdAt: "2026-06-01T10:00:00.000Z",
-      updatedAt: "2026-06-01T10:00:00.000Z",
-      appVersion: "0.1.0",
-    },
-    identity: {
-      hostname: "web01",
-      fqdn: "web01.lan.example.com",
-      prefer_fqdn_over_hostname: true,
-      manage_etc_hosts: "localhost",
-      timezone: "Europe/Stockholm",
-      locale: "en_US.UTF-8",
-    },
-    users: {
-      preserveDefault: true,
-      entries: [
-        {
-          id: "full-1",
-          name: "deploy",
-          gecos: "Deploy User",
-          groups: ["docker"],
-          shell: "/bin/bash",
-          sudo: SUDO_PASSWORDLESS,
-          primary_group: "deploy",
-          homedir: "/srv/deploy",
-          lock_passwd: true,
-        },
-      ],
-    },
-    commands: {
+describe("commands project round-trip", () => {
+  it("preserves canonical full commands through double round-trip", async () => {
+    const firstImport = await importProject(
+      fileFromJson(
+        validProjectCommandsFull,
+        "valid-project-commands-full.cib.json",
+      ),
+    );
+
+    expect(firstImport.warnings).toEqual([]);
+    expect(isCommandsConfig(firstImport.project.commands)).toBe(true);
+    if (!isCommandsConfig(firstImport.project.commands)) {
+      throw new Error("expected canonical commands");
+    }
+
+    expect(firstImport.project.commands).toEqual({
       bootcmd: [
         {
           id: "boot-shell",
@@ -509,38 +491,70 @@ describe("commands generation parity", () => {
         },
         { id: "run-meta", form: "shell", command: 'printf "|" "$HOME"' },
       ],
-    },
-  };
-
-  it("preserves commands across import round-trip and matches golden YAML", async () => {
-    const firstImport = await importProject(
-      fileFromJson(JSON.stringify(commandsProject, null, 2)),
-    );
-    const secondImport = await importProject(
-      fileFromJson(JSON.stringify(firstImport.project, null, 2)),
-    );
-
-    expect(isCommandsConfig(secondImport.project.commands)).toBe(true);
-    if (!isCommandsConfig(secondImport.project.commands)) {
-      throw new Error("expected canonical commands");
-    }
-    expect(secondImport.project.commands.bootcmd).toHaveLength(2);
-    expect(secondImport.project.commands.runcmd).toHaveLength(3);
-    expect(secondImport.project.commands.runcmd[2]).toMatchObject({
-      form: "shell",
-      command: 'printf "|" "$HOME"',
     });
 
+    const exportedOnce = JSON.stringify(firstImport.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exportedOnce));
+    const exportedTwice = JSON.stringify(secondImport.project, null, 2);
+    const thirdImport = await importProject(fileFromJson(exportedTwice));
+
+    expect(secondImport.project.commands).toEqual(firstImport.project.commands);
+    expect(thirdImport.project.commands).toEqual(firstImport.project.commands);
+    expect(thirdImport.project.identity).toEqual(firstImport.project.identity);
+    expect(thirdImport.project.users).toEqual(firstImport.project.users);
+    expect(thirdImport.project.formatVersion).toBe(1);
+
     const yaml = generateCloudInit({
-      identity: secondImport.project.identity,
-      users: isUsersConfig(secondImport.project.users)
-        ? secondImport.project.users
+      identity: thirdImport.project.identity,
+      users: isUsersConfig(thirdImport.project.users)
+        ? thirdImport.project.users
         : undefined,
-      commands: secondImport.project.commands,
+      commands: isCommandsConfig(thirdImport.project.commands)
+        ? thirdImport.project.commands
+        : undefined,
     }).yaml;
     expect(yaml).toBe(identityUsersCommandsFull);
     expect(yaml).not.toContain("boot-shell");
     expect(yaml).not.toContain("run-meta");
+    expect(yaml).not.toContain("full-1");
+    expect(yaml).not.toContain("arg-1");
+  });
+
+  it("keeps YAML section order identity, users, bootcmd, runcmd", async () => {
+    const result = await importProject(
+      fileFromJson(
+        validProjectCommandsFull,
+        "valid-project-commands-full.cib.json",
+      ),
+    );
+    const yaml = generateCloudInit({
+      identity: result.project.identity,
+      users: isUsersConfig(result.project.users)
+        ? result.project.users
+        : undefined,
+      commands: isCommandsConfig(result.project.commands)
+        ? result.project.commands
+        : undefined,
+    }).yaml;
+
+    const body = yaml.slice("#cloud-config\n".length);
+    const keys = body
+      .trim()
+      .split("\n")
+      .filter((line) => !line.startsWith(" ") && line.includes(":"))
+      .map((line) => line.split(":")[0]);
+
+    expect(keys).toEqual([
+      "hostname",
+      "fqdn",
+      "prefer_fqdn_over_hostname",
+      "manage_etc_hosts",
+      "timezone",
+      "locale",
+      "users",
+      "bootcmd",
+      "runcmd",
+    ]);
   });
 });
 
@@ -557,5 +571,17 @@ describe("Phase 4 dependency and format fence", () => {
 
   it("keeps builder format version at 1", () => {
     expect(CURRENT_FORMAT_VERSION).toBe(1);
+  });
+});
+
+describe("Phase 5 final verification", () => {
+  it("keeps package manifests free of new Phase 5 runtime dependencies", () => {
+    expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "react",
+      "react-dom",
+      "yaml",
+      "zod",
+      "zustand",
+    ]);
   });
 });

@@ -14,6 +14,7 @@ import {
 import * as validateConfig from "../../../src/validators/validateConfig.ts";
 import commandsFull from "../../fixtures/commands-full.yaml?raw";
 import identityUsersCommandsFull from "../../fixtures/identity-users-commands-full.yaml?raw";
+import validProjectCommandsFull from "../../fixtures/valid-project-commands-full.cib.json?raw";
 import identityUsersFull from "../../fixtures/identity-users-full.yaml?raw";
 import identityUsersSafetyValid from "../../fixtures/identity-users-safety-valid.yaml?raw";
 import usersCommon from "../../fixtures/users-common.yaml?raw";
@@ -508,33 +509,9 @@ describe("yamlService users export parity", () => {
       identity: undefined,
       commands: COMMANDS_FIXTURE,
     });
-    const combinedProject = validProject({
-      identity: {
-        hostname: "web01",
-        fqdn: "web01.lan.example.com",
-        prefer_fqdn_over_hostname: true,
-        manage_etc_hosts: "localhost",
-        timezone: "Europe/Stockholm",
-        locale: "en_US.UTF-8",
-      },
-      users: {
-        preserveDefault: true,
-        entries: [
-          {
-            id: "full-1",
-            name: "deploy",
-            gecos: "Deploy User",
-            groups: ["docker"],
-            shell: "/bin/bash",
-            sudo: SUDO_PASSWORDLESS,
-            primary_group: "deploy",
-            homedir: "/srv/deploy",
-            lock_passwd: true,
-          },
-        ],
-      },
-      commands: COMMANDS_FIXTURE,
-    });
+    const combinedProject = JSON.parse(
+      validProjectCommandsFull,
+    ) as ProjectFile;
 
     expect(generateCloudInit(toGenerateInput(commandsProject)).yaml).toBe(
       commandsFull,
