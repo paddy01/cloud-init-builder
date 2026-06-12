@@ -2,6 +2,12 @@ import { create } from "zustand";
 import type { IdentityConfig } from "../models/identity.ts";
 import { createDefaultProject, type ProjectFile } from "../models/project.ts";
 import {
+  createBlankCommand,
+  isCommandsConfig,
+  type CommandStage,
+  type CommandsConfig,
+} from "../models/commands.ts";
+import {
   createBlankSshAuthorizedKey,
   createBlankUser,
   isUsersConfig,
@@ -57,8 +63,46 @@ export interface ProjectState {
     value: string,
   ) => void;
   removeSshAuthorizedKey: (userId: string, rowId: string) => void;
+  addCommand: (stage: CommandStage, id?: string) => string | undefined;
+  updateShellCommand: (
+    stage: CommandStage,
+    commandId: string,
+    value: string,
+  ) => void;
+  removeCommand: (stage: CommandStage, commandId: string) => void;
+  moveCommand: (
+    stage: CommandStage,
+    commandId: string,
+    direction: "up" | "down",
+  ) => void;
   markSaved: () => void;
   clearWarnings: () => void;
+}
+
+export function updateProjectCommands(
+  set: (
+    partial:
+      | Partial<ProjectState>
+      | ((state: ProjectState) => Partial<ProjectState>),
+  ) => void,
+  get: () => ProjectState,
+  recipe: (commands: CommandsConfig) => CommandsConfig,
+): void {
+  const { project } = get();
+  if (!project?.commands || !isCommandsConfig(project.commands)) return;
+
+  const nextCommands = recipe(project.commands);
+  set({
+    project: {
+      ...project,
+      commands: nextCommands,
+      metadata: {
+        ...project.metadata,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    isDirty: true,
+  });
 }
 
 function updateProjectUsers(
@@ -250,6 +294,61 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           : user,
       ),
     }));
+  },
+
+  addCommand: (stage, id) => {
+    const { project } = get();
+    if (!project?.commands || !isCommandsConfig(project.commands)) {
+      return undefined;
+    }
+
+    const command = createBlankCommand(id);
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: [...commands[stage], command],
+    }));
+    return command.id;
+  },
+
+  updateShellCommand: (stage, commandId, value) => {
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].map((command) =>
+        command.id === commandId && command.form === "shell"
+          ? { ...command, command: value }
+          : command,
+      ),
+    }));
+  },
+
+  removeCommand: (stage, commandId) => {
+    updateProjectCommands(set, get, (commands) => ({
+      ...commands,
+      [stage]: commands[stage].filter((command) => command.id !== commandId),
+    }));
+  },
+
+  moveCommand: (stage, commandId, direction) => {
+    updateProjectCommands(set, get, (commands) => {
+      const entries = [...commands[stage]];
+      const index = entries.findIndex((command) => command.id === commandId);
+      if (index === -1) {
+        return commands;
+      }
+
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= entries.length) {
+        return commands;
+      }
+
+      const [moved] = entries.splice(index, 1);
+      entries.splice(targetIndex, 0, moved);
+
+      return {
+        ...commands,
+        [stage]: entries,
+      };
+    });
   },
 
   markSaved: () => {
