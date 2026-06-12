@@ -9,12 +9,13 @@ import {
   UserValidationProvider,
   useUserValidation,
 } from "../components/users/UserValidationContext.tsx";
+import { CommandsSection } from "../components/commands/CommandsSection.tsx";
 import { UsersSection } from "../components/users/UsersSection.tsx";
 import { EditorNavigationProvider } from "./EditorNavigationContext.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
 
-export type EditorSection = "identity" | "users";
+export type EditorSection = "identity" | "users" | "commands";
 
 function BlockedExportAnnouncement() {
   const { blockedExportAnnouncement } = useUserValidation();
@@ -49,8 +50,10 @@ function MainLayoutContent() {
               <div className={view === "editor" ? "block" : "hidden lg:block"}>
                 {activeSection === "identity" ? (
                   <IdentityForm />
-                ) : (
+                ) : activeSection === "users" ? (
                   <UsersSection />
+                ) : (
+                  <CommandsSection />
                 )}
               </div>
               <div

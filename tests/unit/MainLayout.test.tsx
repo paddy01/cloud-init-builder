@@ -39,6 +39,62 @@ const DISABLE_DEFAULT_CONFIRM =
 const REMOVE_USER_CONFIRM =
   "Remove user? This removes the custom user card from the project.";
 
+describe("MainLayout commands workflow", () => {
+  beforeEach(() => {
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Test");
+    vi.spyOn(window, "confirm");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("navigates to Commands with Run-first tabs and stage-scoped editing", () => {
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Commands" }));
+
+    expect(screen.getByRole("heading", { name: "Commands" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Identity" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Run commands/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("First-boot runtime commands")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add run command" }));
+    fireEvent.change(screen.getByLabelText("Command"), {
+      target: { value: "echo hello" },
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: /Boot commands/i }));
+    expect(
+      screen.getByText("Boot commands run early on every boot"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add boot command" }));
+
+    const project = useProjectStore.getState().project;
+    expect(project?.commands?.runcmd).toHaveLength(1);
+    expect(project?.commands?.bootcmd).toHaveLength(1);
+  });
+
+  it("marks only the active sidebar section with aria-current when Commands is selected", () => {
+    render(<MainLayout />);
+
+    const nav = screen.getByRole("navigation");
+    const identityButton = within(nav).getByRole("button", { name: "Identity" });
+    const usersButton = within(nav).getByRole("button", { name: "Users" });
+    const commandsButton = within(nav).getByRole("button", { name: "Commands" });
+
+    fireEvent.click(commandsButton);
+
+    expect(commandsButton).toHaveAttribute("aria-current", "page");
+    expect(identityButton).not.toHaveAttribute("aria-current");
+    expect(usersButton).not.toHaveAttribute("aria-current");
+  });
+});
+
 describe("MainLayout users workflow", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -121,11 +177,12 @@ describe("MainLayout users workflow", () => {
     expect(identityButton).toHaveAttribute("aria-current", "page");
     expect(usersButton).not.toHaveAttribute("aria-current");
 
-    for (const label of ["Commands", "Export"] as const) {
-      const row = within(nav).getByText(label).closest("span");
-      expect(row?.className).toContain("text-gray-400");
-      expect(row?.className).toContain("cursor-not-allowed");
-    }
+    const commandsButton = within(nav).getByRole("button", { name: "Commands" });
+    expect(commandsButton).not.toHaveAttribute("aria-current");
+
+    const exportRow = within(nav).getByText("Export").closest("span");
+    expect(exportRow?.className).toContain("text-gray-400");
+    expect(exportRow?.className).toContain("cursor-not-allowed");
 
     fireEvent.click(usersButton);
 

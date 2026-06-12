@@ -3,7 +3,7 @@ import type { EditorSection } from "./MainLayout.tsx";
 const SECTIONS = [
   { id: "identity" as const, label: "Identity" },
   { id: "users" as const, label: "Users" },
-  { id: null, label: "Commands" },
+  { id: "commands" as const, label: "Commands" },
   { id: null, label: "Export" },
 ] as const;
 

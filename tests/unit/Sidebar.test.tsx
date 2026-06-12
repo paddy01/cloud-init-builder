@@ -33,26 +33,37 @@ describe("Sidebar section styling", () => {
     );
   });
 
-  it("renders Users as an interactive button and Commands/Export as disabled stubs", () => {
+  it("renders Commands as an interactive button and Export as a disabled stub", () => {
     render(<Sidebar activeSection="identity" onSectionChange={onSectionChange} />);
 
     const usersButton = screen.getByRole("button", { name: "Users" });
+    const commandsButton = screen.getByRole("button", { name: "Commands" });
     expect(usersButton).not.toHaveAttribute("aria-current");
+    expect(commandsButton).not.toHaveAttribute("aria-current");
 
-    for (const label of ["Commands", "Export"] as const) {
-      const row = screen.getByText(label).closest("span");
-      expect(row?.className).toContain("text-gray-400");
-      expect(row?.className).toContain("cursor-not-allowed");
-      expect(row).not.toHaveAttribute("aria-current");
-    }
+    const exportRow = screen.getByText("Export").closest("span");
+    expect(exportRow?.className).toContain("text-gray-400");
+    expect(exportRow?.className).toContain("cursor-not-allowed");
+    expect(exportRow).not.toHaveAttribute("aria-current");
   });
 
-  it("renders interactive buttons only for Identity and Users", () => {
+  it("renders interactive buttons for Identity, Users, and Commands", () => {
     const { container } = render(
       <Sidebar activeSection="identity" onSectionChange={onSectionChange} />,
     );
     const nav = container.querySelector("nav");
     expect(nav).not.toBeNull();
-    expect(within(nav as HTMLElement).getAllByRole("button")).toHaveLength(2);
+    expect(within(nav as HTMLElement).getAllByRole("button")).toHaveLength(3);
+  });
+
+  it("marks Commands row with active styling and aria-current", () => {
+    render(
+      <Sidebar activeSection="commands" onSectionChange={onSectionChange} />,
+    );
+
+    const commandsButton = screen.getByRole("button", { name: "Commands" });
+    expect(commandsButton.className).toContain("bg-blue-50");
+    expect(commandsButton.className).toContain("border-l-2");
+    expect(commandsButton).toHaveAttribute("aria-current", "page");
   });
 });
