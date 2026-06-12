@@ -4,12 +4,16 @@ import {
   generateCloudInit,
   type GenerateProjectInput,
 } from "../../../src/generators/generateCloudInit.ts";
+import type { CommandsConfig } from "../../../src/models/commands.ts";
+import { isCommandsConfig } from "../../../src/models/commands.ts";
 import { isUsersConfig, SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
 import {
   copyCloudInitYaml,
   exportCloudInitYaml,
 } from "../../../src/services/yamlService.ts";
 import * as validateConfig from "../../../src/validators/validateConfig.ts";
+import commandsFull from "../../fixtures/commands-full.yaml?raw";
+import identityUsersCommandsFull from "../../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersFull from "../../fixtures/identity-users-full.yaml?raw";
 import identityUsersSafetyValid from "../../fixtures/identity-users-safety-valid.yaml?raw";
 import usersCommon from "../../fixtures/users-common.yaml?raw";
@@ -40,8 +44,30 @@ function toGenerateInput(project: ProjectFile): GenerateProjectInput {
   return {
     identity: project.identity,
     users: isUsersConfig(project.users) ? project.users : undefined,
+    commands: isCommandsConfig(project.commands) ? project.commands : undefined,
   };
 }
+
+const COMMANDS_FIXTURE: CommandsConfig = {
+  bootcmd: [
+    {
+      id: "boot-shell",
+      form: "shell",
+      command: "mkdir -p /run/cloud-init-builder",
+    },
+    { id: "boot-argv", form: "argv", executable: "/bin/true", arguments: [] },
+  ],
+  runcmd: [
+    { id: "run-shell", form: "shell", command: "apt-get update" },
+    {
+      id: "run-argv",
+      form: "argv",
+      executable: "touch",
+      arguments: [{ id: "arg-1", value: "/run/foo" }],
+    },
+    { id: "run-meta", form: "shell", command: 'printf "|" "$HOME"' },
+  ],
+};
 
 const SAFETY_USERS_PROJECT = validProject({
   identity: undefined,
@@ -475,5 +501,60 @@ describe("yamlService users export parity", () => {
 
     expect(exportCloudInitYaml(systemProject)).toBe(true);
     expect(createObjectURL).toHaveBeenCalled();
+  });
+
+  it("matches direct generation for commands and combined command fixtures", async () => {
+    const commandsProject = validProject({
+      identity: undefined,
+      commands: COMMANDS_FIXTURE,
+    });
+    const combinedProject = validProject({
+      identity: {
+        hostname: "web01",
+        fqdn: "web01.lan.example.com",
+        prefer_fqdn_over_hostname: true,
+        manage_etc_hosts: "localhost",
+        timezone: "Europe/Stockholm",
+        locale: "en_US.UTF-8",
+      },
+      users: {
+        preserveDefault: true,
+        entries: [
+          {
+            id: "full-1",
+            name: "deploy",
+            gecos: "Deploy User",
+            groups: ["docker"],
+            shell: "/bin/bash",
+            sudo: SUDO_PASSWORDLESS,
+            primary_group: "deploy",
+            homedir: "/srv/deploy",
+            lock_passwd: true,
+          },
+        ],
+      },
+      commands: COMMANDS_FIXTURE,
+    });
+
+    expect(generateCloudInit(toGenerateInput(commandsProject)).yaml).toBe(
+      commandsFull,
+    );
+    expect(generateCloudInit(toGenerateInput(combinedProject)).yaml).toBe(
+      identityUsersCommandsFull,
+    );
+
+    await copyCloudInitYaml(combinedProject);
+    const [copiedYaml] = writeText.mock.calls[writeText.mock.calls.length - 1] ?? [];
+    expect(copiedYaml).toBe(identityUsersCommandsFull);
+
+    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
+    expect(exportCloudInitYaml(combinedProject)).toBe(true);
+    const [blobArg] =
+      createObjectURL.mock.calls[createObjectURL.mock.calls.length - 1] ?? [];
+    expect(blobArg).toBeInstanceOf(Blob);
+    if (blobArg instanceof Blob && typeof blobArg.arrayBuffer === "function") {
+      const exportedText = new TextDecoder().decode(await blobArg.arrayBuffer());
+      expect(exportedText).toBe(identityUsersCommandsFull);
+    }
   });
 });

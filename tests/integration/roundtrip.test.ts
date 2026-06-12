@@ -10,11 +10,14 @@ import {
   CURRENT_FORMAT_VERSION,
   createDefaultProject,
 } from "../../src/models/project.ts";
+import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { importProject } from "../../src/services/projectService.ts";
+import identityUsersCommandsFull from "../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../fixtures/users-safety-valid.yaml?raw";
+import { SUDO_PASSWORDLESS } from "../../src/models/users.ts";
 
 const BCRYPT_HASH =
   "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -451,6 +454,93 @@ describe("Phase 3 dependency fence", () => {
       "zod",
       "zustand",
     ]);
+  });
+});
+
+describe("commands generation parity", () => {
+  const commandsProject = {
+    formatVersion: 1,
+    metadata: {
+      name: "Commands Roundtrip",
+      createdAt: "2026-06-01T10:00:00.000Z",
+      updatedAt: "2026-06-01T10:00:00.000Z",
+      appVersion: "0.1.0",
+    },
+    identity: {
+      hostname: "web01",
+      fqdn: "web01.lan.example.com",
+      prefer_fqdn_over_hostname: true,
+      manage_etc_hosts: "localhost",
+      timezone: "Europe/Stockholm",
+      locale: "en_US.UTF-8",
+    },
+    users: {
+      preserveDefault: true,
+      entries: [
+        {
+          id: "full-1",
+          name: "deploy",
+          gecos: "Deploy User",
+          groups: ["docker"],
+          shell: "/bin/bash",
+          sudo: SUDO_PASSWORDLESS,
+          primary_group: "deploy",
+          homedir: "/srv/deploy",
+          lock_passwd: true,
+        },
+      ],
+    },
+    commands: {
+      bootcmd: [
+        {
+          id: "boot-shell",
+          form: "shell",
+          command: "mkdir -p /run/cloud-init-builder",
+        },
+        { id: "boot-argv", form: "argv", executable: "/bin/true", arguments: [] },
+      ],
+      runcmd: [
+        { id: "run-shell", form: "shell", command: "apt-get update" },
+        {
+          id: "run-argv",
+          form: "argv",
+          executable: "touch",
+          arguments: [{ id: "arg-1", value: "/run/foo" }],
+        },
+        { id: "run-meta", form: "shell", command: 'printf "|" "$HOME"' },
+      ],
+    },
+  };
+
+  it("preserves commands across import round-trip and matches golden YAML", async () => {
+    const firstImport = await importProject(
+      fileFromJson(JSON.stringify(commandsProject, null, 2)),
+    );
+    const secondImport = await importProject(
+      fileFromJson(JSON.stringify(firstImport.project, null, 2)),
+    );
+
+    expect(isCommandsConfig(secondImport.project.commands)).toBe(true);
+    if (!isCommandsConfig(secondImport.project.commands)) {
+      throw new Error("expected canonical commands");
+    }
+    expect(secondImport.project.commands.bootcmd).toHaveLength(2);
+    expect(secondImport.project.commands.runcmd).toHaveLength(3);
+    expect(secondImport.project.commands.runcmd[2]).toMatchObject({
+      form: "shell",
+      command: 'printf "|" "$HOME"',
+    });
+
+    const yaml = generateCloudInit({
+      identity: secondImport.project.identity,
+      users: isUsersConfig(secondImport.project.users)
+        ? secondImport.project.users
+        : undefined,
+      commands: secondImport.project.commands,
+    }).yaml;
+    expect(yaml).toBe(identityUsersCommandsFull);
+    expect(yaml).not.toContain("boot-shell");
+    expect(yaml).not.toContain("run-meta");
   });
 });
 

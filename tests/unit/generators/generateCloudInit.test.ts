@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import identityEmptyAdvanced from "../../fixtures/identity-empty-advanced.yaml?raw";
 import identityFull from "../../fixtures/identity-full.yaml?raw";
 import identityMinimal from "../../fixtures/identity-minimal.yaml?raw";
+import commandsFull from "../../fixtures/commands-full.yaml?raw";
+import identityUsersCommandsFull from "../../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersSafetyValid from "../../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../../fixtures/users-safety-valid.yaml?raw";
 import {
@@ -9,7 +11,9 @@ import {
   CLOUD_CONFIG_ORDER,
   generateCloudInit,
 } from "../../../src/generators/generateCloudInit.ts";
+import type { CommandsConfig } from "../../../src/models/commands.ts";
 import type { UsersConfig } from "../../../src/models/users.ts";
+import { SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
 
 const BCRYPT_HASH =
   "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -24,6 +28,53 @@ const SAFETY_IDENTITY = {
   manage_etc_hosts: "localhost" as const,
   timezone: "Europe/Stockholm",
   locale: "en_US.UTF-8",
+};
+
+const COMMANDS_FIXTURE: CommandsConfig = {
+  bootcmd: [
+    {
+      id: "boot-shell",
+      form: "shell",
+      command: "mkdir -p /run/cloud-init-builder",
+    },
+    { id: "boot-argv", form: "argv", executable: "/bin/true", arguments: [] },
+  ],
+  runcmd: [
+    { id: "run-shell", form: "shell", command: "apt-get update" },
+    {
+      id: "run-argv",
+      form: "argv",
+      executable: "touch",
+      arguments: [{ id: "arg-1", value: "/run/foo" }],
+    },
+    { id: "run-meta", form: "shell", command: 'printf "|" "$HOME"' },
+  ],
+};
+
+const COMBINED_IDENTITY = {
+  hostname: "web01",
+  fqdn: "web01.lan.example.com",
+  prefer_fqdn_over_hostname: true,
+  manage_etc_hosts: "localhost" as const,
+  timezone: "Europe/Stockholm",
+  locale: "en_US.UTF-8",
+};
+
+const COMBINED_USERS: UsersConfig = {
+  preserveDefault: true,
+  entries: [
+    {
+      id: "full-1",
+      name: "deploy",
+      gecos: "Deploy User",
+      groups: ["docker"],
+      shell: "/bin/bash",
+      sudo: SUDO_PASSWORDLESS,
+      primary_group: "deploy",
+      homedir: "/srv/deploy",
+      lock_passwd: true,
+    },
+  ],
 };
 
 const SAFETY_USERS_CONFIG: UsersConfig = {
@@ -135,7 +186,9 @@ describe("generateCloudInit", () => {
       .split("\n")
       .map((line) => line.split(":")[0]);
     expect(keys).toEqual(
-      [...CLOUD_CONFIG_ORDER].filter((key) => key !== "users"),
+      [...CLOUD_CONFIG_ORDER].filter(
+        (key) => key !== "users" && key !== "bootcmd" && key !== "runcmd",
+      ),
     );
   });
 
@@ -200,5 +253,79 @@ describe("generateCloudInit", () => {
     expect(result.yaml).not.toContain("key-a");
     expect(result.yaml).not.toContain("user-unlocked");
     expect(result.yaml).not.toMatch(/\r/);
+  });
+
+  it("matches commands-full golden fixture byte-for-byte", () => {
+    const result = generateCloudInit({ commands: COMMANDS_FIXTURE });
+    expect(result.yaml).toBe(commandsFull);
+    expect(result.yaml).not.toContain("boot-shell");
+    expect(result.yaml).not.toContain("run-shell");
+    expect(result.yaml).not.toContain("form:");
+  });
+
+  it("matches identity-users-commands-full golden fixture byte-for-byte", () => {
+    const result = generateCloudInit({
+      identity: COMBINED_IDENTITY,
+      users: COMBINED_USERS,
+      commands: COMMANDS_FIXTURE,
+    });
+    expect(result.yaml).toBe(identityUsersCommandsFull);
+    expect(result.yaml).not.toContain("full-1");
+    expect(result.yaml).not.toContain("boot-argv");
+  });
+
+  it("omits empty bootcmd and runcmd stages independently", () => {
+    const bootOnly = generateCloudInit({
+      commands: {
+        bootcmd: COMMANDS_FIXTURE.bootcmd,
+        runcmd: [],
+      },
+    }).yaml;
+    expect(bootOnly).toContain("bootcmd:");
+    expect(bootOnly).not.toContain("runcmd:");
+
+    const runOnly = generateCloudInit({
+      commands: {
+        bootcmd: [],
+        runcmd: COMMANDS_FIXTURE.runcmd,
+      },
+    }).yaml;
+    expect(runOnly).toContain("runcmd:");
+    expect(runOnly).not.toContain("bootcmd:");
+  });
+
+  it("orders command stages after users in top-level YAML", () => {
+    const result = generateCloudInit({
+      identity: COMBINED_IDENTITY,
+      users: COMBINED_USERS,
+      commands: COMMANDS_FIXTURE,
+    });
+    const body = result.yaml.slice(CLOUD_CONFIG_HEADER.length);
+    const keys = body
+      .trim()
+      .split("\n")
+      .filter((line) => !line.startsWith(" ") && line.includes(":"))
+      .map((line) => line.split(":")[0]);
+    expect(keys).toEqual([
+      "hostname",
+      "fqdn",
+      "prefer_fqdn_over_hostname",
+      "manage_etc_hosts",
+      "timezone",
+      "locale",
+      "users",
+      "bootcmd",
+      "runcmd",
+    ]);
+  });
+
+  it("preserves literal shell metacharacters without trimming or quoting", () => {
+    const result = generateCloudInit({
+      commands: {
+        bootcmd: [],
+        runcmd: [{ id: "meta", form: "shell", command: 'printf "|" "$HOME"' }],
+      },
+    });
+    expect(result.yaml).toContain('printf "|" "$HOME"');
   });
 });

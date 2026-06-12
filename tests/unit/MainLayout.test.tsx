@@ -22,8 +22,10 @@ import usersDefaultOnly from "../fixtures/users-default-only.yaml?raw";
 import usersNone from "../fixtures/users-none.yaml?raw";
 import usersCommon from "../fixtures/users-common.yaml?raw";
 import usersAdvanced from "../fixtures/users-advanced.yaml?raw";
+import identityUsersCommandsFull from "../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersFull from "../fixtures/identity-users-full.yaml?raw";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
+import { isCommandsConfig } from "../../src/models/commands.ts";
 import { CURRENT_FORMAT_VERSION } from "../../src/models/project.ts";
 import { copyCloudInitYaml } from "../../src/services/yamlService.ts";
 
@@ -77,6 +79,41 @@ describe("MainLayout commands workflow", () => {
     const project = useProjectStore.getState().project;
     expect(project?.commands?.runcmd).toHaveLength(1);
     expect(project?.commands?.bootcmd).toHaveLength(1);
+  });
+
+  it("projects commands into preview YAML through the shared generator input", async () => {
+    vi.useFakeTimers();
+    const { container } = render(<MainLayout />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Commands" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add run command" }));
+    fireEvent.change(screen.getByLabelText("Command"), {
+      target: { value: "apt-get update" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: /Boot commands/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Add boot command" }));
+    fireEvent.change(screen.getByLabelText("Command"), {
+      target: { value: "mkdir -p /run/cloud-init-builder" },
+    });
+
+    const project = useProjectStore.getState().project!;
+    const expectedYaml = generateCloudInit({
+      identity: project.identity,
+      users: isUsersConfig(project.users) ? project.users : undefined,
+      commands: isCommandsConfig(project.commands) ? project.commands : undefined,
+    }).yaml;
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    const previewCode = container.querySelector("aside pre code");
+    expect(previewCode?.textContent).toContain("bootcmd:");
+    expect(previewCode?.textContent).toContain("runcmd:");
+    expect(previewCode?.textContent).toContain("apt-get update");
+    expect(previewCode?.textContent).toContain("mkdir -p /run/cloud-init-builder");
+    expect(previewCode?.textContent).toBe(expectedYaml);
+    vi.useRealTimers();
   });
 
   it("marks only the active sidebar section with aria-current when Commands is selected", () => {

@@ -3,6 +3,7 @@ import {
   CLOUD_CONFIG_HEADER,
   generateCloudInit,
 } from "../../generators/generateCloudInit.ts";
+import { isCommandsConfig } from "../../models/commands.ts";
 import { isUsersConfig } from "../../models/users.ts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
@@ -23,6 +24,9 @@ export function PreviewPanel() {
         identity: debouncedProject?.identity,
         users: isUsersConfig(debouncedProject?.users)
           ? debouncedProject.users
+          : undefined,
+        commands: isCommandsConfig(debouncedProject?.commands)
+          ? debouncedProject.commands
           : undefined,
       }),
     [debouncedProject],

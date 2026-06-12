@@ -1,5 +1,7 @@
+import type { CommandsConfig } from "../models/commands.ts";
 import type { IdentityConfig } from "../models/identity.ts";
 import type { UsersConfig } from "../models/users.ts";
+import { buildCloudInitCommands } from "./generateCommands.ts";
 import { buildCloudInitUsers } from "./generateUsers.ts";
 import { orderKeys } from "./orderKeys.ts";
 import { pruneEmpty } from "./pruneEmpty.ts";
@@ -15,6 +17,8 @@ export const CLOUD_CONFIG_ORDER = [
   "timezone",
   "locale",
   "users",
+  "bootcmd",
+  "runcmd",
 ] as const;
 
 export interface GenerateOptions {
@@ -31,6 +35,7 @@ export interface GenerateResult {
 export interface GenerateProjectInput {
   identity?: IdentityConfig;
   users?: UsersConfig;
+  commands?: CommandsConfig;
 }
 
 export function generateCloudInit(
@@ -44,6 +49,16 @@ export function generateCloudInit(
     const users = buildCloudInitUsers(project.users);
     if (project.users.preserveDefault === false || users.length > 0) {
       pruned.users = users;
+    }
+  }
+
+  if (project.commands !== undefined) {
+    const { bootcmd, runcmd } = buildCloudInitCommands(project.commands);
+    if (bootcmd !== undefined) {
+      pruned.bootcmd = bootcmd;
+    }
+    if (runcmd !== undefined) {
+      pruned.runcmd = runcmd;
     }
   }
 

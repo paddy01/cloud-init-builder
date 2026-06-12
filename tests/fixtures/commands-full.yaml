@@ -1,0 +1,9 @@
+#cloud-config
+bootcmd:
+  - mkdir -p /run/cloud-init-builder
+  - - /bin/true
+runcmd:
+  - apt-get update
+  - - touch
+    - /run/foo
+  - printf "|" "$HOME"

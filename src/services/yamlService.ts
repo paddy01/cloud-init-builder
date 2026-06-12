@@ -2,6 +2,7 @@ import {
   generateCloudInit,
   type GenerateProjectInput,
 } from "../generators/generateCloudInit.ts";
+import { isCommandsConfig } from "../models/commands.ts";
 import type { ProjectFile } from "../models/project.ts";
 import { isUsersConfig } from "../models/users.ts";
 import { slugify } from "../utils/slugify.ts";
@@ -11,6 +12,7 @@ function toGenerateInput(project: ProjectFile): GenerateProjectInput {
   return {
     identity: project.identity,
     users: isUsersConfig(project.users) ? project.users : undefined,
+    commands: isCommandsConfig(project.commands) ? project.commands : undefined,
   };
 }
 

@@ -1,0 +1,26 @@
+#cloud-config
+hostname: web01
+fqdn: web01.lan.example.com
+prefer_fqdn_over_hostname: true
+manage_etc_hosts: localhost
+timezone: Europe/Stockholm
+locale: en_US.UTF-8
+users:
+  - default
+  - name: deploy
+    gecos: Deploy User
+    primary_group: deploy
+    groups:
+      - docker
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    homedir: /srv/deploy
+bootcmd:
+  - mkdir -p /run/cloud-init-builder
+  - - /bin/true
+runcmd:
+  - apt-get update
+  - - touch
+    - /run/foo
+  - printf "|" "$HOME"
