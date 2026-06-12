@@ -2,15 +2,24 @@ import {
   forwardRef,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
+import { useUserValidation } from "../users/UserValidationContext.tsx";
 import { ArgumentRow } from "./ArgumentRow.tsx";
 
 const inputClassName =
   "w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 font-mono text-xs " +
+  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputErrorClassName =
+  "w-full min-w-0 rounded border border-red-300 bg-white px-3 py-2 font-mono text-xs " +
+  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputWarningClassName =
+  "w-full min-w-0 rounded border border-amber-300 bg-white px-3 py-2 font-mono text-xs " +
   "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export interface ArgvCommandInputHandle {
@@ -45,9 +54,39 @@ export const ArgvCommandInput = forwardRef<
     null,
   );
 
+  const {
+    markTouched,
+    getVisibleIssuesForPath,
+    hasVisibleErrorForPath,
+    getFieldMessageId,
+  } = useUserValidation();
+  const executablePath = `commands.${stage}.${command.id}.executable`;
+  const executableIssues = getVisibleIssuesForPath(executablePath);
+  const executableErrors = executableIssues.filter(
+    (issue) => issue.severity === "error",
+  );
+  const executableWarnings = executableIssues.filter(
+    (issue) => issue.severity === "warning",
+  );
+  const hasExecutableError = hasVisibleErrorForPath(executablePath);
   const executableId = `command-executable-${stage}-${command.id}`;
   const executableHelpId = `command-executable-help-${stage}-${command.id}`;
   const argumentsHelpId = `command-arguments-help-${stage}-${command.id}`;
+  const executableDescribedBy = useMemo(
+    () =>
+      [
+        executableHelpId,
+        ...executableIssues.map((issue) =>
+          getFieldMessageId(executablePath, issue.code),
+        ),
+      ].join(" "),
+    [executableHelpId, executableIssues, executablePath, getFieldMessageId],
+  );
+  const executableClassName = hasExecutableError
+    ? inputErrorClassName
+    : executableWarnings.length > 0
+      ? inputWarningClassName
+      : inputClassName;
 
   useImperativeHandle(ref, () => ({
     focusExecutable: () => {
@@ -108,15 +147,33 @@ export const ArgvCommandInput = forwardRef<
           type="text"
           placeholder="e.g. /usr/bin/systemctl"
           value={command.executable}
-          aria-describedby={executableHelpId}
+          aria-describedby={executableDescribedBy}
+          aria-invalid={hasExecutableError ? true : undefined}
           onChange={(event) =>
             updateArgvExecutable(stage, command.id, event.target.value)
           }
-          className={inputClassName}
+          onBlur={() => markTouched(executablePath)}
+          className={executableClassName}
         />
         <p id={executableHelpId} className="text-xs text-gray-500">
           Use the executable name or path. Add each argument separately below.
         </p>
+        {executableErrors.map((issue) => (
+          <FieldMessage
+            key={issue.code}
+            id={getFieldMessageId(executablePath, issue.code)}
+            message={issue.message}
+            severity="error"
+          />
+        ))}
+        {executableWarnings.map((issue) => (
+          <FieldMessage
+            key={issue.code}
+            id={getFieldMessageId(executablePath, issue.code)}
+            message={issue.message}
+            severity="warning"
+          />
+        ))}
       </div>
 
       <div className="space-y-2">

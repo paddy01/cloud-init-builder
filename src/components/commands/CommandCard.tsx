@@ -1,5 +1,15 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
+import { useUserValidation } from "../users/UserValidationContext.tsx";
+import {
+  isFullyBlankCommand,
+  pathToFocusTargetId,
+} from "./commandValidationPaths.ts";
 import {
   ArgvCommandInput,
   type ArgvCommandInputHandle,
@@ -22,6 +32,7 @@ interface CommandCardProps {
   total: number;
   shouldFocusCommand?: boolean;
   onFocused?: () => void;
+  onFocusRequestHandled?: () => void;
   onRemove: (commandId: string) => void;
   onMove: (commandId: string, direction: "up" | "down") => void;
 }
@@ -49,17 +60,6 @@ function scrollCardIntoView(cardRef: RefObject<HTMLElement | null>): void {
   });
 }
 
-function isBlankCommand(command: BuilderCommand): boolean {
-  if (command.form === "shell") {
-    return command.command.trim() === "";
-  }
-
-  return (
-    command.executable.trim() === "" &&
-    command.arguments.every((argument) => argument.value.trim() === "")
-  );
-}
-
 export function CommandCard({
   stage,
   command,
@@ -67,15 +67,37 @@ export function CommandCard({
   total,
   shouldFocusCommand = false,
   onFocused,
+  onFocusRequestHandled,
   onRemove,
   onMove,
 }: CommandCardProps) {
+  const {
+    focusRequestPath,
+    getCommandCardIssueCounts,
+  } = useUserValidation();
   const cardRef = useRef<HTMLElement>(null);
   const commandRef = useRef<HTMLTextAreaElement>(null);
   const argvRef = useRef<ArgvCommandInputHandle>(null);
   const [focusArgvExecutable, setFocusArgvExecutable] = useState(false);
   const isFirst = position === 1;
   const isLast = position === total;
+  const { errors: cardErrors, warnings: cardWarnings } =
+    getCommandCardIssueCounts(stage, command.id);
+  const cardStatusBadge =
+    cardErrors > 0
+      ? {
+          label: cardErrors === 1 ? "1 error" : `${cardErrors} errors`,
+          className:
+            "inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs text-red-700",
+        }
+      : cardWarnings > 0
+        ? {
+            label:
+              cardWarnings === 1 ? "1 warning" : `${cardWarnings} warnings`,
+            className:
+              "inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800",
+          }
+        : null;
 
   useLayoutEffect(() => {
     if (!shouldFocusCommand) {
@@ -100,8 +122,33 @@ export function CommandCard({
     setFocusArgvExecutable(false);
   }, [focusArgvExecutable, command.form]);
 
+  useLayoutEffect(() => {
+    const prefix = `commands.${stage}.${command.id}.`;
+    if (!focusRequestPath?.startsWith(prefix)) {
+      return;
+    }
+
+    scrollCardIntoView(cardRef);
+
+    const focusTarget = () => {
+      if (focusRequestPath.endsWith(".command")) {
+        commandRef.current?.focus({ preventScroll: true });
+      } else if (focusRequestPath.endsWith(".executable")) {
+        argvRef.current?.focusExecutable();
+      } else {
+        const targetId = pathToFocusTargetId(focusRequestPath);
+        if (targetId) {
+          document.getElementById(targetId)?.focus({ preventScroll: true });
+        }
+      }
+      onFocusRequestHandled?.();
+    };
+
+    queueMicrotask(focusTarget);
+  }, [command.id, focusRequestPath, onFocusRequestHandled, stage]);
+
   const handleRemove = () => {
-    if (!isBlankCommand(command) && !window.confirm(REMOVE_CONFIRM)) {
+    if (!isFullyBlankCommand(command) && !window.confirm(REMOVE_CONFIRM)) {
       return;
     }
     onRemove(command.id);
@@ -120,12 +167,17 @@ export function CommandCard({
       className="rounded-lg border border-gray-200 bg-white p-6"
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <p
-          id={`command-card-title-${stage}-${command.id}`}
-          className="text-sm font-semibold text-gray-900"
-        >
-          Command {position}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p
+            id={`command-card-title-${stage}-${command.id}`}
+            className="text-sm font-semibold text-gray-900"
+          >
+            Command {position}
+          </p>
+          {cardStatusBadge ? (
+            <span className={cardStatusBadge.className}>{cardStatusBadge.label}</span>
+          ) : null}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2" role="group" aria-label="Reorder command">
             <button

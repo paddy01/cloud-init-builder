@@ -1,9 +1,17 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import type { CommandArgument, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
+import { useUserValidation } from "../users/UserValidationContext.tsx";
 
 const inputClassName =
   "min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 font-mono text-xs " +
+  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputErrorClassName =
+  "min-w-0 flex-1 rounded border border-red-300 bg-white px-3 py-2 font-mono text-xs " +
+  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputWarningClassName =
+  "min-w-0 flex-1 rounded border border-amber-300 bg-white px-3 py-2 font-mono text-xs " +
   "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 interface ArgumentRowProps {
@@ -26,8 +34,31 @@ export function ArgumentRow({
   const updateCommandArgument = useProjectStore(
     (state) => state.updateCommandArgument,
   );
+  const {
+    markTouched,
+    getVisibleIssuesForPath,
+    hasVisibleErrorForPath,
+    getFieldMessageId,
+  } = useUserValidation();
   const focusRef = useRef<HTMLInputElement>(null);
+  const path = `commands.${stage}.${commandId}.arguments.${row.id}`;
+  const visibleIssues = getVisibleIssuesForPath(path);
+  const errors = visibleIssues.filter((issue) => issue.severity === "error");
+  const warnings = visibleIssues.filter((issue) => issue.severity === "warning");
+  const hasError = hasVisibleErrorForPath(path);
   const inputId = `command-argument-${stage}-${commandId}-${row.id}`;
+  const describedBy = useMemo(
+    () =>
+      visibleIssues
+        .map((issue) => getFieldMessageId(path, issue.code))
+        .join(" "),
+    [getFieldMessageId, path, visibleIssues],
+  );
+  const className = hasError
+    ? inputErrorClassName
+    : warnings.length > 0
+      ? inputWarningClassName
+      : inputClassName;
 
   useLayoutEffect(() => {
     if (!shouldFocus) {
@@ -47,10 +78,13 @@ export function ArgumentRow({
           type="text"
           placeholder="e.g. enable"
           value={row.value}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={hasError ? true : undefined}
           onChange={(event) =>
             updateCommandArgument(stage, commandId, row.id, event.target.value)
           }
-          className={inputClassName}
+          onBlur={() => markTouched(path)}
+          className={className}
         />
         <button
           type="button"
@@ -60,6 +94,22 @@ export function ArgumentRow({
           Remove argument
         </button>
       </div>
+      {errors.map((issue) => (
+        <FieldMessage
+          key={issue.code}
+          id={getFieldMessageId(path, issue.code)}
+          message={issue.message}
+          severity="error"
+        />
+      ))}
+      {warnings.map((issue) => (
+        <FieldMessage
+          key={issue.code}
+          id={getFieldMessageId(path, issue.code)}
+          message={issue.message}
+          severity="warning"
+        />
+      ))}
     </div>
   );
 }

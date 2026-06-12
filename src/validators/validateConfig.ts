@@ -2,8 +2,10 @@ import {
   MANAGE_ETC_HOSTS_VALUES,
   type IdentityConfig,
 } from "../models/identity.ts";
+import { isCommandsConfig } from "../models/commands.ts";
 import type { ProjectFile } from "../models/project.ts";
 import { isUsersConfig } from "../models/users.ts";
+import { validateCommands } from "./validateCommands.ts";
 import { isValidFqdn, isValidHostname } from "./hostname.ts";
 import { isValidLocale } from "./locale.ts";
 import { isValidTimezone } from "./timezone.ts";
@@ -101,6 +103,9 @@ export function validateConfig(
     ...validateIdentity(project?.identity),
     ...validateUsers(
       isUsersConfig(project?.users) ? project.users : undefined,
+    ),
+    ...validateCommands(
+      isCommandsConfig(project?.commands) ? project.commands : undefined,
     ),
   ];
 }
