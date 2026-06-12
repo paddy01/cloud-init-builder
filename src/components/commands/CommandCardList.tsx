@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { useUserValidation } from "../users/UserValidationContext.tsx";
 import { CommandCard } from "./CommandCard.tsx";
 
 const EMPTY_STATE = {
@@ -24,9 +25,15 @@ const STAGE_LABEL = {
 interface CommandCardListProps {
   stage: CommandStage;
   commands: BuilderCommand[];
+  onFocusRequestHandled?: () => void;
 }
 
-export function CommandCardList({ stage, commands }: CommandCardListProps) {
+export function CommandCardList({
+  stage,
+  commands,
+  onFocusRequestHandled,
+}: CommandCardListProps) {
+  const { consumeFocusRequest } = useUserValidation();
   const addCommand = useProjectStore((state) => state.addCommand);
   const removeCommand = useProjectStore((state) => state.removeCommand);
   const moveCommand = useProjectStore((state) => state.moveCommand);
@@ -34,6 +41,10 @@ export function CommandCardList({ stage, commands }: CommandCardListProps) {
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const [moveAnnouncement, setMoveAnnouncement] = useState("");
   const clearPendingFocus = useCallback(() => setPendingFocusId(null), []);
+  const handleFocusRequestHandled = useCallback(() => {
+    consumeFocusRequest();
+    onFocusRequestHandled?.();
+  }, [consumeFocusRequest, onFocusRequestHandled]);
   const copy = EMPTY_STATE[stage];
 
   const handleAdd = () => {
@@ -98,6 +109,7 @@ export function CommandCardList({ stage, commands }: CommandCardListProps) {
             total={commands.length}
             shouldFocusCommand={pendingFocusId === command.id}
             onFocused={clearPendingFocus}
+            onFocusRequestHandled={handleFocusRequestHandled}
             onRemove={handleRemove}
             onMove={handleMove}
           />

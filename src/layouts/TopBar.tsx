@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { COMMANDS_VALIDATION_SUMMARY_HEADING_ID } from "../components/commands/CommandValidationSummary.tsx";
 import { useUserValidation } from "../components/users/UserValidationContext.tsx";
+import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
 import { exportProject, importProject } from "../services/projectService.ts";
 import { copyCloudInitYaml, exportCloudInitYaml } from "../services/yamlService.ts";
 import { useProjectStore } from "../state/projectStore.ts";
-import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
 import { useEditorNavigation } from "./EditorNavigationContext.tsx";
 
 function isUserIssue(path: string): boolean {
   return path.startsWith("users.");
+}
+
+function isCommandIssue(path: string): boolean {
+  return path.startsWith("commands.");
 }
 
 export function TopBar() {
@@ -23,8 +28,9 @@ export function TopBar() {
   const { setActiveSection } = useEditorNavigation();
   const {
     blockingErrors,
-    revealAllUserValidation,
+    revealAllValidation,
     requestFocus,
+    getFirstBlockingIssueSection,
   } = useUserValidation();
 
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
@@ -33,8 +39,11 @@ export function TopBar() {
   const noProject = project === null;
   const nativeExportDisabled = noProject;
   const userErrors = blockingErrors.filter((issue) => isUserIssue(issue.path));
+  const commandErrors = blockingErrors.filter((issue) => isCommandIssue(issue.path));
   const userErrorCount = userErrors.length;
+  const commandErrorCount = commandErrors.length;
   const hasUserErrors = userErrorCount > 0;
+  const hasCommandErrors = commandErrorCount > 0;
 
   const exportTooltipText = useMemo(() => {
     if (noProject) {
@@ -46,6 +55,12 @@ export function TopBar() {
       }
       return `Cannot export yet. ${userErrorCount} user validation errors prevent export. Review the Users validation summary.`;
     }
+    if (hasCommandErrors) {
+      if (commandErrorCount === 1) {
+        return "Cannot export yet. 1 command validation error prevents export. Review the Commands validation summary.";
+      }
+      return `Cannot export yet. ${commandErrorCount} command validation errors prevent export. Review the Commands validation summary.`;
+    }
     const identityErrorCount = blockingErrors.length;
     if (identityErrorCount === 1) {
       return "Cannot export yet. 1 validation error prevents export. Fix the highlighted field below.";
@@ -54,7 +69,14 @@ export function TopBar() {
       return `Cannot export yet. ${identityErrorCount} validation errors prevent export. Fix the highlighted fields below.`;
     }
     return "";
-  }, [blockingErrors.length, hasUserErrors, noProject, userErrorCount]);
+  }, [
+    blockingErrors.length,
+    commandErrorCount,
+    hasCommandErrors,
+    hasUserErrors,
+    noProject,
+    userErrorCount,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -75,10 +97,17 @@ export function TopBar() {
   };
 
   const handleBlockedExport = () => {
-    revealAllUserValidation();
-    if (hasUserErrors) {
+    revealAllValidation();
+
+    const section = getFirstBlockingIssueSection();
+    if (section === "users") {
       setActiveSection("users");
       requestFocus(USERS_VALIDATION_SUMMARY_HEADING_ID);
+      return;
+    }
+    if (section === "commands") {
+      setActiveSection("commands");
+      requestFocus(COMMANDS_VALIDATION_SUMMARY_HEADING_ID);
       return;
     }
     setActiveSection("identity");
