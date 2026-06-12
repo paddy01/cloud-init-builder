@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  commandsConfigSchema,
+  DEFAULT_COMMANDS_CONFIG,
+} from "./commands.ts";
 import { identitySchema } from "./identity.ts";
 import { DEFAULT_USERS_CONFIG, usersConfigSchema } from "./users.ts";
 import { APP_VERSION } from "../utils/version.ts";
@@ -15,6 +19,7 @@ export const projectFileSchema = z.looseObject({
   metadata: projectMetadataSchema,
   identity: identitySchema.optional(),
   users: z.union([usersConfigSchema, z.array(z.unknown())]).optional(),
+  commands: commandsConfigSchema.optional(),
 });
 
 export type ProjectFile = z.infer<typeof projectFileSchema>;
@@ -34,5 +39,6 @@ export function createDefaultProject(name: string): ProjectFile {
       appVersion: APP_VERSION,
     },
     users: structuredClone(DEFAULT_USERS_CONFIG),
+    commands: structuredClone(DEFAULT_COMMANDS_CONFIG),
   };
 }

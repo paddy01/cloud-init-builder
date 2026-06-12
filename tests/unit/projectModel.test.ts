@@ -75,5 +75,9 @@ describe("createDefaultProject", () => {
       preserveDefault: true,
       entries: [],
     });
+    expect(project.commands).toEqual({
+      bootcmd: [],
+      runcmd: [],
+    });
   });
 });

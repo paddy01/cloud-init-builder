@@ -4,6 +4,7 @@ import {
   projectFileSchema,
   type ProjectFile,
 } from "../models/project.ts";
+import { normalizeCommandsSection } from "../models/commands.ts";
 import { normalizeUsersSection } from "../models/users.ts";
 import { getExportFilename } from "../utils/slugify.ts";
 
@@ -48,13 +49,19 @@ function migrateProject(
   const usersNormalization = normalizeUsersSection(raw.users);
   migrated.users = usersNormalization.users;
 
+  const commandsNormalization = normalizeCommandsSection(raw.commands);
+  migrated.commands = commandsNormalization.commands;
+
   // Future: add migration steps here
   // if (version < 2) migrated = migrateV1toV2(migrated);
 
   migrated.formatVersion = CURRENT_FORMAT_VERSION;
   return {
     migrated,
-    warnings: usersNormalization.warnings,
+    warnings: [
+      ...usersNormalization.warnings,
+      ...commandsNormalization.warnings,
+    ],
   };
 }
 

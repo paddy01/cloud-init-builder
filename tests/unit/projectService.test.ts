@@ -8,6 +8,7 @@ import {
   importProject,
   MAX_FILE_SIZE,
 } from "../../src/services/projectService.ts";
+import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import { getExportFilename } from "../../src/utils/slugify.ts";
 
@@ -149,6 +150,97 @@ describe("importProject", () => {
       name: "ops",
       sudo: true,
     });
+  });
+
+  it("normalizes absent commands to default config", async () => {
+    const withoutCommands = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "No Commands",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+    });
+
+    const result = await importProject(
+      fixtureFile(withoutCommands, "no-commands.cib.json"),
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.project.commands).toEqual({
+      bootcmd: [],
+      runcmd: [],
+    });
+  });
+
+  it("preserves valid imported commands", async () => {
+    const withCommands = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "With Commands",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      commands: {
+        bootcmd: [{ id: "b1", form: "shell", command: "mount -a" }],
+        runcmd: [
+          {
+            id: "r1",
+            form: "argv",
+            executable: "apt-get",
+            arguments: [{ id: "a1", value: "update" }],
+          },
+        ],
+      },
+    });
+
+    const result = await importProject(
+      fixtureFile(withCommands, "with-commands.cib.json"),
+    );
+
+    expect(isCommandsConfig(result.project.commands)).toBe(true);
+    if (!isCommandsConfig(result.project.commands)) {
+      throw new Error("expected canonical commands");
+    }
+    expect(result.project.commands.bootcmd).toEqual([
+      { id: "b1", form: "shell", command: "mount -a" },
+    ]);
+    expect(result.project.commands.runcmd[0]).toMatchObject({
+      id: "r1",
+      form: "argv",
+      executable: "apt-get",
+    });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("replaces invalid commands shapes with defaults and warnings", async () => {
+    const invalidCommands = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "Bad Commands",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      commands: {
+        bootcmd: [{ id: "bad", form: "shell", command: 123 }],
+        runcmd: "not-an-array",
+      },
+    });
+
+    const result = await importProject(
+      fixtureFile(invalidCommands, "invalid-commands.cib.json"),
+    );
+
+    expect(result.project.commands).toEqual({
+      bootcmd: [],
+      runcmd: [],
+    });
+    expect(result.warnings.some((warning) => warning.path.startsWith("commands"))).toBe(
+      true,
+    );
   });
 
   it("replaces invalid users shapes with defaults and a warning", async () => {
