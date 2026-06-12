@@ -22,8 +22,14 @@ export const COMMAND_VALIDATION_MESSAGES = {
     "Review this command: interactive input may cause cloud-init to wait indefinitely.",
 } as const;
 
-const REMOTE_PIPE_SHELL =
-  /\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:sh|bash|dash|zsh)\b/i;
+const SHELL_RUNNERS = new Set(["sh", "bash", "dash", "zsh"]);
+
+const SHELL_RUNNER_PATTERN = `(?:sudo\\s+)?(?:(?:${[...SHELL_RUNNERS].join("|")})\\b|(?:/[\\w.-]+)*/(?:${[...SHELL_RUNNERS].join("|")})\\b)`;
+
+const REMOTE_PIPE_SHELL = new RegExp(
+  `\\b(?:curl|wget)\\b[^|\\n]*\\|\\s*${SHELL_RUNNER_PATTERN}`,
+  "i",
+);
 
 const RECURSIVE_DELETE =
   /\brm\b[^\n;&|]*(?:\s-(?:[A-Za-z]*r[A-Za-z]*|[A-Za-z]*R[A-Za-z]*)\b|\s--recursive\b)/i;
@@ -36,8 +42,6 @@ const BROAD_CHMOD =
 
 const INTERACTIVE_COMMAND =
   /(^|[;&|]\s*|\b(?:sudo|env)\s+)(?:passwd|read|nano|vi|vim|less|more|top)\b/i;
-
-const SHELL_RUNNERS = new Set(["sh", "bash", "dash", "zsh"]);
 
 function shellCommandPath(stage: CommandStage, commandId: string): string {
   return `commands.${stage}.${commandId}.command`;

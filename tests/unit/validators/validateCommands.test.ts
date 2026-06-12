@@ -196,4 +196,49 @@ describe("validateCommands", () => {
     expect(issues.some((issue) => issue.severity === "warning")).toBe(true);
     expect(issues.some((issue) => issue.severity === "error")).toBe(false);
   });
+
+  it("warns on remote content piped to path-qualified shell", () => {
+    const command = createBlankCommand("remote-path-shell");
+    command.command = "curl https://example.com/install.sh | /bin/bash";
+    const issues = validateCommands(commandsConfig({ runcmd: [command] }));
+    expect(issues).toContainEqual({
+      path: "commands.runcmd.remote-path-shell.command",
+      code: "COMMAND_REMOTE_PIPE_SHELL",
+      message: COMMAND_VALIDATION_MESSAGES.COMMAND_REMOTE_PIPE_SHELL,
+      severity: "warning",
+    });
+  });
+
+  it("does not warn when local text is piped to a path-qualified shell", () => {
+    const command = createBlankCommand("local-pipe");
+    command.command = "echo hello | /bin/bash";
+    const issues = validateCommands(commandsConfig({ runcmd: [command] }));
+    expect(
+      issues.some((issue) => issue.code === "COMMAND_REMOTE_PIPE_SHELL"),
+    ).toBe(false);
+  });
+
+  it("warns on recursive deletion in bootcmd", () => {
+    const command = createBlankCommand("boot-rm");
+    command.command = "rm -rf /";
+    const issues = validateCommands(commandsConfig({ bootcmd: [command] }));
+    expect(issues).toContainEqual({
+      path: "commands.bootcmd.boot-rm.command",
+      code: "COMMAND_RECURSIVE_DELETE",
+      message: COMMAND_VALIDATION_MESSAGES.COMMAND_RECURSIVE_DELETE,
+      severity: "warning",
+    });
+  });
+
+  it("warns on recursive deletion in runcmd", () => {
+    const command = createBlankCommand("run-rm");
+    command.command = "rm -rf /";
+    const issues = validateCommands(commandsConfig({ runcmd: [command] }));
+    expect(issues).toContainEqual({
+      path: "commands.runcmd.run-rm.command",
+      code: "COMMAND_RECURSIVE_DELETE",
+      message: COMMAND_VALIDATION_MESSAGES.COMMAND_RECURSIVE_DELETE,
+      severity: "warning",
+    });
+  });
 });

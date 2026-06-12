@@ -460,6 +460,25 @@ describe("yamlService users export parity", () => {
     expect(createObjectURL).toHaveBeenCalled();
   });
 
+  it("allows warning-only command projects to download", () => {
+    const project = validProject({
+      identity: { hostname: "web01" },
+      commands: {
+        bootcmd: [],
+        runcmd: [
+          {
+            id: "risky-run",
+            form: "shell",
+            command: "rm -rf /var/tmp/build",
+          },
+        ],
+      },
+    });
+
+    expect(exportCloudInitYaml(project)).toBe(true);
+    expect(createObjectURL).toHaveBeenCalled();
+  });
+
   it("matches direct generation for users-safety-valid and identity-users-safety-valid", async () => {
     expect(generateCloudInit(toGenerateInput(SAFETY_USERS_PROJECT)).yaml).toBe(
       usersSafetyValid,
