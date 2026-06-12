@@ -1,9 +1,13 @@
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
-import {
-  createBlankArgvCommand,
-  createBlankCommand,
-} from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import {
+  ARGV_TO_SHELL_CONFIRM,
+  convertArgvToShellQuoted,
+  createBlankArgvForShellSwitch,
+  SHELL_TO_ARGV_CONFIRM,
+  tryConvertArgvToShell,
+  tryConvertShellToArgv,
+} from "../../utils/commandConversion.ts";
 
 const modeButtonBase =
   "min-h-10 flex-1 rounded px-3 py-2 text-sm text-gray-700";
@@ -24,18 +28,53 @@ export function CommandFormSelector({
 }: CommandFormSelectorProps) {
   const replaceCommand = useProjectStore((state) => state.replaceCommand);
 
-  const switchForm = (nextForm: BuilderCommand["form"]) => {
-    if (command.form === nextForm) {
+  const applySwitch = (
+    nextCommand: BuilderCommand,
+    nextForm: BuilderCommand["form"],
+  ) => {
+    replaceCommand(stage, command.id, nextCommand);
+    onFormSwitch?.(nextForm);
+  };
+
+  const switchToArgv = () => {
+    if (command.form === "argv") {
       return;
     }
 
-    const nextCommand =
-      nextForm === "shell"
-        ? { ...createBlankCommand(command.id), command: "" }
-        : createBlankArgvCommand(command.id);
+    const conversion = tryConvertShellToArgv(command.command, command.id);
+    if (conversion.ok) {
+      applySwitch(conversion.command, "argv");
+      return;
+    }
 
-    replaceCommand(stage, command.id, nextCommand);
-    onFormSwitch?.(nextForm);
+    if (conversion.reason === "empty") {
+      applySwitch(createBlankArgvForShellSwitch(command.id), "argv");
+      return;
+    }
+
+    if (!window.confirm(SHELL_TO_ARGV_CONFIRM)) {
+      return;
+    }
+
+    applySwitch(createBlankArgvForShellSwitch(command.id), "argv");
+  };
+
+  const switchToShell = () => {
+    if (command.form === "shell") {
+      return;
+    }
+
+    const conversion = tryConvertArgvToShell(command);
+    if (conversion.ok) {
+      applySwitch(conversion.command, "shell");
+      return;
+    }
+
+    if (!window.confirm(ARGV_TO_SHELL_CONFIRM)) {
+      return;
+    }
+
+    applySwitch(convertArgvToShellQuoted(command), "shell");
   };
 
   return (
@@ -53,7 +92,7 @@ export function CommandFormSelector({
           className={`${modeButtonBase} ${
             command.form === "shell" ? modeButtonSelected : modeButtonUnselected
           }`}
-          onClick={() => switchForm("shell")}
+          onClick={switchToShell}
         >
           Shell command
         </button>
@@ -64,7 +103,7 @@ export function CommandFormSelector({
           className={`${modeButtonBase} ${
             command.form === "argv" ? modeButtonSelected : modeButtonUnselected
           }`}
-          onClick={() => switchForm("argv")}
+          onClick={switchToArgv}
         >
           Executable and arguments
         </button>
