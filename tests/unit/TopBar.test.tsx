@@ -38,7 +38,7 @@ describe("TopBar Open dirty guard (WR-01)", () => {
       importWarnings: [],
     });
     vi.spyOn(window, "confirm");
-    vi.spyOn(window, "alert");
+    vi.spyOn(window, "alert").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -86,15 +86,19 @@ describe("TopBar Open dirty guard (WR-01)", () => {
     const { container } = renderTopBar();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
-    fireEvent.change(input, {
-      target: {
-        files: [new File(["{}"], "x.cib.json", { type: "application/json" })],
-      },
+    await act(async () => {
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["{}"], "x.cib.json", { type: "application/json" })],
+        },
+      });
     });
 
     await vi.waitFor(() => {
-      expect(projectService.importProject).toHaveBeenCalledOnce();
+      expect(useProjectStore.getState().project?.metadata.name).toBe("Imported");
     });
+    expect(projectService.importProject).toHaveBeenCalledOnce();
+    expect(window.alert).not.toHaveBeenCalled();
   });
 });
 
