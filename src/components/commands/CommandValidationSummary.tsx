@@ -3,7 +3,7 @@ import { isCommandsConfig } from "../../models/commands.ts";
 import type { CommandStage } from "../../models/commands.ts";
 import type { ValidationIssue } from "../../validators/validateConfig.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
-import { useUserValidation } from "../users/UserValidationContext.tsx";
+import { useUserValidation } from "../users/UserValidationContext.ts";
 import {
   getCommandSummaryLabel,
   getStageFromIssuePath,
