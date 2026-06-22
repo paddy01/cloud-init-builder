@@ -5,7 +5,7 @@ import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserVal
 import { exportProject, importProject } from "../services/projectService.ts";
 import { copyCloudInitYaml, exportCloudInitYaml } from "../services/yamlService.ts";
 import { useProjectStore } from "../state/projectStore.ts";
-import { useEditorNavigation } from "./EditorNavigationContext.tsx";
+import { useEditorNavigation } from "./editorNavigation.ts";
 
 function isUserIssue(path: string): boolean {
   return path.startsWith("users.");

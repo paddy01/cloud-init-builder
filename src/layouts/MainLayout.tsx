@@ -11,11 +11,10 @@ import {
 } from "../components/users/UserValidationContext.tsx";
 import { CommandsSection } from "../components/commands/CommandsSection.tsx";
 import { UsersSection } from "../components/users/UsersSection.tsx";
-import { EditorNavigationProvider } from "./EditorNavigationContext.tsx";
+import { EditorNavigationProvider } from "./EditorNavigationProvider.tsx";
+import type { EditorSection } from "./editorNavigation.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { TopBar } from "./TopBar.tsx";
-
-export type EditorSection = "identity" | "users" | "commands";
 
 function BlockedExportAnnouncement() {
   const { blockedExportAnnouncement } = useUserValidation();

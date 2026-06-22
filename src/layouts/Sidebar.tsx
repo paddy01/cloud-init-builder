@@ -1,4 +1,4 @@
-import type { EditorSection } from "./MainLayout.tsx";
+import type { EditorSection } from "./editorNavigation.ts";
 
 const SECTIONS = [
   { id: "identity" as const, label: "Identity" },
