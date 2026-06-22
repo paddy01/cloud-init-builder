@@ -14,7 +14,7 @@ import {
   getSshRowIdFromPath,
   pathToFocusTargetId,
 } from "./userValidationPaths.ts";
-import { useUserValidation } from "./UserValidationContext.tsx";
+import { useUserValidation } from "./UserValidationContext.ts";
 
 const inputDefaultClassName =
   "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +

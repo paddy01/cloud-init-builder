@@ -1,4 +1,4 @@
-import { useUserValidation } from "./UserValidationContext.tsx";
+import { useUserValidation } from "./UserValidationContext.ts";
 
 interface UserAuthStatusProps {
   userId: string;

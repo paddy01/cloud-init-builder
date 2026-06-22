@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import type { BuilderSshAuthorizedKey } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { FieldMessage } from "./FieldMessage.tsx";
-import { useUserValidation } from "./UserValidationContext.tsx";
+import { useUserValidation } from "./UserValidationContext.ts";
 
 const inputDefaultClassName =
   "min-w-0 flex-1 border border-gray-300 rounded px-3 py-2 text-xs font-mono bg-white " +

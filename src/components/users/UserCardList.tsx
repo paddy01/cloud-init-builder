@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import type { BuilderUser } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { UserCard } from "./UserCard.tsx";
-import { useUserValidation } from "./UserValidationContext.tsx";
+import { useUserValidation } from "./UserValidationContext.ts";
 
 interface UserCardListProps {
   entries: BuilderUser[];
