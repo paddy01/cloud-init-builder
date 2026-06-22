@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLayoutEffect, type ReactNode } from "react";
 import {
   act,
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { CommandsSection } from "../../../../src/components/commands/CommandsSection.tsx";
 import { PreviewPanel } from "../../../../src/components/preview/PreviewPanel.tsx";
 import { isCommandsConfig } from "../../../../src/models/commands.ts";
+import {
+  UserValidationProvider,
+  useUserValidation,
+} from "../../../../src/components/users/UserValidationContext.tsx";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
 
 const initialState = {
@@ -20,6 +26,21 @@ const initialState = {
 
 const REMOVE_CONFIRM =
   "Remove command? This removes the command from the project and changes the execution order.";
+
+function CommandsRevealHarness({ children }: { children?: ReactNode }) {
+  const { revealAllValidation } = useUserValidation();
+
+  useLayoutEffect(() => {
+    revealAllValidation();
+  }, [revealAllValidation]);
+
+  return (
+    <>
+      <CommandsSection />
+      {children}
+    </>
+  );
+}
 
 describe("CommandsSection", () => {
   beforeEach(() => {
@@ -312,5 +333,40 @@ describe("CommandsSection", () => {
     ]);
 
     vi.useRealTimers();
+  });
+
+  it("switches to Boot commands and focuses the invalid field when activating a cross-stage issue", async () => {
+    render(
+      <UserValidationProvider>
+        <CommandsRevealHarness />
+      </UserValidationProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Boot commands/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Add boot command" }));
+
+    const bootCommand = screen.getByLabelText("Command");
+    fireEvent.change(bootCommand, { target: { value: "apt-get update" } });
+    fireEvent.change(bootCommand, { target: { value: "" } });
+    fireEvent.blur(bootCommand);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Run commands/i }));
+    expect(screen.getByRole("tab", { name: /Run commands/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    const issueButton = await screen.findByRole("button", {
+      name: /Boot command 1: Export blocked: enter a command/i,
+    });
+    fireEvent.click(issueButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /Boot commands/i })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByLabelText("Command")).toHaveFocus();
+    });
   });
 });

@@ -138,15 +138,6 @@ export function CommandCard({
   }, [reorderFocusDirection, onReorderFocused, isFirst, isLast]);
 
   useLayoutEffect(() => {
-    if (!focusArgvExecutable) {
-      return;
-    }
-
-    argvRef.current?.focusExecutable();
-    setFocusArgvExecutable(false);
-  }, [focusArgvExecutable, command.form]);
-
-  useLayoutEffect(() => {
     const prefix = `commands.${stage}.${command.id}.`;
     if (!focusRequestPath?.startsWith(prefix)) {
       return;

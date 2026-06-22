@@ -112,6 +112,23 @@ describe("CommandsWorkflow argv editing and form switching", () => {
     expect(screen.getAllByPlaceholderText("e.g. enable")[1]).toHaveValue("--now");
   });
 
+  it("focuses the executable exactly once when switching shell to argv", () => {
+    const focusSpy = vi.spyOn(HTMLInputElement.prototype, "focus");
+
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+    fireEvent.change(screen.getByLabelText("Command"), {
+      target: { value: "systemctl enable --now" },
+    });
+    focusSpy.mockClear();
+
+    selectArgvForm(getCommandCard(0));
+
+    expect(screen.getByLabelText("Executable")).toHaveFocus();
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("requires confirmation for ambiguous shell-to-argv conversion and preserves shell on cancel", () => {
     render(<MainLayout />);
     openCommandsSection();
