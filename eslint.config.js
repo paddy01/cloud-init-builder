@@ -3,9 +3,19 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
+import { globalIgnores } from "eslint/config";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  globalIgnores([
+    "dist/",
+    "coverage/",
+    "playwright-report/",
+    "test-results/",
+    ".vite/",
+    ".lean-ctx/",
+    "*.tsbuildinfo",
+    "**/*.generated.{js,jsx,ts,tsx}",
+  ]),
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
