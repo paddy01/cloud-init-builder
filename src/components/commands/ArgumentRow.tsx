@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import type { CommandArgument, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
-import { useUserValidation } from "../users/UserValidationContext.tsx";
+import { useUserValidation } from "../users/UserValidationContext.ts";
 
 const inputClassName =
   "min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 font-mono text-xs " +

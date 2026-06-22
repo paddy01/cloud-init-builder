@@ -2,7 +2,7 @@ import { forwardRef, useMemo } from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
-import { useUserValidation } from "../users/UserValidationContext.tsx";
+import { useUserValidation } from "../users/UserValidationContext.ts";
 
 const textareaClassName =
   "min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 " +

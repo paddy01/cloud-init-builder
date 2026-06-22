@@ -5,7 +5,7 @@ import {
   type RefObject,
 } from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
-import { useUserValidation } from "../users/UserValidationContext.tsx";
+import { useUserValidation } from "../users/UserValidationContext.ts";
 import {
   isFullyBlankCommand,
   pathToFocusTargetId,

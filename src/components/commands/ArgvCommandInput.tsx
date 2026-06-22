@@ -9,7 +9,7 @@ import {
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
-import { useUserValidation } from "../users/UserValidationContext.tsx";
+import { useUserValidation } from "../users/UserValidationContext.ts";
 import { ArgumentRow } from "./ArgumentRow.tsx";
 
 const inputClassName =

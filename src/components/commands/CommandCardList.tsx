@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { BuilderCommand, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
-import { useUserValidation } from "../users/UserValidationContext.tsx";
+import { useUserValidation } from "../users/UserValidationContext.ts";
 import { CommandCard } from "./CommandCard.tsx";
 
 const EMPTY_STATE = {
