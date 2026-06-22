@@ -6,7 +6,7 @@ import {
   type CommandArgument,
 } from "../models/commands.ts";
 
-const SHELL_UNSAFE_CHARS = /['"\\$`*?\[\]{}()<>|&;!\n\r]/;
+const SHELL_UNSAFE_CHARS = /['"\\$`*?[\]{}()<>|&;!\n\r[]/;
 const SAFE_TOKEN_PATTERN = /^[A-Za-z0-9_@%+=:,./-]+$/;
 
 export const SHELL_TO_ARGV_CONFIRM =
@@ -34,7 +34,7 @@ export function quoteForSh(value: string): string {
     return "''";
   }
 
-  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 export function tryConvertShellToArgv(

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { CommandArgument, CommandStage } from "../../models/commands.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
@@ -47,13 +47,9 @@ export function ArgumentRow({
   const warnings = visibleIssues.filter((issue) => issue.severity === "warning");
   const hasError = hasVisibleErrorForPath(path);
   const inputId = `command-argument-${stage}-${commandId}-${row.id}`;
-  const describedBy = useMemo(
-    () =>
-      visibleIssues
-        .map((issue) => getFieldMessageId(path, issue.code))
-        .join(" "),
-    [getFieldMessageId, path, visibleIssues],
-  );
+  const describedBy = visibleIssues
+    .map((issue) => getFieldMessageId(path, issue.code))
+    .join(" ");
   const className = hasError
     ? inputErrorClassName
     : warnings.length > 0

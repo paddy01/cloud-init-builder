@@ -1,10 +1,6 @@
 import { useCallback, type KeyboardEvent } from "react";
 import type { CommandStage } from "../../models/commands.ts";
-
-const STAGES: { id: CommandStage; label: string; panelId: string }[] = [
-  { id: "runcmd", label: "Run commands", panelId: "command-stage-panel-runcmd" },
-  { id: "bootcmd", label: "Boot commands", panelId: "command-stage-panel-bootcmd" },
-];
+import { COMMAND_STAGES } from "./commandStageTabs.ts";
 
 interface CommandStageTabsProps {
   activeStage: CommandStage;
@@ -17,11 +13,11 @@ export function CommandStageTabs({
   counts,
   onStageChange,
 }: CommandStageTabsProps) {
-  const activeIndex = STAGES.findIndex((stage) => stage.id === activeStage);
+  const activeIndex = COMMAND_STAGES.findIndex((stage) => stage.id === activeStage);
 
   const selectStageByIndex = useCallback(
     (index: number) => {
-      const stage = STAGES[index];
+      const stage = COMMAND_STAGES[index];
       if (stage) {
         onStageChange(stage.id);
       }
@@ -41,7 +37,7 @@ export function CommandStageTabs({
         break;
       case "ArrowRight":
         event.preventDefault();
-        selectStageByIndex(Math.min(STAGES.length - 1, activeIndex + 1));
+        selectStageByIndex(Math.min(COMMAND_STAGES.length - 1, activeIndex + 1));
         break;
       case "Home":
         event.preventDefault();
@@ -49,7 +45,7 @@ export function CommandStageTabs({
         break;
       case "End":
         event.preventDefault();
-        selectStageByIndex(STAGES.length - 1);
+        selectStageByIndex(COMMAND_STAGES.length - 1);
         break;
       default:
         break;
@@ -63,7 +59,7 @@ export function CommandStageTabs({
       className="mt-6 flex border-b border-gray-200"
       onKeyDown={handleKeyDown}
     >
-      {STAGES.map((stage) => {
+      {COMMAND_STAGES.map((stage) => {
         const isActive = activeStage === stage.id;
         const count = counts[stage.id];
 
@@ -98,10 +94,4 @@ export function CommandStageTabs({
       })}
     </div>
   );
-}
-
-export function getCommandStagePanelId(stage: CommandStage): string {
-  return stage === "runcmd"
-    ? "command-stage-panel-runcmd"
-    : "command-stage-panel-bootcmd";
 }
