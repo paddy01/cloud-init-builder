@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UserValidationProvider } from "../../src/components/users/UserValidationContext.tsx";
-import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationContext.tsx";
+import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationProvider.tsx";
+import type { EditorSection } from "../../src/layouts/editorNavigation.ts";
 import { TopBar } from "../../src/layouts/TopBar.tsx";
 import { useProjectStore } from "../../src/state/projectStore.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
@@ -13,7 +14,7 @@ import { isUsersConfig } from "../../src/models/users.ts";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 
 function renderTopBar(
-  activeSection: "identity" | "users" = "identity",
+  activeSection: EditorSection = "identity",
   setActiveSection = vi.fn(),
 ) {
   return render(
@@ -496,6 +497,32 @@ describe("TopBar export gating", () => {
     await userEvent.click(exportBtn);
     expect(exportSpy).not.toHaveBeenCalled();
     expect(setActiveSection).toHaveBeenCalledWith("users");
+  });
+
+  it("navigates to Commands and blocks export for empty shell commands", async () => {
+    const setActiveSection = vi.fn();
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          commands: {
+            bootcmd: [],
+            runcmd: [{ id: "empty-shell", form: "shell", command: "" }],
+          },
+        },
+      });
+    });
+
+    const exportSpy = vi.spyOn(yamlService, "exportCloudInitYaml");
+    renderTopBar("identity", setActiveSection);
+    const exportBtn = screen.getByRole("button", { name: /export yaml/i });
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+
+    await userEvent.click(exportBtn);
+    expect(exportSpy).not.toHaveBeenCalled();
+    expect(setActiveSection).toHaveBeenCalledWith("commands");
   });
 
   it("allows system users without authentication to export", async () => {
