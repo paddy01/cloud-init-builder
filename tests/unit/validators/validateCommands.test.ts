@@ -3,6 +3,7 @@ import {
   createBlankArgvCommand,
   createBlankCommand,
   createBlankCommandArgument,
+  type BuilderCommand,
   type CommandsConfig,
 } from "../../../src/models/commands.ts";
 import {
@@ -18,6 +19,13 @@ function commandsConfig(
     runcmd: [],
     ...partial,
   };
+}
+
+function shellCommand(
+  id: string,
+  command: string,
+): Extract<BuilderCommand, { form: "shell" }> {
+  return { id, form: "shell", command };
 }
 
 describe("validateCommands", () => {
@@ -84,8 +92,7 @@ describe("validateCommands", () => {
     first.executable = "/bin/true";
     first.arguments = [createBlankCommandArgument("blank-arg")];
 
-    const second = createBlankCommand("second");
-    second.command = "echo ok";
+    const second = shellCommand("second", "echo ok");
 
     const issues = validateCommands(
       commandsConfig({ runcmd: [first, second], bootcmd: [] }),
@@ -97,8 +104,10 @@ describe("validateCommands", () => {
   });
 
   it("warns on remote content piped to shell", () => {
-    const command = createBlankCommand("remote-pipe");
-    command.command = "curl https://example.com/install.sh | bash";
+    const command = shellCommand(
+      "remote-pipe",
+      "curl https://example.com/install.sh | bash",
+    );
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.remote-pipe.command",
@@ -109,8 +118,10 @@ describe("validateCommands", () => {
   });
 
   it("does not warn when curl output is not piped to a shell", () => {
-    const command = createBlankCommand("safe-curl");
-    command.command = "curl -fsSL https://example.com/file.txt -o /tmp/file.txt";
+    const command = shellCommand(
+      "safe-curl",
+      "curl -fsSL https://example.com/file.txt -o /tmp/file.txt",
+    );
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(
       issues.some((issue) => issue.code === "COMMAND_REMOTE_PIPE_SHELL"),
@@ -118,8 +129,7 @@ describe("validateCommands", () => {
   });
 
   it("warns on recursive deletion", () => {
-    const command = createBlankCommand("recursive-rm");
-    command.command = "rm -rf /var/tmp/build";
+    const command = shellCommand("recursive-rm", "rm -rf /var/tmp/build");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.recursive-rm.command",
@@ -130,8 +140,7 @@ describe("validateCommands", () => {
   });
 
   it("warns on recursive permission changes", () => {
-    const command = createBlankCommand("recursive-chmod");
-    command.command = "chmod -R 755 /srv/app";
+    const command = shellCommand("recursive-chmod", "chmod -R 755 /srv/app");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.recursive-chmod.command",
@@ -142,8 +151,7 @@ describe("validateCommands", () => {
   });
 
   it("warns on broad chmod modes", () => {
-    const command = createBlankCommand("broad-chmod");
-    command.command = "chmod 777 /tmp/shared";
+    const command = shellCommand("broad-chmod", "chmod 777 /tmp/shared");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.broad-chmod.command",
@@ -154,8 +162,7 @@ describe("validateCommands", () => {
   });
 
   it("warns on interactive commands", () => {
-    const command = createBlankCommand("interactive");
-    command.command = "passwd deploy";
+    const command = shellCommand("interactive", "passwd deploy");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.interactive.command",
@@ -190,16 +197,17 @@ describe("validateCommands", () => {
   });
 
   it("keeps warnings non-blocking while structural errors remain errors", () => {
-    const command = createBlankCommand("mixed");
-    command.command = "curl https://example.com | bash";
+    const command = shellCommand("mixed", "curl https://example.com | bash");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues.some((issue) => issue.severity === "warning")).toBe(true);
     expect(issues.some((issue) => issue.severity === "error")).toBe(false);
   });
 
   it("warns on remote content piped to path-qualified shell", () => {
-    const command = createBlankCommand("remote-path-shell");
-    command.command = "curl https://example.com/install.sh | /bin/bash";
+    const command = shellCommand(
+      "remote-path-shell",
+      "curl https://example.com/install.sh | /bin/bash",
+    );
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.remote-path-shell.command",
@@ -210,8 +218,7 @@ describe("validateCommands", () => {
   });
 
   it("does not warn when local text is piped to a path-qualified shell", () => {
-    const command = createBlankCommand("local-pipe");
-    command.command = "echo hello | /bin/bash";
+    const command = shellCommand("local-pipe", "echo hello | /bin/bash");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(
       issues.some((issue) => issue.code === "COMMAND_REMOTE_PIPE_SHELL"),
@@ -219,8 +226,7 @@ describe("validateCommands", () => {
   });
 
   it("warns on recursive deletion in bootcmd", () => {
-    const command = createBlankCommand("boot-rm");
-    command.command = "rm -rf /";
+    const command = shellCommand("boot-rm", "rm -rf /");
     const issues = validateCommands(commandsConfig({ bootcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.bootcmd.boot-rm.command",
@@ -231,8 +237,7 @@ describe("validateCommands", () => {
   });
 
   it("warns on recursive deletion in runcmd", () => {
-    const command = createBlankCommand("run-rm");
-    command.command = "rm -rf /";
+    const command = shellCommand("run-rm", "rm -rf /");
     const issues = validateCommands(commandsConfig({ runcmd: [command] }));
     expect(issues).toContainEqual({
       path: "commands.runcmd.run-rm.command",

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UserCard } from "../../../../src/components/users/UserCard.tsx";
-import { UserValidationProvider } from "../../../../src/components/users/UserValidationContext.tsx";
+import { UserValidationProvider } from "../../../../src/components/users/UserValidationProvider.tsx";
 import { buildCloudInitUsers } from "../../../../src/generators/generateUsers.ts";
 import {
   createBlankUser,

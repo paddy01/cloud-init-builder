@@ -4,7 +4,7 @@ import {
   getUserIdFromIssuePath,
   getUserLabel,
 } from "./userValidationPaths.ts";
-import { useUserValidation } from "./UserValidationContext.tsx";
+import { useUserValidation } from "./UserValidationContext.ts";
 import { isUsersConfig } from "../../models/users.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 

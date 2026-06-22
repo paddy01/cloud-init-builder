@@ -9,10 +9,8 @@ import {
 } from "@testing-library/react";
 import { UserCard } from "../../../../src/components/users/UserCard.tsx";
 import { UserCardList } from "../../../../src/components/users/UserCardList.tsx";
-import {
-  UserValidationProvider,
-  useUserValidation,
-} from "../../../../src/components/users/UserValidationContext.tsx";
+import { useUserValidation } from "../../../../src/components/users/UserValidationContext.ts";
+import { UserValidationProvider } from "../../../../src/components/users/UserValidationProvider.tsx";
 import {
   USERS_VALIDATION_SUMMARY_HEADING_ID,
   UserValidationSummary,

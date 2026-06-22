@@ -22,7 +22,6 @@ import usersDefaultOnly from "../fixtures/users-default-only.yaml?raw";
 import usersNone from "../fixtures/users-none.yaml?raw";
 import usersCommon from "../fixtures/users-common.yaml?raw";
 import usersAdvanced from "../fixtures/users-advanced.yaml?raw";
-import identityUsersCommandsFull from "../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersFull from "../fixtures/identity-users-full.yaml?raw";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 import { isCommandsConfig } from "../../src/models/commands.ts";

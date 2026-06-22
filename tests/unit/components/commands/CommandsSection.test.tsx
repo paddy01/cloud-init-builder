@@ -11,10 +11,8 @@ import {
 import { CommandsSection } from "../../../../src/components/commands/CommandsSection.tsx";
 import { PreviewPanel } from "../../../../src/components/preview/PreviewPanel.tsx";
 import { isCommandsConfig } from "../../../../src/models/commands.ts";
-import {
-  UserValidationProvider,
-  useUserValidation,
-} from "../../../../src/components/users/UserValidationContext.tsx";
+import { useUserValidation } from "../../../../src/components/users/UserValidationContext.ts";
+import { UserValidationProvider } from "../../../../src/components/users/UserValidationProvider.tsx";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
 
 const initialState = {
