@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { MainLayout } from "../../../../src/layouts/MainLayout.tsx";
@@ -97,8 +98,12 @@ describe("UsersWorkflow add and edit", () => {
     );
     expect(reimported.project.users).toEqual(storeUsers);
 
-    useProjectStore.getState().loadProject(reimported.project);
-    expect(screen.getAllByLabelText("Username")[0]).toHaveValue("deploy");
+    await act(async () => {
+      useProjectStore.getState().loadProject(reimported.project);
+    });
+    await waitFor(() => {
+      expect(screen.getAllByLabelText("Username")[0]).toHaveValue("deploy");
+    });
     expect(screen.getAllByLabelText("Full name")[1]).toHaveValue(
       "Second Deploy",
     );
@@ -259,7 +264,9 @@ describe("UsersWorkflow validation interaction boundaries", () => {
         .length,
     ).toBeGreaterThan(0);
 
-    useProjectStore.getState().newProject("Fresh");
+    await act(async () => {
+      useProjectStore.getState().newProject("Fresh");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Users" }));
     fireEvent.click(screen.getByRole("button", { name: "Add user" }));
 
