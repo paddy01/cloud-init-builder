@@ -2,3 +2,5 @@ node_modules
 dist
 *.local
 .resume-codex
+playwright-report/
+test-results/
