@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { UserValidationProvider } from "../../src/components/users/UserValidationContext.tsx";
+import { UserValidationProvider } from "../../src/components/users/UserValidationProvider.tsx";
 import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationProvider.tsx";
 import type { EditorSection } from "../../src/layouts/editorNavigation.ts";
 import { TopBar } from "../../src/layouts/TopBar.tsx";

@@ -5,10 +5,8 @@ import {
   type EditorPreviewView,
 } from "../components/preview/EditorPreviewTabs.tsx";
 import { PreviewPanel } from "../components/preview/PreviewPanel.tsx";
-import {
-  UserValidationProvider,
-  useUserValidation,
-} from "../components/users/UserValidationContext.tsx";
+import { UserValidationProvider } from "../components/users/UserValidationProvider.tsx";
+import { useUserValidation } from "../components/users/UserValidationContext.ts";
 import { CommandsSection } from "../components/commands/CommandsSection.tsx";
 import { UsersSection } from "../components/users/UsersSection.tsx";
 import { EditorNavigationProvider } from "./EditorNavigationProvider.tsx";
