@@ -182,6 +182,43 @@ describe("exportCloudInitYaml", () => {
     expect(anchor.download).toBe("my-server-template.yaml");
   });
 
+  it("uses renamed project name for YAML filename when hostname is absent", () => {
+    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
+
+    exportCloudInitYaml(
+      validProject({
+        metadata: { name: "Demo Server", ...baseMetadata },
+        identity: undefined,
+      }),
+    );
+
+    expect(anchor.download).toBe("demo-server.yaml");
+  });
+
+  it("prefers hostname over renamed project name for YAML filename", () => {
+    exportCloudInitYaml(
+      validProject({
+        metadata: { name: "Demo Server", ...baseMetadata },
+        identity: { hostname: "web01" },
+      }),
+    );
+
+    expect(anchor.download).toBe("web01.yaml");
+  });
+
+  it("falls back to untitled.yaml when hostname is absent and project name slugifies to empty", () => {
+    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
+
+    exportCloudInitYaml(
+      validProject({
+        metadata: { name: "***", ...baseMetadata },
+        identity: undefined,
+      }),
+    );
+
+    expect(anchor.download).toBe("untitled.yaml");
+  });
+
   it("defers URL.revokeObjectURL until after the click microtask", () => {
     exportCloudInitYaml(validProject());
 

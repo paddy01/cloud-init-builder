@@ -289,6 +289,72 @@ describe("importProject", () => {
   });
 });
 
+describe("metadata name normalization", () => {
+  const baseMetadata = {
+    createdAt: "2026-06-01T10:00:00.000Z",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+    appVersion: "0.1.0",
+  };
+
+  it("trims padded names on strict import", async () => {
+    const json = JSON.stringify({
+      formatVersion: 1,
+      metadata: { name: "  Demo Server  ", ...baseMetadata },
+    });
+
+    const result = await importProject(
+      fixtureFile(json, "padded-name.cib.json"),
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.project.metadata.name).toBe("Demo Server");
+  });
+
+  it("normalizes whitespace-only strict import names to Untitled Project", async () => {
+    const json = JSON.stringify({
+      formatVersion: 1,
+      metadata: { name: "   ", ...baseMetadata },
+    });
+
+    const result = await importProject(
+      fixtureFile(json, "blank-name.cib.json"),
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.project.metadata.name).toBe("Untitled Project");
+  });
+
+  it("trims padded names on lenient fallback import", async () => {
+    const json = JSON.stringify({
+      formatVersion: 1,
+      metadata: { name: "  Incomplete Project  " },
+      identity: { hostname: "incomplete-host" },
+    });
+
+    const result = await importProject(
+      fixtureFile(json, "padded-lenient.cib.json"),
+    );
+
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.project.metadata.name).toBe("Incomplete Project");
+  });
+
+  it("normalizes whitespace-only lenient fallback names to Untitled Project", async () => {
+    const json = JSON.stringify({
+      formatVersion: 1,
+      metadata: { name: "   " },
+      identity: { hostname: "incomplete-host" },
+    });
+
+    const result = await importProject(
+      fixtureFile(json, "blank-lenient.cib.json"),
+    );
+
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.project.metadata.name).toBe("Untitled Project");
+  });
+});
+
 describe("users credential normalization", () => {
   const BCRYPT_HASH =
     "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -572,6 +638,38 @@ describe("exportProject", () => {
 
     vi.runAllTimers();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+  });
+
+  it("uses renamed project name for .cib.json download filename", () => {
+    const project = {
+      formatVersion: 1,
+      metadata: {
+        name: "Demo Server",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+    };
+
+    exportProject(project, "Demo Server");
+
+    expect(anchor.download).toBe("demo-server.cib.json");
+  });
+
+  it("falls back to untitled.cib.json when project name slugifies to empty", () => {
+    const project = {
+      formatVersion: 1,
+      metadata: {
+        name: "***",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+    };
+
+    exportProject(project, "***");
+
+    expect(anchor.download).toBe("untitled.cib.json");
   });
 
   it("returns false when document.body.appendChild throws", () => {

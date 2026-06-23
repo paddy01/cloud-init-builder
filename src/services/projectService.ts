@@ -20,6 +20,14 @@ export interface ImportResult {
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+function normalizeImportedProjectName(value: unknown): string {
+  if (typeof value !== "string") {
+    return "Untitled Project";
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "Untitled Project";
+}
+
 async function readFileText(file: File): Promise<string> {
   if (typeof file.text === "function") {
     return file.text();
@@ -110,7 +118,17 @@ export async function importProject(file: File): Promise<ImportResult> {
   const result = projectFileSchema.safeParse(migrated);
 
   if (result.success) {
-    return { project: result.data, warnings: migrationWarnings };
+    const normalizedName = normalizeImportedProjectName(result.data.metadata.name);
+    return {
+      project: {
+        ...result.data,
+        metadata: {
+          ...result.data.metadata,
+          name: normalizedName,
+        },
+      },
+      warnings: migrationWarnings,
+    };
   }
 
   const warnings: ImportWarning[] = [
@@ -128,8 +146,7 @@ export async function importProject(file: File): Promise<ImportResult> {
       ? (migrated.metadata as Record<string, unknown>)
       : undefined;
 
-  const fallbackName =
-    typeof rawMetadata?.name === "string" ? rawMetadata.name : "Untitled Project";
+  const fallbackName = normalizeImportedProjectName(rawMetadata?.name);
 
   const defaults = createDefaultProject(fallbackName);
   const rawMeta = rawMetadata ?? {};
@@ -141,7 +158,7 @@ export async function importProject(file: File): Promise<ImportResult> {
       formatVersion: CURRENT_FORMAT_VERSION,
       metadata: {
         ...defaults.metadata,
-        ...(typeof rawMeta.name === "string" ? { name: rawMeta.name } : {}),
+        name: fallbackName,
         ...(typeof rawMeta.createdAt === "string"
           ? { createdAt: rawMeta.createdAt }
           : {}),

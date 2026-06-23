@@ -44,6 +44,28 @@ describe("lossless round-trip", () => {
   });
 });
 
+describe("normalizes imported metadata names", () => {
+  it("cleans padded imported names across JSON round-trip", async () => {
+    const padded = JSON.stringify({
+      formatVersion: 1,
+      metadata: {
+        name: "  Demo Server  ",
+        createdAt: "2026-06-01T10:00:00.000Z",
+        updatedAt: "2026-06-01T10:00:00.000Z",
+        appVersion: packageJson.version,
+      },
+    });
+
+    const firstImport = await importProject(fileFromJson(padded, "padded.cib.json"));
+    expect(firstImport.project.metadata.name).toBe("Demo Server");
+
+    const exported = JSON.stringify(firstImport.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exported, "roundtrip.cib.json"));
+    expect(secondImport.project.metadata.name).toBe("Demo Server");
+    expect(secondImport.warnings).toEqual([]);
+  });
+});
+
 describe("lossless pass-through of unknown keys", () => {
   it("preserves identity and users across single and double round-trip per D-11", async () => {
     const firstImport = await importProject(
