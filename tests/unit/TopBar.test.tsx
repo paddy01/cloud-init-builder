@@ -624,3 +624,203 @@ describe("TopBar export gating", () => {
     expect(screen.queryByText(/export succeeded/i)).toBeNull();
   });
 });
+
+describe("TopBar project rename", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "alert").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("opens inline editor from Rename project beside the readable title", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Project name" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+
+    expect(screen.queryByText("Untitled Project")).not.toBeInTheDocument();
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    expect(input).toHaveValue("Untitled Project");
+    expect(screen.getByRole("button", { name: "Save project name" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel project rename" })).toBeInTheDocument();
+  });
+
+  it("commits trimmed name on Enter, dirties project, and updates updatedAt", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    const beforeUpdatedAt = useProjectStore.getState().project!.metadata.updatedAt;
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "  Demo Server  ");
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.getByText("Demo Server")).toBeInTheDocument();
+    expect(useProjectStore.getState().project?.metadata.name).toBe("Demo Server");
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    expect(useProjectStore.getState().project?.metadata.updatedAt).not.toBe(beforeUpdatedAt);
+    expect(screen.getByTitle("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("commits via Save project name despite input blur during click", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Demo Server");
+    await userEvent.click(screen.getByRole("button", { name: "Save project name" }));
+
+    expect(screen.getByText("Demo Server")).toBeInTheDocument();
+    expect(useProjectStore.getState().project?.metadata.name).toBe("Demo Server");
+    expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+
+  it("cancels on Escape without dirtying or changing updatedAt", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    const beforeUpdatedAt = useProjectStore.getState().project!.metadata.updatedAt;
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Demo Server");
+    await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(useProjectStore.getState().project?.metadata.name).toBe("Untitled Project");
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    expect(useProjectStore.getState().project?.metadata.updatedAt).toBe(beforeUpdatedAt);
+  });
+
+  it("cancels via Cancel project rename without dirtying", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Demo Server");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel project rename" }));
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(useProjectStore.getState().isDirty).toBe(false);
+  });
+
+  it("cancels on blur without committing", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Demo Server");
+    fireEvent.blur(input);
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(useProjectStore.getState().project?.metadata.name).toBe("Untitled Project");
+    expect(useProjectStore.getState().isDirty).toBe(false);
+  });
+
+  it("keeps previous name for whitespace-only rename attempts", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "   ");
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(useProjectStore.getState().project?.metadata.name).toBe("Untitled Project");
+    expect(useProjectStore.getState().isDirty).toBe(false);
+  });
+
+  it("no-ops unchanged trimmed commits", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    const beforeUpdatedAt = useProjectStore.getState().project!.metadata.updatedAt;
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "  Untitled Project  ");
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    expect(useProjectStore.getState().project?.metadata.updatedAt).toBe(beforeUpdatedAt);
+  });
+
+  it("accepts punctuation-heavy names without validation errors", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "!!! @@@ ###");
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.getByText("!!! @@@ ###")).toBeInTheDocument();
+    expect(useProjectStore.getState().project?.metadata.name).toBe("!!! @@@ ###");
+    expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+
+  it("exposes full committed name via title and truncation classes for long names", () => {
+    const longName =
+      "Homelab Proxmox Template With A Very Long Descriptive Project Name";
+    useProjectStore.getState().newProject(longName);
+    renderTopBar();
+
+    const title = screen.getByText(longName);
+    expect(title).toHaveAttribute("title", longName);
+    expect(title.className).toContain("truncate");
+    expect(title.className).toContain("whitespace-nowrap");
+    expect(title.className).toContain("overflow-hidden");
+    expect(title.className).toContain("text-ellipsis");
+  });
+
+  it("does not show rename success toast or banner copy", async () => {
+    useProjectStore.getState().newProject("Untitled Project");
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    const input = screen.getByRole("textbox", { name: "Project name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Demo Server");
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.queryByText(/renamed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/success/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/saved/i)).not.toBeInTheDocument();
+  });
+
+  it("still creates Untitled Project immediately from New without a naming prompt", async () => {
+    renderTopBar();
+
+    await userEvent.click(screen.getByRole("button", { name: /^new$/i }));
+
+    expect(screen.getByText("Untitled Project")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Project name" })).not.toBeInTheDocument();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+});

@@ -18,12 +18,15 @@ function isCommandIssue(path: string): boolean {
 export function TopBar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const isCommittingRenameRef = useRef(false);
   const project = useProjectStore((state) => state.project);
   const isDirty = useProjectStore((state) => state.isDirty);
   const importWarnings = useProjectStore((state) => state.importWarnings);
   const newProject = useProjectStore((state) => state.newProject);
   const loadProject = useProjectStore((state) => state.loadProject);
   const markSaved = useProjectStore((state) => state.markSaved);
+  const updateMetadata = useProjectStore((state) => state.updateMetadata);
   const clearWarnings = useProjectStore((state) => state.clearWarnings);
   const { setActiveSection } = useEditorNavigation();
   const {
@@ -34,6 +37,8 @@ export function TopBar() {
   } = useUserValidation();
 
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [isRenamingProject, setIsRenamingProject] = useState(false);
+  const [projectNameDraft, setProjectNameDraft] = useState("");
 
   const exportBlocked = blockingErrors.length > 0;
   const noProject = project === null;
@@ -117,8 +122,74 @@ export function TopBar() {
     if (isDirty && !window.confirm("You have unsaved changes. Create a new project anyway?")) {
       return;
     }
+    setIsRenamingProject(false);
     newProject("Untitled Project");
   };
+
+  const handleBeginProjectRename = () => {
+    if (!project) return;
+    setProjectNameDraft(project.metadata.name);
+    setIsRenamingProject(true);
+  };
+
+  const handleCancelProjectRename = () => {
+    setIsRenamingProject(false);
+    setProjectNameDraft("");
+  };
+
+  const handleCommitProjectName = () => {
+    if (!project) return;
+
+    const trimmed = projectNameDraft.trim();
+    if (trimmed.length === 0) {
+      handleCancelProjectRename();
+      return;
+    }
+
+    if (trimmed === project.metadata.name) {
+      handleCancelProjectRename();
+      return;
+    }
+
+    updateMetadata(trimmed);
+    setIsRenamingProject(false);
+    setProjectNameDraft("");
+  };
+
+  const handleRenameInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      handleCommitProjectName();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleCancelProjectRename();
+    }
+  };
+
+  const handleRenameInputBlur = () => {
+    if (isCommittingRenameRef.current) {
+      isCommittingRenameRef.current = false;
+      return;
+    }
+    handleCancelProjectRename();
+  };
+
+  const handleRenameConfirmPointerDown = (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    isCommittingRenameRef.current = true;
+  };
+
+  useEffect(() => {
+    if (!isRenamingProject) return;
+    const input = renameInputRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+  }, [isRenamingProject]);
 
   const handleSave = () => {
     if (!project) return;
@@ -204,12 +275,93 @@ export function TopBar() {
       <header className="flex h-14 items-center gap-3 px-4">
         <h1 className="text-lg font-semibold text-gray-900">Cloud-Init Builder</h1>
         <div className="h-6 border-l border-gray-300" />
-        <div className="flex items-center gap-1.5 text-sm text-gray-700">
-          <span>{project?.metadata.name ?? "No Project"}</span>
-          {isDirty && (
-            <span className="text-amber-500" title="Unsaved changes">
-              *
-            </span>
+        <div className="flex min-w-0 items-center gap-2 text-sm text-gray-700">
+          {isRenamingProject && project ? (
+            <>
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={projectNameDraft}
+                onChange={(event) => setProjectNameDraft(event.target.value)}
+                onKeyDown={handleRenameInputKeyDown}
+                onBlur={handleRenameInputBlur}
+                aria-label="Project name"
+                className="h-8 w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-[10rem] rounded border border-gray-300 bg-white px-2 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              />
+              {isDirty && (
+                <span className="text-amber-500" title="Unsaved changes">
+                  *
+                </span>
+              )}
+              <button
+                type="button"
+                aria-label="Save project name"
+                onMouseDown={handleRenameConfirmPointerDown}
+                onClick={handleCommitProjectName}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M5 10l3 3 7-7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Cancel project rename"
+                onClick={handleCancelProjectRename}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 6l8 8M14 6l-8 8" />
+                </svg>
+              </button>
+            </>
+          ) : (
+            <>
+              <span
+                title={project ? project.metadata.name : undefined}
+                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-[10rem] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+              >
+                {project?.metadata.name ?? "No Project"}
+              </span>
+              {isDirty && (
+                <span className="text-amber-500" title="Unsaved changes">
+                  *
+                </span>
+              )}
+              {project && (
+                <button
+                  type="button"
+                  aria-label="Rename project"
+                  onClick={handleBeginProjectRename}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M13.5 3.5l3 3L7 16H4v-3L13.5 3.5z" />
+                  </svg>
+                </button>
+              )}
+            </>
           )}
         </div>
         {copyFeedback && (
