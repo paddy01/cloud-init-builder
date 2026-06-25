@@ -47,6 +47,11 @@ export function exportCloudInitYaml(project: ProjectFile): boolean {
 }
 
 export async function copyCloudInitYaml(project: ProjectFile): Promise<boolean> {
+  const issues = validateConfig(project);
+  if (issues.some((issue) => issue.severity === "error")) {
+    return false;
+  }
+
   const result = generateCloudInit(toGenerateInput(project));
 
   try {

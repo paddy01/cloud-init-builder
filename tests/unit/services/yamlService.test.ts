@@ -268,6 +268,15 @@ describe("copyCloudInitYaml", () => {
     expect(text).toMatch(/^#cloud-config\n/);
   });
 
+  it("returns false without writing to clipboard when validation fails", async () => {
+    const project = validProject({ identity: undefined });
+
+    const success = await copyCloudInitYaml(project);
+
+    expect(success).toBe(false);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it("returns false when clipboard write fails", async () => {
     writeText.mockRejectedValueOnce(new Error("denied"));
 
@@ -363,6 +372,7 @@ describe("yamlService users export parity", () => {
       identityUsersFull,
     );
 
+    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
     await copyCloudInitYaml(commonProject);
     const [commonCopied] = writeText.mock.calls[0] ?? [];
     expect(commonCopied).toBe(usersCommon);
@@ -576,11 +586,11 @@ describe("yamlService users export parity", () => {
       identityUsersCommandsFull,
     );
 
+    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
     await copyCloudInitYaml(combinedProject);
     const [copiedYaml] = writeText.mock.calls[writeText.mock.calls.length - 1] ?? [];
     expect(copiedYaml).toBe(identityUsersCommandsFull);
 
-    vi.spyOn(validateConfig, "validateConfig").mockReturnValue([]);
     expect(exportCloudInitYaml(combinedProject)).toBe(true);
     const [blobArg] =
       createObjectURL.mock.calls[createObjectURL.mock.calls.length - 1] ?? [];
