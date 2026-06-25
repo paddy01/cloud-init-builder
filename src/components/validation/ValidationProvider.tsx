@@ -252,28 +252,29 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     });
   }, [markTouched]);
 
-  const revealAllValidation = useCallback(() => {
+  const revealAllValidation = useCallback((channel: "export" | "copy" = "export") => {
     setRevealAll(true);
 
     const firstError = blockingErrors[0];
     const section = firstError ? getIssueSection(firstError.path) : null;
+    const blockedPrefix = channel === "copy" ? "Copy is blocked" : "Export is blocked";
 
     if (section === "commands") {
       setBlockedExportAnnouncement(
-        "Export is blocked. Review the highlighted command errors.",
+        `${blockedPrefix}. Review the highlighted command errors.`,
       );
       return;
     }
 
     if (section === "users") {
       setBlockedExportAnnouncement(
-        "Export is blocked. Review the highlighted user errors.",
+        `${blockedPrefix}. Review the highlighted user errors.`,
       );
       return;
     }
 
     setBlockedExportAnnouncement(
-      "Export is blocked. Review the highlighted errors.",
+      `${blockedPrefix}. Review the highlighted errors.`,
     );
   }, [blockingErrors]);
 

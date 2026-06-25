@@ -308,6 +308,97 @@ describe("Copy YAML button", () => {
     vi.restoreAllMocks();
   });
 
+  it("is natively disabled with no project loaded", () => {
+    renderTopBar();
+
+    const copyBtn = screen.getByRole("button", { name: /copy yaml/i });
+    expect(copyBtn).toBeDisabled();
+    expect(copyBtn).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("uses aria-disabled on a fresh project missing hostname", () => {
+    useProjectStore.getState().newProject("Test");
+    renderTopBar();
+
+    const copyBtn = screen.getByRole("button", { name: /copy yaml/i });
+    expect(copyBtn).not.toBeDisabled();
+    expect(copyBtn).toHaveAttribute("aria-disabled", "true");
+
+    const wrapper = copyBtn.closest("span");
+    expect(wrapper?.getAttribute("title")).toContain("Cannot copy yet");
+    expect(wrapper?.getAttribute("title")).toContain("1 validation error");
+    expect(wrapper?.getAttribute("title")).toContain("prevents YAML output");
+  });
+
+  it("does not call copyCloudInitYaml on blocked activation", async () => {
+    useProjectStore.getState().newProject("Test");
+    const copySpy = vi.spyOn(yamlService, "copyCloudInitYaml");
+
+    renderTopBar();
+    await userEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
+
+    expect(copySpy).not.toHaveBeenCalled();
+  });
+
+  it("shows blocked-copy feedback then clears after 4000 ms", async () => {
+    vi.useFakeTimers();
+    useProjectStore.getState().newProject("Test");
+
+    renderTopBar();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /copy yaml/i }));
+    });
+
+    expect(
+      screen.getByText("Copy blocked. Fix validation errors before copying YAML."),
+    ).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(
+      screen.queryByText("Copy blocked. Fix validation errors before copying YAML."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("navigates to Users and blocks copy for reserved usernames", async () => {
+    const validSsh =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTGkHwfcOs9I6YuKoGkqNgUvX7Z deploy@host";
+    const setActiveSection = vi.fn();
+    useProjectStore.getState().newProject("Test");
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.setState({
+        project: {
+          ...useProjectStore.getState().project!,
+          users: {
+            preserveDefault: true,
+            entries: [
+              {
+                id: "root-user",
+                name: "root",
+                shell: "/bin/bash",
+                ssh_authorized_keys: [{ id: "k1", value: validSsh }],
+              },
+            ],
+          },
+        },
+      });
+    });
+
+    const copySpy = vi.spyOn(yamlService, "copyCloudInitYaml");
+    renderTopBar("identity", setActiveSection);
+    const copyBtn = screen.getByRole("button", { name: /copy yaml/i });
+    expect(copyBtn).toHaveAttribute("aria-disabled", "true");
+    expect(copyBtn.closest("span")?.getAttribute("title")).toContain(
+      "user validation error prevents YAML output",
+    );
+
+    await userEvent.click(copyBtn);
+    expect(copySpy).not.toHaveBeenCalled();
+    expect(setActiveSection).toHaveBeenCalledWith("users");
+  });
+
   it("shows success feedback then clears after 2000 ms", async () => {
     vi.useFakeTimers();
     useProjectStore.getState().newProject("Test");

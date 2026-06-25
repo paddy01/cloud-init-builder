@@ -360,9 +360,34 @@ describe("Blocked export announcement surface", () => {
       expect(announcement.closest('[aria-live="assertive"]')).not.toBeNull();
     });
   });
+
+  it("announces copy-specific blocked wording when copy channel is used", async () => {
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
+    const blank = createBlankUser("announce-copy-user");
+    seedUsers([{ ...blank, gecos: "Configured without username" }]);
+
+    render(
+      <UserValidationProvider>
+        <AssertiveLiveRegion channel="copy" />
+      </UserValidationProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Trigger reveal" }));
+
+    await waitFor(() => {
+      const announcement = screen.getByText(
+        "Copy is blocked. Review the highlighted user errors.",
+      );
+      expect(announcement.closest('[aria-live="assertive"]')).not.toBeNull();
+    });
+  });
 });
 
-function AssertiveLiveRegion() {
+function AssertiveLiveRegion({
+  channel = "export",
+}: {
+  channel?: "export" | "copy";
+}) {
   const { blockedExportAnnouncement, revealAllUserValidation } =
     useUserValidation();
 
@@ -371,7 +396,7 @@ function AssertiveLiveRegion() {
       <div aria-live="assertive" aria-atomic="true" className="sr-only">
         {blockedExportAnnouncement}
       </div>
-      <button type="button" onClick={() => revealAllUserValidation()}>
+      <button type="button" onClick={() => revealAllUserValidation(channel)}>
         Trigger reveal
       </button>
     </>

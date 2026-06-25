@@ -2,6 +2,8 @@ import { createContext, useContext } from "react";
 import type { CommandStage } from "../../models/commands.ts";
 import type { ValidationIssue } from "../../validators/validateConfig.ts";
 
+export type YamlOutputChannel = "export" | "copy";
+
 export interface ValidationContextValue {
   mergedIssues: ValidationIssue[];
   blockingErrors: ValidationIssue[];
@@ -11,8 +13,8 @@ export interface ValidationContextValue {
   getPasswordDraft: (userId: string) => string;
   markTouched: (path: string) => void;
   markAuthTouched: (userId: string) => void;
-  revealAllValidation: () => void;
-  revealAllUserValidation: () => void;
+  revealAllValidation: (channel?: YamlOutputChannel) => void;
+  revealAllUserValidation: (channel?: YamlOutputChannel) => void;
   requestFocus: (path: string) => void;
   focusRequestPath: string | null;
   consumeFocusRequest: () => string | null;
