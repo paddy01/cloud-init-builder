@@ -667,12 +667,28 @@ describe("MainLayout export gating", () => {
       },
     });
 
-    render(<MainLayout />);
+    const { container } = render(<MainLayout />);
     fireEvent.click(screen.getByRole("button", { name: "Users" }));
 
     const passwordInput = screen.getByLabelText("Hashed password");
     fireEvent.change(passwordInput, { target: { value: "hunter2" } });
     fireEvent.blur(passwordInput);
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    const aside = container.querySelector("aside");
+    expect(aside).toBeTruthy();
+    expect(within(aside!).getByText(/validation error/i)).toBeInTheDocument();
+    expect(
+      within(aside!).getByText(
+        /Export blocked: enter a supported password hash/i,
+      ),
+    ).toBeInTheDocument();
+
+    const previewCode = container.querySelector("aside pre code");
+    expect(previewCode?.textContent).not.toContain("hunter2");
 
     const exportBtn = screen.getByRole("button", { name: /export yaml/i });
     expect(exportBtn).toHaveAttribute("aria-disabled", "true");
