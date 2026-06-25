@@ -7,17 +7,13 @@ import { isCommandsConfig } from "../../models/commands.ts";
 import { isUsersConfig } from "../../models/users.ts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
-import { validateConfig } from "../../validators/validateConfig.ts";
+import { useValidation } from "../validation/validationContext.ts";
 import { PreviewBanner } from "./PreviewBanner.tsx";
 
 export function PreviewPanel() {
   const project = useProjectStore((s) => s.project);
   const debouncedProject = useDebouncedValue(project, 300);
-  const issues = useMemo(() => validateConfig(project), [project]);
-  const blockingErrors = useMemo(
-    () => issues.filter((issue) => issue.severity === "error"),
-    [issues],
-  );
+  const { blockingErrors } = useValidation();
   const result = useMemo(
     () =>
       generateCloudInit({
