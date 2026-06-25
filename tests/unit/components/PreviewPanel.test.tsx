@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { PreviewPanel } from "../../../src/components/preview/PreviewPanel.tsx";
+import { UserValidationProvider } from "../../../src/components/users/UserValidationProvider.tsx";
 import { createDefaultProject } from "../../../src/models/project.ts";
 import { useProjectStore } from "../../../src/state/projectStore.ts";
+
+function renderPreviewPanel(ui: ReactElement = <PreviewPanel />) {
+  return render(<UserValidationProvider>{ui}</UserValidationProvider>);
+}
 
 const initialState = {
   project: null,
@@ -23,7 +29,7 @@ describe("PreviewPanel empty state", () => {
   });
 
   it("shows no-project state when project is null", () => {
-    render(<PreviewPanel />);
+    renderPreviewPanel();
 
     expect(screen.getByText("No project loaded")).toBeInTheDocument();
     expect(
@@ -36,7 +42,7 @@ describe("PreviewPanel empty state", () => {
     project.identity = {};
     useProjectStore.setState({ ...initialState, project });
 
-    const { container } = render(<PreviewPanel />);
+    const { container } = renderPreviewPanel();
 
     act(() => {
       vi.advanceTimersByTime(300);
@@ -53,7 +59,7 @@ describe("PreviewPanel empty state", () => {
     project.identity = { hostname: undefined };
     useProjectStore.setState({ ...initialState, project });
 
-    const { container } = render(<PreviewPanel />);
+    const { container } = renderPreviewPanel();
 
     act(() => {
       vi.advanceTimersByTime(300);
@@ -71,7 +77,7 @@ describe("PreviewPanel empty state", () => {
     };
     useProjectStore.setState({ ...initialState, project });
 
-    const { container } = render(<PreviewPanel />);
+    const { container } = renderPreviewPanel();
 
     act(() => {
       vi.advanceTimersByTime(300);
@@ -94,7 +100,7 @@ describe("PreviewPanel debounce and validation", () => {
   });
 
   it("does not show hostname in preview before 300 ms debounce", () => {
-    render(<PreviewPanel />);
+    renderPreviewPanel();
 
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
@@ -107,7 +113,7 @@ describe("PreviewPanel debounce and validation", () => {
   });
 
   it("shows hostname in preview after 300 ms debounce", () => {
-    const { container } = render(<PreviewPanel />);
+    const { container } = renderPreviewPanel();
 
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
@@ -125,7 +131,7 @@ describe("PreviewPanel debounce and validation", () => {
   });
 
   it("shows validation banner immediately without waiting for debounce", () => {
-    render(<PreviewPanel />);
+    renderPreviewPanel();
 
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "-bad" });
@@ -140,7 +146,7 @@ describe("PreviewPanel debounce and validation", () => {
     const project = useProjectStore.getState().project;
     if (!project) throw new Error("expected project");
 
-    const { container } = render(<PreviewPanel />);
+    const { container } = renderPreviewPanel();
 
     act(() => {
       useProjectStore.setState({
@@ -194,7 +200,7 @@ describe("PreviewPanel security", () => {
   });
 
   it("renders YAML in pre/code without script injection surface", () => {
-    const { container } = render(<PreviewPanel />);
+    const { container } = renderPreviewPanel();
 
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
