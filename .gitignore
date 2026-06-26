@@ -4,3 +4,4 @@ dist
 .resume-codex
 playwright-report/
 test-results/
+.agents/
