@@ -1,94 +1,154 @@
 # Code Review Report
 
-Review date: 2026-06-26
+Review date: 2026-07-12
 
-Scope: local review of the React/Vite SPA source, focused on project models,
-validators, cloud-init generators, import/export services, UI workflow wiring,
-and existing automated tests. The project was reported as mainly generated with
-Cursor Composer 2.5, so the review emphasized integration risks, validation
-gaps, and generated-code hygiene.
+Scope: full local review of the current React/Vite SPA, focused on the v1
+contract: guided identity, users, and commands editing; valid `#cloud-config`
+YAML export; and reopenable builder project JSON. The worktree was clean before
+the review. The application was reported as mostly generated with Cursor
+Composer 2, so the review emphasized integration seams, validation bypasses,
+browser behavior, and generated-code hygiene.
 
 ## Verification
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `npm run build` | Pass | TypeScript and Vite production build completed. |
-| `npm test` | Pass | 42 test files and 482 tests passed. |
-| `npx playwright test` | Pass | 3 Chromium tests passed after allowing local server binding. |
-| `npm run lint` | Fail | ESLint found two hook dependency warnings; `--max-warnings 0` makes this a failing gate. |
+| `npm run lint` | Pass | ESLint completed with `--max-warnings 0`. |
+| `npm test` | Pass | 43 test files and 487 tests passed. |
+| `npm run build` | Pass | TypeScript project build and Vite production build completed. |
+| `npm run test:e2e` | Pass | 3 Chromium e2e tests passed, including export, save, reopen, and blocked command recovery. |
+| `npm run verify` | Pass | Combined lint, Vitest, build, and Playwright verification completed. |
 
-The first Playwright run failed in the sandbox because the preview server could
-not bind to `127.0.0.1:4173` (`listen EPERM`). Re-running with local server
-binding allowed completed successfully.
+## Executive Summary
+
+The core v1 functionality is in good shape: generator output, validation,
+project import/export, and the main UI workflows have broad unit and e2e
+coverage. The issues found in this report have been addressed in quick task
+`260712-vc4`, with the generator contract intentionally kept
+validator-independent and documented by tests.
 
 ## Findings
 
-### High: CI lint gate currently fails
+### High: CI lint gate currently fails (resolved)
 
-Location: `src/layouts/TopBar.tsx:125`, `src/layouts/TopBar.tsx:134`,
-`src/layouts/TopBar.tsx:146`
+Location: `package.json:10`, `src/layouts/TopBar.tsx:125`,
+`src/layouts/TopBar.tsx:134`, `src/layouts/TopBar.tsx:146`
 
-`TopBar` creates a `tooltipDeps` object on every render and captures that object
-inside two `useMemo` callbacks, but the dependency arrays list the individual
-fields instead of `tooltipDeps`. ESLint reports `react-hooks/exhaustive-deps`
-warnings at lines 136 and 148, and the configured lint command exits non-zero
-because `package.json` uses `eslint . --max-warnings 0`.
+`TopBar` creates a fresh `tooltipDeps` object on every render and closes over
+it inside two `useMemo` callbacks, but the dependency arrays list individual
+fields instead of `tooltipDeps`. ESLint reports two
+`react-hooks/exhaustive-deps` warnings, and `npm run lint` exits non-zero
+because the script treats warnings as failures.
 
-Impact: CI or pre-merge checks that run `npm run lint` fail even though the app
-builds and tests pass.
+Impact before fix: CI or pre-merge quality gates that run the documented lint
+command failed even though tests and production build passed.
 
-Recommended fix: remove the intermediate `tooltipDeps` object and pass the
-fields inline to `buildBlockedYamlTooltip`, or memoize `tooltipDeps` and use the
-memoized object as the hook dependency.
+Resolution: the intermediate object was removed from the memo closures, and
+`npm run lint` now passes with `--max-warnings 0`.
 
-### Medium: Dirty-page unload protection is incomplete across browsers
+### Medium: Dirty-page unload protection is incomplete across browsers (resolved)
 
 Location: `src/hooks/useBeforeUnload.ts:10`
 
 The `beforeunload` handler calls `event.preventDefault()`, but it does not set
-`event.returnValue`. Some browser behavior still depends on assigning
-`returnValue` for the navigation confirmation prompt to appear consistently.
+`event.returnValue`. Modern browser behavior is inconsistent here; assigning
+`returnValue` remains the most compatible way to request a native navigation
+confirmation prompt.
 
-Impact: users with unsaved project changes may not reliably receive a browser
-warning before closing or navigating away.
+Impact before fix: users with unsaved project changes may not reliably receive
+a warning before closing or navigating away.
 
-Recommended fix: set `event.returnValue = ""` after `event.preventDefault()`.
-Add a focused hook test that dispatches `beforeunload` while `isDirty` is true
-and verifies the event is canceled.
+Resolution: the hook now assigns `event.returnValue = ""`, with focused tests
+covering clean and dirty unload behavior.
 
-### Low: Command generation relies on callers to validate before emitting
+### Medium: Lenient import fallback can return non-canonical project shapes (resolved)
 
-Location: `src/generators/generateCommands.ts:3`
+Location: `src/services/projectService.ts:154`, `src/services/projectService.ts:157`,
+`src/services/projectService.ts:172`, `src/components/preview/PreviewPanel.tsx:19`
 
-`mapBuilderCommand` emits shell commands, executables, and arguments exactly as
-stored in the builder model. Current export and copy paths call
-`validateConfig()` first, so this is not a confirmed user-facing export bug, but
-direct generator callers can still produce YAML containing blank or padded
-command values.
+When schema parsing fails, the fallback project is built as
+`{ ...defaults, ...migrated, ... } as ProjectFile`. Users and commands are
+normalized before this point, but identity is not. A malformed imported
+`identity` value can therefore override the default with a non-canonical shape,
+then flow into the store and preview generation. Export/copy still re-run
+validation, so this is not a confirmed YAML download corruption path, but the
+app is no longer holding a trustworthy `ProjectFile` after fallback import.
 
-Impact: future code that calls the generator directly could bypass the UI/export
-validation contract and emit weak command output.
+Impact before fix: malformed project JSON could produce misleading preview
+output or brittle state behavior after import, undermining the product's "high
+confidence" output bar.
 
-Recommended fix: either document that generators require validated input, or
-normalize command strings inside the generator and add direct generator tests
-for blank and padded command values.
+Resolution: identity is normalized during import migration; invalid identity
+data is omitted with an import warning, matching users/commands fallback style.
+
+### Low: Command generation still depends on caller-side validation (accepted contract)
+
+Location: `src/generators/generateCloudInit.ts:55`,
+`src/generators/generateCommands.ts:3`
+
+The YAML export and clipboard services call `validateConfig()` before
+generation, which protects the main user-facing output paths. The lower-level
+generator still always returns `ok: true` and directly projects command strings,
+executables, and arguments from the builder model. Direct callers can produce
+YAML containing blank or otherwise invalid commands if they bypass the service
+contract.
+
+Impact before clarification: future code could accidentally bypass export gating
+and emit weak command YAML from the generator API.
+
+Resolution: the existing validator-independent generator design is preserved
+and documented in code, with a regression test pinning the direct-caller
+contract.
+
+### Low: Browser e2e coverage is not wired into npm scripts (resolved)
+
+Location: `package.json:6`, `package.json:11`, `playwright.config.ts:1`
+
+The repository has meaningful Playwright coverage, and it passed when run
+directly. However, `npm test` runs only Vitest, and there is no `test:e2e` or
+combined verification script in `package.json`.
+
+Impact before fix: reviewers or CI jobs that only ran documented npm scripts
+could miss the browser-level save/open/export coverage.
+
+Resolution: `test:e2e` and `verify` npm scripts were added and documented in
+`README.md`.
+
+## Fix Plan Status
+
+1. Restore the required quality gate.
+   - Complete.
+
+2. Harden browser data-loss protection.
+   - Complete.
+
+3. Canonicalize fallback imports.
+   - Complete.
+
+4. Clarify generator boundaries.
+   - Complete; the validator-independent generator contract was retained.
+
+5. Make full verification discoverable.
+   - Complete.
 
 ## Positive Coverage Notes
 
-- Import handling has explicit compatibility behavior for legacy users,
-  malformed sections, oversized files, invalid JSON, and future format
-  versions.
 - YAML export and clipboard paths block output when validation contains errors.
-- User validation covers duplicate names, reserved names, SSH key validity,
-  password hash safety, and authentication requirements.
-- Command validation covers blank commands plus common risk patterns such as
+- Identity validators cover hostname, FQDN, timezone, locale, and
+  `manage_etc_hosts` values.
+- User validation covers reserved and duplicate usernames, password hash
+  safety, SSH key validity, duplicate keys, and authentication requirements.
+- Command validation covers blank entries and common risk patterns such as
   remote-content shell pipes, recursive deletion, broad permission changes, and
   interactive commands.
-- Existing unit, integration, and e2e tests cover the main identity, users,
-  commands, preview, save/open, export, and round-trip workflows.
+- Import handling has compatibility behavior for legacy user arrays, malformed
+  users/commands sections, oversized files, invalid JSON, and future format
+  versions.
+- Unit, integration, and e2e tests cover the main identity, users, commands,
+  preview, save/open, export, and round-trip workflows.
 
 ## Residual Risk
 
-This review did not include a manual visual pass in a real browser. The
-automated Playwright smoke coverage passed, but responsive layout polish and
-visual regressions should still be reviewed manually before release.
+This review did not include a manual visual audit in a real browser. The
+automated e2e suite passed, but responsive layout, keyboard polish beyond tested
+paths, and visual regressions should still be checked manually before release.

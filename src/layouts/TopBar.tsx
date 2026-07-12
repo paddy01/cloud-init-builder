@@ -122,17 +122,16 @@ export function TopBar() {
   const hasCommandErrors = commandErrorCount > 0;
   const identityErrorCount = blockingErrors.length;
 
-  const tooltipDeps = {
-    noProject,
-    hasUserErrors,
-    userErrorCount,
-    hasCommandErrors,
-    commandErrorCount,
-    identityErrorCount,
-  };
-
   const exportTooltipText = useMemo(
-    () => buildBlockedYamlTooltip("export", tooltipDeps),
+    () =>
+      buildBlockedYamlTooltip("export", {
+        noProject,
+        hasUserErrors,
+        userErrorCount,
+        hasCommandErrors,
+        commandErrorCount,
+        identityErrorCount,
+      }),
     [
       commandErrorCount,
       hasCommandErrors,
@@ -144,7 +143,15 @@ export function TopBar() {
   );
 
   const copyTooltipText = useMemo(
-    () => buildBlockedYamlTooltip("copy", tooltipDeps),
+    () =>
+      buildBlockedYamlTooltip("copy", {
+        noProject,
+        hasUserErrors,
+        userErrorCount,
+        hasCommandErrors,
+        commandErrorCount,
+        identityErrorCount,
+      }),
     [
       commandErrorCount,
       hasCommandErrors,

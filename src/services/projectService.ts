@@ -4,6 +4,7 @@ import {
   projectFileSchema,
   type ProjectFile,
 } from "../models/project.ts";
+import { identitySchema } from "../models/identity.ts";
 import { normalizeCommandsSection } from "../models/commands.ts";
 import { normalizeUsersSection } from "../models/users.ts";
 import { getExportFilename } from "../utils/slugify.ts";
@@ -26,6 +27,30 @@ function normalizeImportedProjectName(value: unknown): string {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : "Untitled Project";
+}
+
+function normalizeIdentitySection(rawIdentity: unknown): {
+  identity: ProjectFile["identity"];
+  warnings: ImportWarning[];
+} {
+  if (rawIdentity === undefined) {
+    return { identity: undefined, warnings: [] };
+  }
+
+  const result = identitySchema.safeParse(rawIdentity);
+  if (result.success) {
+    return { identity: result.data, warnings: [] };
+  }
+
+  return {
+    identity: undefined,
+    warnings: [
+      {
+        path: "identity",
+        message: "Invalid identity data was omitted during import.",
+      },
+    ],
+  };
 }
 
 async function readFileText(file: File): Promise<string> {
@@ -54,6 +79,13 @@ function migrateProject(
   }
 
   const migrated = { ...raw };
+  const identityNormalization = normalizeIdentitySection(raw.identity);
+  if (identityNormalization.identity === undefined) {
+    delete migrated.identity;
+  } else {
+    migrated.identity = identityNormalization.identity;
+  }
+
   const usersNormalization = normalizeUsersSection(raw.users);
   migrated.users = usersNormalization.users;
 
@@ -67,6 +99,7 @@ function migrateProject(
   return {
     migrated,
     warnings: [
+      ...identityNormalization.warnings,
       ...usersNormalization.warnings,
       ...commandsNormalization.warnings,
     ],

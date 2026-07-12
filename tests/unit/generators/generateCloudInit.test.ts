@@ -328,4 +328,17 @@ describe("generateCloudInit", () => {
     });
     expect(result.yaml).toContain('printf "|" "$HOME"');
   });
+
+  it("keeps the generator validator-independent for direct callers", () => {
+    const result = generateCloudInit({
+      commands: {
+        bootcmd: [],
+        runcmd: [{ id: "blank", form: "shell", command: "" }],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.yaml).toBe(`${CLOUD_CONFIG_HEADER}runcmd:\n  - ""\n`);
+  });
 });

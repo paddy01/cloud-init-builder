@@ -71,6 +71,52 @@ describe("importProject", () => {
     expect(result.project.formatVersion).toBe(1);
   });
 
+  it("omits invalid identity objects during lenient fallback import", async () => {
+    const result = await importProject(
+      fixtureFile(
+        JSON.stringify({
+          formatVersion: 1,
+          metadata: { name: "Invalid Identity" },
+          identity: "not-an-object",
+        }),
+        "invalid-identity.cib.json",
+      ),
+    );
+
+    expect(result.project.identity).toBeUndefined();
+    expect(result.warnings).toContainEqual({
+      path: "identity",
+      message: "Invalid identity data was omitted during import.",
+    });
+  });
+
+  it("omits invalid manage_etc_hosts during import instead of storing a non-canonical identity", async () => {
+    const result = await importProject(
+      fixtureFile(
+        JSON.stringify({
+          formatVersion: 1,
+          metadata: {
+            name: "Invalid Manage Hosts",
+            createdAt: "2026-06-01T10:00:00.000Z",
+            updatedAt: "2026-06-01T10:00:00.000Z",
+            appVersion: "0.1.0",
+          },
+          identity: {
+            hostname: "host",
+            manage_etc_hosts: "template",
+          },
+        }),
+        "invalid-manage-hosts.cib.json",
+      ),
+    );
+
+    expect(result.project.identity).toBeUndefined();
+    expect(result.warnings).toContainEqual({
+      path: "identity",
+      message: "Invalid identity data was omitted during import.",
+    });
+  });
+
   it("rejects future-project-v99 with a version error per D-05", async () => {
     await expect(
       importProject(fixtureFile(futureProjectV99, "future-project-v99.cib.json")),

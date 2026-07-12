@@ -96,12 +96,14 @@ The app is static HTML, CSS, and JavaScript. Deploy `dist/` to GitHub Pages, Net
 | `npm run preview` | Preview production build |
 | `npm run lint` | ESLint (`--max-warnings 0`) |
 | `npm test` | Vitest unit and integration tests |
+| `npm run test:e2e` | Playwright browser tests |
+| `npm run verify` | Full local verification: lint, Vitest, build, and Playwright |
 
-End-to-end tests use Playwright and are not wired to an npm script:
+End-to-end tests use Playwright:
 
 ```bash
 npx playwright install chromium
-npx playwright test
+npm run test:e2e
 ```
 
 Playwright builds the app and runs against the preview server (see `playwright.config.ts`).

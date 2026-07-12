@@ -42,6 +42,8 @@ export function generateCloudInit(
   project: GenerateProjectInput = {},
   options: GenerateOptions = {},
 ): GenerateResult {
+  // Generator callers must provide validated builder state; export/copy services
+  // own blocking validation so this module stays deterministic and side-effect free.
   const flat = { ...(project.identity ?? {}) };
   const pruned: Record<string, unknown> = pruneEmpty(flat) ?? {};
 

@@ -9,6 +9,7 @@ export function useBeforeUnload(): void {
 
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
+      event.returnValue = "";
     };
 
     window.addEventListener("beforeunload", handler);
