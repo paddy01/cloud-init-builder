@@ -336,6 +336,244 @@ describe("importProject", () => {
   });
 });
 
+describe("networking import normalization", () => {
+  const metadata = {
+    name: "Networking",
+    createdAt: "2026-06-01T10:00:00.000Z",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+    appVersion: "0.1.0",
+  };
+
+  function importNetworking(
+    payload: Record<string, unknown>,
+  ): ReturnType<typeof importProject> {
+    return importProject(
+      fixtureFile(
+        JSON.stringify({ metadata, ...payload }),
+        "networking-import.cib.json",
+      ),
+    );
+  }
+
+  function warningPaths(
+    result: Awaited<ReturnType<typeof importProject>>,
+  ): string[] {
+    return result.warnings.map((warning) => warning.path);
+  }
+
+  it("migrates a clean pre-v2 project to an empty networking section silently", async () => {
+    const result = await importNetworking({ formatVersion: 1 });
+
+    expect(result.project.formatVersion).toBe(2);
+    expect(result.project.networking).toEqual({ interfaces: [] });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("discards pre-v2 networking including null with a section warning", async () => {
+    const present = await importNetworking({
+      formatVersion: 1,
+      networking: { interfaces: [] },
+    });
+    const nullSection = await importNetworking({
+      formatVersion: 1,
+      networking: null,
+    });
+
+    expect(present.project.networking).toEqual({ interfaces: [] });
+    expect(nullSection.project.networking).toEqual({ interfaces: [] });
+    expect(warningPaths(present)).toContain("networking");
+    expect(warningPaths(nullSection)).toContain("networking");
+  });
+
+  it("treats absent and null format-2 networking as clean empty state", async () => {
+    const absent = await importNetworking({ formatVersion: 2 });
+    const nullSection = await importNetworking({
+      formatVersion: 2,
+      networking: null,
+    });
+
+    expect(absent.project.networking).toEqual({ interfaces: [] });
+    expect(nullSection.project.networking).toEqual({ interfaces: [] });
+    expect(absent.warnings).toEqual([]);
+    expect(nullSection.warnings).toEqual([]);
+  });
+
+  it("warns for malformed interface collections and their unknown keys", async () => {
+    const nullList = await importNetworking({
+      formatVersion: 2,
+      networking: { interfaces: null },
+    });
+    const objectList = await importNetworking({
+      formatVersion: 2,
+      networking: { interfaces: { renderer: "networkd" } },
+    });
+
+    expect(nullList.project.networking.interfaces).toEqual([]);
+    expect(warningPaths(nullList)).toContain("networking.interfaces");
+    expect(objectList.project.networking.interfaces).toEqual([]);
+    expect(warningPaths(objectList)).toEqual(
+      expect.arrayContaining([
+        "networking.interfaces",
+        "networking.interfaces.renderer",
+      ]),
+    );
+  });
+
+  it("preserves valid siblings while omitting an entry with a malformed active draft", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "first", identityMode: "name", name: "ens18", macAddress: "" },
+          { id: "bad", identityMode: "name", name: null, macAddress: "" },
+          { id: "last", identityMode: "mac", name: "", macAddress: "AA:BB:CC:DD:EE:FF" },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces.map((entry) => entry.id)).toEqual([
+      "first",
+      "last",
+    ]);
+    expect(result.project.networking.interfaces[1]?.macAddress).toBe(
+      "aa:bb:cc:dd:ee:ff",
+    );
+    expect(warningPaths(result)).toContain("networking.interfaces.1.name");
+  });
+
+  it("clears only a malformed inactive draft and warns at its indexed path", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "stable", identityMode: "name", name: "ens18", macAddress: null },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces).toEqual([
+      { id: "stable", identityMode: "name", name: "ens18", macAddress: "" },
+    ]);
+    expect(warningPaths(result)).toContain(
+      "networking.interfaces.0.macAddress",
+    );
+  });
+
+  it("infers a missing or invalid mode only from exactly one nonblank string draft", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "name-only", name: " ens18 ", macAddress: "" },
+          { id: "mac-only", identityMode: "invalid", name: "", macAddress: "AA:BB:CC:DD:EE:FF" },
+          { id: "both", name: "ens19", macAddress: "00:11:22:33:44:55" },
+          { id: "neither", name: " ", macAddress: "" },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces).toEqual([
+      {
+        id: "name-only",
+        identityMode: "name",
+        name: " ens18 ",
+        macAddress: "",
+      },
+      {
+        id: "mac-only",
+        identityMode: "mac",
+        name: "",
+        macAddress: "aa:bb:cc:dd:ee:ff",
+      },
+    ]);
+    expect(warningPaths(result)).toEqual(
+      expect.arrayContaining([
+        "networking.interfaces.2.identityMode",
+        "networking.interfaces.3.identityMode",
+      ]),
+    );
+  });
+
+  it("warns for and removes every unknown nested networking key", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        renderer: "networkd",
+        interfaces: [
+          {
+            id: "stable",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            renderer: "NetworkManager",
+          },
+        ],
+      },
+    });
+
+    expect(warningPaths(result)).toEqual(
+      expect.arrayContaining([
+        "networking.renderer",
+        "networking.interfaces.0.renderer",
+      ]),
+    );
+    expect(result.project.networking).toEqual({
+      interfaces: [
+        { id: "stable", identityMode: "name", name: "ens18", macAddress: "" },
+      ],
+    });
+  });
+
+  it("silently repairs unsafe, empty, missing, and duplicate IDs without reordering", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "stable", identityMode: "name", name: "one", macAddress: "" },
+          { id: "stable", identityMode: "name", name: "two", macAddress: "" },
+          { id: "bad id", identityMode: "name", name: "three", macAddress: "" },
+          { id: "", identityMode: "name", name: "four", macAddress: "" },
+          { identityMode: "name", name: "five", macAddress: "" },
+        ],
+      },
+    });
+    const entries = result.project.networking.interfaces;
+    const ids = entries.map((entry) => entry.id);
+
+    expect(entries.map((entry) => entry.name)).toEqual([
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+    ]);
+    expect(ids[0]).toBe("stable");
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every((id) => /^[A-Za-z][A-Za-z0-9_-]*$/.test(id))).toBe(true);
+    expect(warningPaths(result).some((path) => path.endsWith(".id"))).toBe(false);
+  });
+
+  it("preserves exact Unicode code units and is idempotent when reopened", async () => {
+    const composed = "caf\u00e9";
+    const decomposed = "cafe\u0301";
+    const first = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "composed", identityMode: "name", name: composed, macAddress: "" },
+          { id: "decomposed", identityMode: "name", name: decomposed, macAddress: "" },
+        ],
+      },
+    });
+    const reopened = await importNetworking(first.project);
+
+    expect(first.project.networking.interfaces[0]?.name).toBe(composed);
+    expect(first.project.networking.interfaces[1]?.name).toBe(decomposed);
+    expect(reopened.project.networking).toEqual(first.project.networking);
+    expect(reopened.warnings).toEqual([]);
+  });
+});
+
 describe("metadata name normalization", () => {
   const baseMetadata = {
     createdAt: "2026-06-01T10:00:00.000Z",
