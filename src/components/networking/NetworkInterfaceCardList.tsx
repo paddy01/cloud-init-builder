@@ -53,8 +53,14 @@ export function NetworkInterfaceCardList({
     }
 
     moveNetworkInterface(id, direction);
+    const movedInterface = interfaces[currentIndex];
+    const activeDraft =
+      movedInterface?.identityMode === "mac"
+        ? movedInterface.macAddress
+        : movedInterface?.name;
+    const title = activeDraft?.trim() || `Interface ${currentIndex + 1}`;
     setMoveAnnouncement(
-      `Interface moved to position ${targetIndex + 1} of ${interfaces.length}.`,
+      `${title} moved to position ${targetIndex + 1} of ${interfaces.length}.`,
     );
     setPendingReorderFocus({ id, direction });
   };

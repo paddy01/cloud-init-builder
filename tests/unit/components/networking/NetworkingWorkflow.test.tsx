@@ -105,8 +105,22 @@ describe("NetworkingWorkflow", () => {
       "interface-b",
       "interface-a",
     ]);
-    expect(screen.getByText("Interface moved to position 2 of 2.")).toBeInTheDocument();
+    expect(screen.getByText("ens18 moved to position 2 of 2.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Move ens18 up" })).toHaveFocus();
+  });
+
+  it("announces consecutive interfaces moved to the same position", () => {
+    seedInterface("interface-a", { name: "ens18" });
+    seedInterface("interface-b", { name: "ens19" });
+    seedInterface("interface-c", { name: "ens20" });
+    render(<NetworkingSection />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move ens18 down" }));
+    expect(screen.getByText("ens18 moved to position 2 of 3.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Move ens20 up" }));
+    expect(screen.getByText("ens20 moved to position 2 of 3.")).toBeInTheDocument();
+    expect(screen.queryByText("ens18 moved to position 2 of 3.")).not.toBeInTheDocument();
   });
 
   it("removes a blank card immediately and focuses Add interface", () => {
