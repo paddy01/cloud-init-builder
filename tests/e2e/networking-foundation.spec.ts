@@ -262,4 +262,68 @@ test.describe("networking foundation", () => {
       fullPage: true,
     });
   });
+
+  test("wraps long recovered import-warning paths on mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const longUnknownKey = `unknown-${"network-property-".repeat(20)}tail`;
+    const importedProject = {
+      formatVersion: 2,
+      metadata: {
+        name: "Recovered networking warning",
+        createdAt: "2026-07-19T10:00:00.000Z",
+        updatedAt: "2026-07-19T10:00:00.000Z",
+        appVersion: "0.1.0",
+      },
+      users: { preserveDefault: true, entries: [] },
+      commands: { bootcmd: [], runcmd: [] },
+      networking: {
+        interfaces: [
+          {
+            id: "network-interface-warning",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            [longUnknownKey]: true,
+          },
+        ],
+      },
+    };
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "recovered-networking-warning.cib.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(importedProject)),
+    });
+
+    const status = page.getByRole("status");
+    const warningPath = status.locator("code");
+    const dismiss = status.getByRole("button", {
+      name: "Dismiss import warnings",
+    });
+    await expect(warningPath).toHaveText(
+      `networking.interfaces.0.${longUnknownKey}`,
+    );
+    await expect(warningPath).toBeVisible();
+    await expect(dismiss).toBeVisible();
+
+    const warningBox = await warningPath.boundingBox();
+    const dismissBox = await dismiss.boundingBox();
+    expect(warningBox?.x).toBeGreaterThanOrEqual(0);
+    expect((warningBox?.x ?? 0) + (warningBox?.width ?? 0)).toBeLessThanOrEqual(
+      390,
+    );
+    expect((dismissBox?.x ?? 0) + (dismissBox?.width ?? 0)).toBeLessThanOrEqual(
+      390,
+    );
+
+    const overflow = await page.evaluate(() => ({
+      document:
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+      body: document.body.scrollWidth - document.body.clientWidth,
+    }));
+    expect(overflow.document).toBeLessThanOrEqual(0);
+    expect(overflow.body).toBeLessThanOrEqual(0);
+  });
 });
