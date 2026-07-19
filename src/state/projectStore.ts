@@ -17,6 +17,7 @@ import {
   type UsersConfig,
 } from "../models/users.ts";
 import {
+  allocateUniqueInterfaceId,
   createBlankNetworkInterface,
   isNetworkingConfig,
   type BuilderNetworkInterface,
@@ -381,7 +382,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       return undefined;
     }
 
-    const networkInterface = createBlankNetworkInterface(id);
+    const interfaceId =
+      id ??
+      allocateUniqueInterfaceId(
+        new Set(project.networking.interfaces.map((entry) => entry.id)),
+      );
+    const networkInterface = createBlankNetworkInterface(interfaceId);
     updateProjectNetworking(set, get, (networking) => ({
       ...networking,
       interfaces: [...networking.interfaces, networkInterface],

@@ -114,7 +114,7 @@ function dedupeWarnings(
   });
 }
 
-function allocateUniqueInterfaceId(usedIds: Set<string>): string {
+export function allocateUniqueInterfaceId(usedIds: Set<string>): string {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const candidate = createNetworkInterfaceId();
     if (SAFE_INTERFACE_ID.test(candidate) && !usedIds.has(candidate)) {

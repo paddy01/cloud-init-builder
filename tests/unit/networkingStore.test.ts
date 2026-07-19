@@ -67,6 +67,41 @@ describe("networking store actions", () => {
     ]);
   });
 
+  it("allocates automatic IDs around collisions with loaded interfaces", () => {
+    const collidingUuid = "00000000-0000-4000-8000-000000000001";
+    const uniqueUuid = "00000000-0000-4000-8000-000000000002";
+    const loadedId = `network-interface-${collidingUuid}`;
+    const project = createDefaultProject("Loaded Networking");
+    project.networking.interfaces.push({
+      id: loadedId,
+      identityMode: "name",
+      name: "ens18",
+      macAddress: "",
+    });
+    useProjectStore.getState().loadProject(project);
+    vi.spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce(collidingUuid)
+      .mockReturnValueOnce(uniqueUuid);
+
+    const addedId = useProjectStore.getState().addNetworkInterface();
+
+    expect(addedId).toBe(`network-interface-${uniqueUuid}`);
+    expect(new Set(networking().interfaces.map((entry) => entry.id)).size).toBe(2);
+
+    useProjectStore
+      .getState()
+      .updateNetworkInterface(addedId!, { name: "ens19" });
+    expect(networking().interfaces).toEqual([
+      expect.objectContaining({ id: loadedId, name: "ens18" }),
+      expect.objectContaining({ id: addedId, name: "ens19" }),
+    ]);
+
+    useProjectStore.getState().removeNetworkInterface(addedId!);
+    expect(networking().interfaces).toEqual([
+      expect.objectContaining({ id: loadedId, name: "ens18" }),
+    ]);
+  });
+
   it("patches only the matching stable ID and preserves both selector drafts", () => {
     useProjectStore.getState().addNetworkInterface("interface-a");
     useProjectStore.getState().addNetworkInterface("interface-b");
