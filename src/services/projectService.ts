@@ -7,6 +7,10 @@ import {
 import { identitySchema } from "../models/identity.ts";
 import { normalizeCommandsSection } from "../models/commands.ts";
 import { normalizeUsersSection } from "../models/users.ts";
+import {
+  DEFAULT_NETWORKING_CONFIG,
+  normalizeNetworkingSection,
+} from "../models/networking.ts";
 import { getExportFilename } from "../utils/slugify.ts";
 
 export interface ImportWarning {
@@ -92,6 +96,25 @@ function migrateProject(
   const commandsNormalization = normalizeCommandsSection(raw.commands);
   migrated.commands = commandsNormalization.commands;
 
+  let networkingNormalization;
+  if (version < 2) {
+    networkingNormalization = {
+      networking: structuredClone(DEFAULT_NETWORKING_CONFIG),
+      warnings: Object.prototype.hasOwnProperty.call(raw, "networking")
+        ? [
+            {
+              path: "networking",
+              message:
+                "Networking data from a pre-networking project format was omitted during import.",
+            },
+          ]
+        : [],
+    };
+  } else {
+    networkingNormalization = normalizeNetworkingSection(raw.networking);
+  }
+  migrated.networking = networkingNormalization.networking;
+
   // Future: add migration steps here
   // if (version < 2) migrated = migrateV1toV2(migrated);
 
@@ -102,6 +125,7 @@ function migrateProject(
       ...identityNormalization.warnings,
       ...usersNormalization.warnings,
       ...commandsNormalization.warnings,
+      ...networkingNormalization.warnings,
     ],
   };
 }
