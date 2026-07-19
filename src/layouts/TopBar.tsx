@@ -529,7 +529,12 @@ export function TopBar() {
         />
       </header>
       {importWarnings.length > 0 && (
-        <div className="flex items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="flex items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+        >
           <div className="flex-1">
             <p>
               {importWarnings.length} import warning
@@ -544,7 +549,7 @@ export function TopBar() {
                 </li>
               ))}
               {importWarnings.length > 3 && (
-                <li className="italic">…and {importWarnings.length - 3} more</li>
+                <li className="italic">...and {importWarnings.length - 3} more</li>
               )}
             </ul>
           </div>
@@ -553,7 +558,7 @@ export function TopBar() {
             onClick={clearWarnings}
             className="shrink-0 rounded border border-amber-300 px-2 py-1 text-xs hover:bg-amber-100"
           >
-            Dismiss
+            Dismiss import warnings
           </button>
         </div>
       )}
