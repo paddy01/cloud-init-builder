@@ -8,6 +8,7 @@ import { PreviewPanel } from "../components/preview/PreviewPanel.tsx";
 import { UserValidationProvider } from "../components/users/UserValidationProvider.tsx";
 import { useUserValidation } from "../components/users/UserValidationContext.ts";
 import { CommandsSection } from "../components/commands/CommandsSection.tsx";
+import { NetworkingSection } from "../components/networking/NetworkingSection.tsx";
 import { UsersSection } from "../components/users/UsersSection.tsx";
 import { EditorNavigationProvider } from "./EditorNavigationProvider.tsx";
 import type { EditorSection } from "./editorNavigation.ts";
@@ -24,6 +25,19 @@ function BlockedExportAnnouncement() {
   );
 }
 
+function EditorSectionContent({ activeSection }: { activeSection: EditorSection }) {
+  switch (activeSection) {
+    case "identity":
+      return <IdentityForm />;
+    case "users":
+      return <UsersSection />;
+    case "networking":
+      return <NetworkingSection />;
+    case "commands":
+      return <CommandsSection />;
+  }
+}
+
 function MainLayoutContent() {
   const [view, setView] = useState<EditorPreviewView>("editor");
   const [activeSection, setActiveSection] = useState<EditorSection>("identity");
@@ -36,22 +50,16 @@ function MainLayoutContent() {
       <BlockedExportAnnouncement />
       <div className="flex h-screen flex-col">
         <TopBar />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <Sidebar
             activeSection={activeSection}
             onSectionChange={setActiveSection}
           />
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
             <EditorPreviewTabs view={view} onChange={setView} />
             <div className="flex-1 overflow-y-auto p-6">
               <div className={view === "editor" ? "block" : "hidden lg:block"}>
-                {activeSection === "identity" ? (
-                  <IdentityForm />
-                ) : activeSection === "users" ? (
-                  <UsersSection />
-                ) : (
-                  <CommandsSection />
-                )}
+                <EditorSectionContent activeSection={activeSection} />
               </div>
               <div
                 className={view === "preview" ? "block lg:hidden" : "hidden"}
