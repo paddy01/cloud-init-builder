@@ -25,6 +25,10 @@ export type BuilderNetworkInterface = z.infer<
 >;
 export type NetworkingConfig = z.infer<typeof networkingConfigSchema>;
 
+export function isNetworkingConfig(value: unknown): value is NetworkingConfig {
+  return networkingConfigSchema.safeParse(value).success;
+}
+
 export const DEFAULT_NETWORKING_CONFIG: NetworkingConfig = {
   interfaces: [],
 };

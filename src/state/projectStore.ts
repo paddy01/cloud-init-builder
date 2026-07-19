@@ -16,7 +16,17 @@ import {
   type BuilderUser,
   type UsersConfig,
 } from "../models/users.ts";
+import {
+  createBlankNetworkInterface,
+  isNetworkingConfig,
+  type BuilderNetworkInterface,
+  type NetworkingConfig,
+} from "../models/networking.ts";
 import type { ImportWarning } from "../services/projectService.ts";
+
+type NetworkInterfacePatch = Partial<
+  Omit<BuilderNetworkInterface, "id">
+>;
 
 const EMPTY_STRING_NORMALIZED_KEYS = [
   "hostname",
@@ -65,6 +75,13 @@ export interface ProjectState {
     value: string,
   ) => void;
   removeSshAuthorizedKey: (userId: string, rowId: string) => void;
+  addNetworkInterface: (id?: string) => string | undefined;
+  updateNetworkInterface: (
+    id: string,
+    patch: NetworkInterfacePatch,
+  ) => void;
+  removeNetworkInterface: (id: string) => void;
+  moveNetworkInterface: (id: string, direction: "up" | "down") => void;
   addCommand: (stage: CommandStage, id?: string) => string | undefined;
   updateShellCommand: (
     stage: CommandStage,
@@ -124,6 +141,34 @@ export function updateProjectCommands(
     project: {
       ...project,
       commands: nextCommands,
+      metadata: {
+        ...project.metadata,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    isDirty: true,
+  });
+}
+
+export function updateProjectNetworking(
+  set: (
+    partial:
+      | Partial<ProjectState>
+      | ((state: ProjectState) => Partial<ProjectState>),
+  ) => void,
+  get: () => ProjectState,
+  recipe: (networking: NetworkingConfig) => NetworkingConfig,
+): void {
+  const { project } = get();
+  if (!project || !isNetworkingConfig(project.networking)) return;
+
+  const nextNetworking = recipe(project.networking);
+  if (nextNetworking === project.networking) return;
+
+  set({
+    project: {
+      ...project,
+      networking: nextNetworking,
       metadata: {
         ...project.metadata,
         updatedAt: new Date().toISOString(),
@@ -322,6 +367,85 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           : user,
       ),
     }));
+  },
+
+  addNetworkInterface: (id) => {
+    const { project } = get();
+    if (!project || !isNetworkingConfig(project.networking)) {
+      return undefined;
+    }
+    if (
+      id !== undefined &&
+      project.networking.interfaces.some((entry) => entry.id === id)
+    ) {
+      return undefined;
+    }
+
+    const networkInterface = createBlankNetworkInterface(id);
+    updateProjectNetworking(set, get, (networking) => ({
+      ...networking,
+      interfaces: [...networking.interfaces, networkInterface],
+    }));
+    return networkInterface.id;
+  },
+
+  updateNetworkInterface: (id, patch) => {
+    updateProjectNetworking(set, get, (networking) => {
+      const index = networking.interfaces.findIndex((entry) => entry.id === id);
+      if (index === -1) return networking;
+
+      const current = networking.interfaces[index];
+      if (!current) return networking;
+
+      const identityMode = patch.identityMode ?? current.identityMode;
+      const name = patch.name ?? current.name;
+      const macAddress = patch.macAddress ?? current.macAddress;
+      if (
+        identityMode === current.identityMode &&
+        name === current.name &&
+        macAddress === current.macAddress
+      ) {
+        return networking;
+      }
+
+      const interfaces = [...networking.interfaces];
+      interfaces[index] = {
+        ...current,
+        identityMode,
+        name,
+        macAddress,
+      };
+      return { ...networking, interfaces };
+    });
+  },
+
+  removeNetworkInterface: (id) => {
+    updateProjectNetworking(set, get, (networking) => {
+      const index = networking.interfaces.findIndex((entry) => entry.id === id);
+      if (index === -1) return networking;
+
+      const interfaces = [...networking.interfaces];
+      interfaces.splice(index, 1);
+      return { ...networking, interfaces };
+    });
+  },
+
+  moveNetworkInterface: (id, direction) => {
+    updateProjectNetworking(set, get, (networking) => {
+      const index = networking.interfaces.findIndex((entry) => entry.id === id);
+      if (index === -1) return networking;
+
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= networking.interfaces.length) {
+        return networking;
+      }
+
+      const interfaces = [...networking.interfaces];
+      const moved = interfaces.splice(index, 1)[0];
+      if (!moved) return networking;
+      interfaces.splice(targetIndex, 0, moved);
+      return { ...networking, interfaces };
+    });
   },
 
   addCommand: (stage, id) => {
