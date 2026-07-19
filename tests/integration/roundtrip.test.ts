@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import packageJson from "../../package.json";
 import futureProjectV99 from "../fixtures/future-project-v99.cib.json?raw";
 import invalidProjectBadMetadata from "../fixtures/invalid-project-bad-metadata.cib.json?raw";
 import legacyProjectUsersArray from "../fixtures/legacy-project-users-array.cib.json?raw";
 import validProjectIdentityFull from "../fixtures/valid-project-identity-full.cib.json?raw";
 import validProjectCommandsFull from "../fixtures/valid-project-commands-full.cib.json?raw";
+import validProjectNetworkingV2 from "../fixtures/valid-project-networking-v2.cib.json?raw";
 import validProjectUsersFull from "../fixtures/valid-project-users-full.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
@@ -14,7 +15,10 @@ import {
 import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
-import { importProject } from "../../src/services/projectService.ts";
+import {
+  exportProject,
+  importProject,
+} from "../../src/services/projectService.ts";
 import identityUsersCommandsFull from "../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../fixtures/users-safety-valid.yaml?raw";
@@ -30,6 +34,16 @@ function fileFromJson(json: string, name = "roundtrip.cib.json"): File {
   return new File([json], name, { type: "application/json" });
 }
 
+function blobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Failed to read Blob."));
+    reader.readAsText(blob);
+  });
+}
+
 describe("lossless round-trip", () => {
   it("preserves metadata across export and import", async () => {
     const project = createDefaultProject("Roundtrip Test");
@@ -41,6 +55,151 @@ describe("lossless round-trip", () => {
     expect(result.project.metadata.createdAt).toBe(project.metadata.createdAt);
     expect(result.project.metadata.updatedAt).toBe(project.metadata.updatedAt);
     expect(result.project.metadata.appVersion).toBe(project.metadata.appVersion);
+  });
+});
+
+describe("networking project round-trip", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("preserves interface order, stable IDs, modes, and both drafts through two round trips", async () => {
+    const firstImport = await importProject(
+      fileFromJson(
+        validProjectNetworkingV2,
+        "valid-project-networking-v2.cib.json",
+      ),
+    );
+
+    expect(firstImport.warnings).toEqual([]);
+    expect(firstImport.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
+    expect(firstImport.project.networking.interfaces).toEqual([
+      {
+        id: "network-interface-uplink",
+        identityMode: "name",
+        name: "uplink-\u00e9",
+        macAddress: "52:54:00:12:34:56",
+      },
+      {
+        id: "network-interface-failover",
+        identityMode: "mac",
+        name: "uplink-e\u0301",
+        macAddress: "02:42:ac:11:00:02",
+      },
+    ]);
+
+    const exportedOnce = JSON.stringify(firstImport.project, null, 2);
+    const secondImport = await importProject(fileFromJson(exportedOnce));
+    const exportedTwice = JSON.stringify(secondImport.project, null, 2);
+    const thirdImport = await importProject(fileFromJson(exportedTwice));
+
+    expect(secondImport.warnings).toEqual([]);
+    expect(thirdImport.warnings).toEqual([]);
+    expect(secondImport.project).toEqual(firstImport.project);
+    expect(thirdImport.project).toEqual(firstImport.project);
+    expect(secondImport.project.networking.interfaces[0]?.name).toBe(
+      "uplink-\u00e9",
+    );
+    expect(secondImport.project.networking.interfaces[1]?.name).toBe(
+      "uplink-e\u0301",
+    );
+    expect(
+      secondImport.project.networking.interfaces[0]?.name.normalize("NFD"),
+    ).toBe(secondImport.project.networking.interfaces[1]?.name);
+    expect(secondImport.project.networking.interfaces[0]?.name).not.toBe(
+      secondImport.project.networking.interfaces[1]?.name,
+    );
+  });
+
+  it("keeps networking outside generated cloud-init YAML", async () => {
+    const { project } = await importProject(
+      fileFromJson(validProjectNetworkingV2),
+    );
+    const generatorInput = {
+      identity: project.identity,
+      users: isUsersConfig(project.users) ? project.users : undefined,
+      commands: isCommandsConfig(project.commands)
+        ? project.commands
+        : undefined,
+    };
+    const yamlBefore = generateCloudInit(generatorInput).yaml;
+
+    project.networking.interfaces.reverse();
+    project.networking.interfaces[0]!.name = "changed-after-yaml";
+    const yamlAfter = generateCloudInit(generatorInput).yaml;
+
+    expect(yamlAfter).toBe(yamlBefore);
+    expect(yamlAfter).not.toMatch(/^network:/m);
+    expect(yamlAfter).not.toContain("network-interface-");
+  });
+
+  it("serializes an invocation-time snapshot without mutating live project state", async () => {
+    const { project } = await importProject(
+      fileFromJson(validProjectNetworkingV2),
+    );
+    const beforeSave = structuredClone(project);
+    let capturedBlob: Blob | undefined;
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn((blob: Blob) => {
+        capturedBlob = blob;
+        return "blob:networking-roundtrip";
+      }),
+      revokeObjectURL: vi.fn(),
+    });
+    const anchor = { href: "", download: "", click: vi.fn() };
+    vi.spyOn(document, "createElement").mockReturnValue(
+      anchor as unknown as HTMLAnchorElement,
+    );
+    vi.spyOn(document.body, "appendChild").mockImplementation(
+      (node) => node,
+    );
+    vi.spyOn(document.body, "removeChild").mockImplementation(
+      (node) => node,
+    );
+
+    expect(exportProject(project, project.metadata.name)).toBe(true);
+    expect(project).toEqual(beforeSave);
+    expect(capturedBlob).toBeInstanceOf(Blob);
+
+    project.networking.interfaces[0]!.name = "live-edit-after-save";
+    const savedProject = JSON.parse(
+      await blobText(capturedBlob!),
+    ) as typeof project;
+    expect(savedProject).toEqual(beforeSave);
+    expect(savedProject.networking.interfaces[0]?.name).toBe("uplink-\u00e9");
+    expect(project.networking.interfaces[0]?.name).toBe("live-edit-after-save");
+  });
+
+  it("does not mutate project state when a download is interrupted", async () => {
+    const { project } = await importProject(
+      fileFromJson(validProjectNetworkingV2),
+    );
+    const beforeSave = structuredClone(project);
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:interrupted"),
+      revokeObjectURL: vi.fn(),
+    });
+    const anchor = {
+      href: "",
+      download: "",
+      click: vi.fn(() => {
+        throw new Error("download interrupted");
+      }),
+    };
+    vi.spyOn(document, "createElement").mockReturnValue(
+      anchor as unknown as HTMLAnchorElement,
+    );
+    vi.spyOn(document.body, "appendChild").mockImplementation(
+      (node) => node,
+    );
+    vi.spyOn(document.body, "removeChild").mockImplementation(
+      (node) => node,
+    );
+
+    expect(exportProject(project, project.metadata.name)).toBe(false);
+    expect(project).toEqual(beforeSave);
   });
 });
 
@@ -470,6 +629,7 @@ describe("users project round-trip", () => {
 describe("Phase 3 dependency fence", () => {
   it("keeps package manifests free of new Phase 3 runtime dependencies", () => {
     expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "lucide-react",
       "react",
       "react-dom",
       "yaml",
@@ -583,6 +743,7 @@ describe("commands project round-trip", () => {
 describe("Phase 4 dependency and format fence", () => {
   it("keeps package manifests free of new Phase 4 runtime dependencies", () => {
     expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "lucide-react",
       "react",
       "react-dom",
       "yaml",
@@ -599,6 +760,7 @@ describe("Phase 4 dependency and format fence", () => {
 describe("Phase 5 final verification", () => {
   it("keeps package manifests free of new Phase 5 runtime dependencies", () => {
     expect(Object.keys(packageJson.dependencies).sort()).toEqual([
+      "lucide-react",
       "react",
       "react-dom",
       "yaml",

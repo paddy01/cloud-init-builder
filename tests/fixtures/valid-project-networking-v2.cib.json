@@ -1,0 +1,36 @@
+{
+  "formatVersion": 2,
+  "metadata": {
+    "name": "Networking Roundtrip",
+    "createdAt": "2026-07-19T10:00:00.000Z",
+    "updatedAt": "2026-07-19T11:30:00.000Z",
+    "appVersion": "0.1.0"
+  },
+  "identity": {
+    "hostname": "networking-roundtrip"
+  },
+  "users": {
+    "preserveDefault": true,
+    "entries": []
+  },
+  "commands": {
+    "bootcmd": [],
+    "runcmd": []
+  },
+  "networking": {
+    "interfaces": [
+      {
+        "id": "network-interface-uplink",
+        "identityMode": "name",
+        "name": "uplink-\u00e9",
+        "macAddress": "52:54:00:12:34:56"
+      },
+      {
+        "id": "network-interface-failover",
+        "identityMode": "mac",
+        "name": "uplink-e\u0301",
+        "macAddress": "02:42:ac:11:00:02"
+      }
+    ]
+  }
+}
