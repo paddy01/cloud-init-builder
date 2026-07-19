@@ -58,7 +58,7 @@ describe("NetworkingWorkflow", () => {
 
     expect(networking().interfaces).toHaveLength(1);
     expect(networking().interfaces[0]?.identityMode).toBe("name");
-    expect(screen.getByLabelText("Device name")).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "Device name" })).toHaveFocus();
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
       block: "center",
@@ -69,13 +69,13 @@ describe("NetworkingWorkflow", () => {
     seedInterface("interface-a");
     render(<NetworkingSection />);
 
-    fireEvent.change(screen.getByLabelText("Device name"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Device name" }), {
       target: { value: "  ens18  " },
     });
     expect(screen.getByRole("article", { name: "ens18" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "MAC address" }));
-    fireEvent.change(screen.getByLabelText("MAC address"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "MAC address" }), {
       target: { value: " AA:BB:CC:DD:EE:FF " },
     });
     expect(
@@ -83,7 +83,9 @@ describe("NetworkingWorkflow", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "Device name" }));
-    expect(screen.getByLabelText("Device name")).toHaveValue("  ens18  ");
+    expect(screen.getByRole("textbox", { name: "Device name" })).toHaveValue(
+      "  ens18  ",
+    );
     expect(networking().interfaces[0]?.macAddress).toBe(
       " AA:BB:CC:DD:EE:FF ",
     );
@@ -146,6 +148,6 @@ describe("NetworkingWorkflow", () => {
     expect(networking().interfaces.map((entry) => entry.id)).toEqual([
       "interface-b",
     ]);
-    expect(screen.getByLabelText("MAC address")).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "MAC address" })).toHaveFocus();
   });
 });
