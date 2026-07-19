@@ -1,0 +1,265 @@
+import { readFile } from "node:fs/promises";
+import { expect, test, type Download, type Locator } from "@playwright/test";
+
+const LONG_DEVICE_NAME =
+  "uplink-interface-with-a-deliberately-long-identifier-for-mobile-layout";
+const FIRST_MAC_DRAFT = "52:54:00:12:34:56";
+const SECOND_NAME_DRAFT = "ens18";
+const SECOND_MAC_DRAFT = "02:42:ac:11:00:02";
+
+interface SavedNetworkingProject {
+  formatVersion: number;
+  networking: {
+    interfaces: Array<{
+      id: string;
+      identityMode: "name" | "mac";
+      name: string;
+      macAddress: string;
+    }>;
+  };
+}
+
+async function downloadText(download: Download): Promise<string> {
+  const path = await download.path();
+  if (!path) {
+    throw new Error("expected Playwright to materialize the download");
+  }
+  return readFile(path, "utf-8");
+}
+
+async function expectFortyPixelSquare(locator: Locator) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box?.width).toBe(40);
+  expect(box?.height).toBe(40);
+}
+
+test.describe("networking foundation", () => {
+  test("builds, saves, reopens, and keeps networking outside YAML", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await page.locator("#identity-hostname").fill("networking-e2e");
+
+    const navigation = page.getByRole("navigation");
+    await expect(navigation.locator("li")).toHaveText([
+      "Identity",
+      "Users",
+      "Networking",
+      "Commands",
+      "Export",
+    ]);
+    await page.getByRole("button", { name: "Networking" }).click();
+    await expect(
+      page.getByRole("button", { name: "Networking" }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText("No interfaces yet")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Add interface" }),
+    ).toHaveCount(1);
+
+    const navBox = await navigation.boundingBox();
+    const previewBox = await page.locator("aside").boundingBox();
+    expect(navBox?.width).toBe(224);
+    expect(previewBox?.width).toBe(320);
+
+    await page.getByRole("button", { name: "Add interface" }).click();
+    const firstCard = page.getByRole("article").first();
+    const firstNameInput = firstCard.getByRole("textbox", {
+      name: "Device name",
+    });
+    await expect(firstNameInput).toBeFocused();
+    await firstNameInput.fill(LONG_DEVICE_NAME);
+    await firstCard
+      .getByRole("radio", { name: "MAC address" })
+      .check({ force: true });
+    await firstCard
+      .getByRole("textbox", { name: "MAC address" })
+      .fill(FIRST_MAC_DRAFT);
+    await firstCard
+      .getByRole("radio", { name: "Device name" })
+      .check({ force: true });
+    await expect(firstNameInput).toHaveValue(LONG_DEVICE_NAME);
+
+    await page.getByRole("button", { name: "Add interface" }).click();
+    const secondCard = page.getByRole("article").nth(1);
+    await secondCard
+      .getByRole("textbox", { name: "Device name" })
+      .fill(SECOND_NAME_DRAFT);
+    await secondCard
+      .getByRole("radio", { name: "MAC address" })
+      .check({ force: true });
+    await secondCard
+      .getByRole("textbox", { name: "MAC address" })
+      .fill(SECOND_MAC_DRAFT);
+    await secondCard
+      .getByRole("button", { name: `Move ${SECOND_MAC_DRAFT} up` })
+      .click();
+
+    const cards = page.getByRole("article");
+    await expect(cards).toHaveCount(2);
+    await expect(cards.nth(0)).toHaveAccessibleName(SECOND_MAC_DRAFT);
+    await expect(cards.nth(1)).toHaveAccessibleName(LONG_DEVICE_NAME);
+    await expect(page.locator("article article")).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("networking-desktop-1440x900.png"),
+      fullPage: true,
+    });
+
+    const projectDownloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save" }).click();
+    const projectDownload = await projectDownloadPromise;
+    const projectText = await downloadText(projectDownload);
+    const saved = JSON.parse(projectText) as SavedNetworkingProject;
+    expect(saved.formatVersion).toBe(2);
+    expect(saved.networking.interfaces).toHaveLength(2);
+    expect(saved.networking.interfaces).toEqual([
+      expect.objectContaining({
+        identityMode: "mac",
+        name: SECOND_NAME_DRAFT,
+        macAddress: SECOND_MAC_DRAFT,
+      }),
+      expect.objectContaining({
+        identityMode: "name",
+        name: LONG_DEVICE_NAME,
+        macAddress: FIRST_MAC_DRAFT,
+      }),
+    ]);
+    const savedIds = saved.networking.interfaces.map((entry) => entry.id);
+    expect(new Set(savedIds).size).toBe(2);
+
+    const projectPath = await projectDownload.path();
+    if (!projectPath) {
+      throw new Error("expected Playwright to materialize the project download");
+    }
+    await page.getByRole("button", { name: "Open" }).click();
+    await page.locator('input[type="file"]').setInputFiles(projectPath);
+    await expect(page.getByRole("status")).toHaveCount(0);
+    await page.getByRole("button", { name: "Networking" }).click();
+
+    const reopenedCards = page.getByRole("article");
+    await expect(reopenedCards).toHaveCount(2);
+    await expect(reopenedCards.nth(0)).toHaveAccessibleName(SECOND_MAC_DRAFT);
+    await expect(reopenedCards.nth(1)).toHaveAccessibleName(LONG_DEVICE_NAME);
+    await expect(
+      reopenedCards.nth(0).getByRole("radio", { name: "MAC address" }),
+    ).toBeChecked();
+    await expect(
+      reopenedCards.nth(0).getByRole("textbox", { name: "MAC address" }),
+    ).toHaveValue(SECOND_MAC_DRAFT);
+    await reopenedCards
+      .nth(0)
+      .getByRole("radio", { name: "Device name" })
+      .check({ force: true });
+    await expect(
+      reopenedCards.nth(0).getByRole("textbox", { name: "Device name" }),
+    ).toHaveValue(SECOND_NAME_DRAFT);
+    await reopenedCards
+      .nth(0)
+      .getByRole("radio", { name: "MAC address" })
+      .check({ force: true });
+    await reopenedCards
+      .nth(1)
+      .getByRole("radio", { name: "MAC address" })
+      .check({ force: true });
+    await expect(
+      reopenedCards.nth(1).getByRole("textbox", { name: "MAC address" }),
+    ).toHaveValue(FIRST_MAC_DRAFT);
+    await reopenedCards
+      .nth(1)
+      .getByRole("radio", { name: "Device name" })
+      .check({ force: true });
+    await expect(
+      reopenedCards.nth(1).getByRole("textbox", { name: "Device name" }),
+    ).toHaveValue(LONG_DEVICE_NAME);
+
+    const reopenedLabelIds = await reopenedCards.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("aria-labelledby") ?? ""),
+    );
+    expect(reopenedLabelIds).toEqual(
+      savedIds.map((id) => `network-interface-title-${id}`),
+    );
+
+    const yamlDownloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export YAML" }).click();
+    const yaml = await downloadText(await yamlDownloadPromise);
+    expect(yaml.startsWith("#cloud-config\n")).toBe(true);
+    expect(yaml).not.toMatch(/^network:/m);
+    for (const id of savedIds) {
+      expect(yaml).not.toContain(id);
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("tab", { name: "Editor" })).toBeVisible();
+    const mobileNavBox = await navigation.boundingBox();
+    expect(mobileNavBox?.width).toBe(390);
+    await expect(reopenedCards).toHaveCount(2);
+
+    const longTitle = reopenedCards.nth(1).getByRole("heading", {
+      name: LONG_DEVICE_NAME,
+    });
+    const longTitleBox = await longTitle.boundingBox();
+    const actionGroup = reopenedCards.nth(1).getByRole("group", {
+      name: `Reorder ${LONG_DEVICE_NAME}`,
+    });
+    const actionGroupBox = await actionGroup.boundingBox();
+    expect(actionGroupBox?.y).toBeGreaterThan(
+      (longTitleBox?.y ?? 0) + (longTitleBox?.height ?? 0),
+    );
+
+    const deviceSegment = reopenedCards.nth(1).getByText("Device name", {
+      exact: true,
+    }).first();
+    const macSegment = reopenedCards.nth(1).getByText("MAC address", {
+      exact: true,
+    }).first();
+    const deviceSegmentBox = await deviceSegment.boundingBox();
+    const macSegmentBox = await macSegment.boundingBox();
+    expect(deviceSegmentBox?.y).toBe(macSegmentBox?.y);
+    expect(Math.abs((deviceSegmentBox?.width ?? 0) - (macSegmentBox?.width ?? 0))).toBeLessThan(2);
+
+    await expectFortyPixelSquare(
+      reopenedCards.nth(1).getByRole("button", {
+        name: `Move ${LONG_DEVICE_NAME} up`,
+      }),
+    );
+    await expectFortyPixelSquare(
+      reopenedCards.nth(1).getByRole("button", {
+        name: `Remove ${LONG_DEVICE_NAME}`,
+      }),
+    );
+
+    const overflow = await page.evaluate(() => ({
+      document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      body: document.body.scrollWidth - document.body.clientWidth,
+    }));
+    expect(overflow.document).toBeLessThanOrEqual(0);
+    expect(overflow.body).toBeLessThanOrEqual(0);
+
+    await reopenedCards
+      .nth(1)
+      .getByRole("button", { name: `Remove ${LONG_DEVICE_NAME}` })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Keep interface" }),
+    ).toBeFocused();
+    await expect(
+      dialog.getByRole("button", { name: "Remove interface" }),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Keep interface" }).click();
+    await expect(
+      reopenedCards.nth(1).getByRole("button", {
+        name: `Remove ${LONG_DEVICE_NAME}`,
+      }),
+    ).toBeFocused();
+
+    await page.screenshot({
+      path: testInfo.outputPath("networking-mobile-390x844.png"),
+      fullPage: true,
+    });
+  });
+});
