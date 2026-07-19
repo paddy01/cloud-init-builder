@@ -51,8 +51,8 @@ describe("projectFileSchema", () => {
 });
 
 describe("CURRENT_FORMAT_VERSION", () => {
-  it("equals 1", () => {
-    expect(CURRENT_FORMAT_VERSION).toBe(1);
+  it("equals 2", () => {
+    expect(CURRENT_FORMAT_VERSION).toBe(2);
   });
 });
 
@@ -79,5 +79,13 @@ describe("createDefaultProject", () => {
       bootcmd: [],
       runcmd: [],
     });
+    expect(project.networking).toEqual({ interfaces: [] });
+  });
+
+  it("creates independent networking arrays", () => {
+    const first = createDefaultProject("First");
+    const second = createDefaultProject("Second");
+
+    expect(first.networking.interfaces).not.toBe(second.networking.interfaces);
   });
 });

@@ -34,9 +34,10 @@ const baseMetadata = {
 
 function validProject(overrides: Partial<ProjectFile> = {}): ProjectFile {
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     metadata: { name: "Test Server Template", ...baseMetadata },
     identity: { hostname: "web01" },
+    networking: { interfaces: [] },
     ...overrides,
   };
 }
@@ -48,6 +49,28 @@ function toGenerateInput(project: ProjectFile): GenerateProjectInput {
     commands: isCommandsConfig(project.commands) ? project.commands : undefined,
   };
 }
+
+describe("networking authoring boundary", () => {
+  it("does not project builder networking into cloud-init YAML yet", () => {
+    const project = validProject({
+      networking: {
+        interfaces: [
+          {
+            id: "interface-1",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+          },
+        ],
+      },
+    });
+
+    expect(toGenerateInput(project)).not.toHaveProperty("networking");
+    expect(generateCloudInit(toGenerateInput(project)).yaml).not.toMatch(
+      /^network:/m,
+    );
+  });
+});
 
 const COMMANDS_FIXTURE: CommandsConfig = {
   bootcmd: [
