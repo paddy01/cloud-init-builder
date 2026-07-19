@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NetworkingSection } from "../../../../src/components/networking/NetworkingSection.tsx";
+import { createDefaultProject } from "../../../../src/models/project.ts";
 import type { NetworkingConfig } from "../../../../src/models/networking.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
 
@@ -149,5 +151,145 @@ describe("NetworkingWorkflow", () => {
       "interface-b",
     ]);
     expect(screen.getByRole("textbox", { name: "MAC address" })).toHaveFocus();
+  });
+
+  it("uses native radio keyboard behavior while retaining both exact drafts", async () => {
+    const user = userEvent.setup();
+    seedInterface("interface-a", {
+      name: " enp1s0 ",
+      macAddress: "aa:bb:cc:dd:ee:ff",
+    });
+    render(<NetworkingSection />);
+
+    const nameMode = screen.getByRole("radio", { name: "Device name" });
+    await user.click(nameMode);
+    await user.keyboard("{ArrowRight}");
+
+    expect(screen.getByRole("radio", { name: "MAC address" })).toBeChecked();
+    expect(screen.getByRole("textbox", { name: "MAC address" })).toHaveValue(
+      "aa:bb:cc:dd:ee:ff",
+    );
+
+    await user.keyboard("{ArrowLeft}");
+    expect(nameMode).toBeChecked();
+    expect(screen.getByRole("textbox", { name: "Device name" })).toHaveValue(
+      " enp1s0 ",
+    );
+    expect(networking().interfaces[0]).toMatchObject({
+      identityMode: "name",
+      name: " enp1s0 ",
+      macAddress: "aa:bb:cc:dd:ee:ff",
+    });
+  });
+
+  it("keeps populated cards from both the safe action and trapped dialog focus", async () => {
+    const user = userEvent.setup();
+    seedInterface("interface-a", { name: "ens18" });
+    render(<NetworkingSection />);
+
+    const remove = screen.getByRole("button", { name: "Remove ens18" });
+    await user.click(remove);
+    const dialog = screen.getByRole("dialog");
+    const keep = within(dialog).getByRole("button", { name: "Keep interface" });
+    const confirm = within(dialog).getByRole("button", { name: "Remove interface" });
+
+    expect(keep).toHaveFocus();
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(confirm).toHaveFocus();
+    await user.keyboard("{Tab}");
+    expect(keep).toHaveFocus();
+    await user.click(keep);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(remove).toHaveFocus();
+    expect(networking().interfaces).toHaveLength(1);
+  });
+
+  it("focuses the previous field, then Add interface, after confirmed removals", () => {
+    seedInterface("interface-a", { name: "ens18" });
+    seedInterface("interface-b", { name: "ens19" });
+    render(<NetworkingSection />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove ens19" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove interface" }));
+    expect(screen.getByRole("textbox", { name: "Device name" })).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "Device name" })).toHaveValue(
+      "ens18",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove ens18" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove interface" }));
+    expect(screen.getByRole("button", { name: "Add interface" })).toHaveFocus();
+    expect(networking().interfaces).toHaveLength(0);
+  });
+
+  it("keeps boundary controls disabled without dirtying or announcing a no-op", () => {
+    seedInterface("interface-a", { name: "ens18" });
+    seedInterface("interface-b", { name: "ens19" });
+    useProjectStore.getState().markSaved();
+    const projectBefore = useProjectStore.getState().project;
+    const updatedAtBefore = projectBefore?.metadata.updatedAt;
+    render(<NetworkingSection />);
+
+    const firstUp = screen.getByRole("button", { name: "Move ens18 up" });
+    const lastDown = screen.getByRole("button", { name: "Move ens19 down" });
+    expect(firstUp).toBeDisabled();
+    expect(lastDown).toBeDisabled();
+    fireEvent.click(firstUp);
+    fireEvent.click(lastDown);
+
+    const state = useProjectStore.getState();
+    expect(state.project).toBe(projectBefore);
+    expect(state.project?.metadata.updatedAt).toBe(updatedAtBefore);
+    expect(state.isDirty).toBe(false);
+    expect(
+      screen.queryByText(/Interface moved to position/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses immediate scrolling when reduced motion is preferred", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    render(<NetworkingSection />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add interface" }));
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      behavior: "auto",
+      block: "center",
+    });
+  });
+
+  it("renders no-project and invalid-runtime states without mutation controls", () => {
+    useProjectStore.setState(initialState);
+    const { rerender } = render(<NetworkingSection />);
+
+    expect(screen.getByText("No project loaded")).toBeInTheDocument();
+    expect(
+      screen.getByText("Create or open a project to configure networking."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add interface" })).toBeNull();
+
+    const invalidProject = createDefaultProject("Invalid networking");
+    invalidProject.networking = {
+      interfaces: "invalid",
+    } as unknown as NetworkingConfig;
+    act(() => {
+      useProjectStore.setState({ project: invalidProject });
+    });
+    rerender(<NetworkingSection />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Networking couldn't be displayed. Reopen the project and review any import warnings.",
+    );
+    expect(screen.queryByRole("button", { name: "Add interface" })).toBeNull();
   });
 });
