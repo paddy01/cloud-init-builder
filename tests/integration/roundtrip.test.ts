@@ -158,7 +158,7 @@ describe("version handling integration", () => {
       fileFromJson(JSON.stringify(project, null, 2)),
     );
 
-    expect(result.project.formatVersion).toBe(1);
+    expect(result.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
     expect(result.warnings).toEqual([]);
   });
 
@@ -343,7 +343,7 @@ describe("users project round-trip", () => {
     }).yaml;
 
     expect(roundTrippedYaml).toBe(yaml);
-    expect(thirdImport.project.formatVersion).toBe(1);
+    expect(thirdImport.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
   });
 
   it("preserves lock state, supported hash, stable SSH row IDs, and key order through double round-trip", async () => {
@@ -454,7 +454,7 @@ describe("users project round-trip", () => {
     expect(thirdImport.project).toMatchObject({
       futureFeature: { enabled: true },
     });
-    expect(thirdImport.project.formatVersion).toBe(1);
+    expect(thirdImport.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
 
     const roundTrippedYaml = generateCloudInit({
       identity: thirdImport.project.identity,
@@ -524,7 +524,7 @@ describe("commands project round-trip", () => {
     expect(thirdImport.project.commands).toEqual(firstImport.project.commands);
     expect(thirdImport.project.identity).toEqual(firstImport.project.identity);
     expect(thirdImport.project.users).toEqual(firstImport.project.users);
-    expect(thirdImport.project.formatVersion).toBe(1);
+    expect(thirdImport.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
 
     const yaml = generateCloudInit({
       identity: thirdImport.project.identity,
@@ -591,8 +591,8 @@ describe("Phase 4 dependency and format fence", () => {
     ]);
   });
 
-  it("keeps builder format version at 1", () => {
-    expect(CURRENT_FORMAT_VERSION).toBe(1);
+  it("keeps the builder format-version fence explicit", () => {
+    expect(CURRENT_FORMAT_VERSION).toBe(2);
   });
 });
 
