@@ -40,6 +40,51 @@ const DISABLE_DEFAULT_CONFIRM =
 const REMOVE_USER_CONFIRM =
   "Remove user? This removes the custom user card from the project.";
 
+describe("MainLayout networking navigation", () => {
+  beforeEach(() => {
+    useProjectStore.setState(initialState);
+    useProjectStore.getState().newProject("Test");
+  });
+
+  it("renders Networking explicitly without mutating project state", () => {
+    render(<MainLayout />);
+    const beforeProject = structuredClone(useProjectStore.getState().project);
+    const beforeDirty = useProjectStore.getState().isDirty;
+
+    fireEvent.click(screen.getByRole("button", { name: "Networking" }));
+
+    expect(screen.getByRole("heading", { name: "Networking" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Commands" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Networking" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(useProjectStore.getState().project).toEqual(beforeProject);
+    expect(useProjectStore.getState().isDirty).toBe(beforeDirty);
+  });
+
+  it("does not project networking into the YAML preview", () => {
+    vi.useFakeTimers();
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
+      useProjectStore.getState().addNetworkInterface("network-preview-test");
+      useProjectStore.getState().updateNetworkInterface("network-preview-test", {
+        name: "ens18",
+      });
+    });
+    const { container } = render(<MainLayout />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Networking" }));
+    act(() => vi.advanceTimersByTime(300));
+
+    const yaml = container.querySelector("aside pre code")?.textContent ?? "";
+    expect(yaml).toContain("hostname: web01");
+    expect(yaml).not.toContain("network:");
+    expect(yaml).not.toContain("ens18");
+    vi.useRealTimers();
+  });
+});
+
 describe("MainLayout commands workflow", () => {
   beforeEach(() => {
     useProjectStore.setState(initialState);

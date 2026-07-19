@@ -5,13 +5,13 @@ import { Sidebar } from "../../src/layouts/Sidebar.tsx";
 describe("Sidebar section styling", () => {
   const onSectionChange = vi.fn();
 
-  it("renders all four section labels from SECTIONS array", () => {
+  it("renders all five section labels in editor order", () => {
     render(<Sidebar activeSection="identity" onSectionChange={onSectionChange} />);
 
-    expect(screen.getByText("Identity")).toBeInTheDocument();
-    expect(screen.getByText("Users")).toBeInTheDocument();
-    expect(screen.getByText("Commands")).toBeInTheDocument();
-    expect(screen.getByText("Export")).toBeInTheDocument();
+    const items = within(screen.getByRole("navigation"))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+    expect(items).toEqual(["Identity", "Users", "Networking", "Commands", "Export"]);
   });
 
   it("renders Identity row with active styling", () => {
@@ -47,13 +47,31 @@ describe("Sidebar section styling", () => {
     expect(exportRow).not.toHaveAttribute("aria-current");
   });
 
-  it("renders interactive buttons for Identity, Users, and Commands", () => {
+  it("renders interactive buttons for Identity, Users, Networking, and Commands", () => {
     const { container } = render(
       <Sidebar activeSection="identity" onSectionChange={onSectionChange} />,
     );
     const nav = container.querySelector("nav");
     expect(nav).not.toBeNull();
-    expect(within(nav as HTMLElement).getAllByRole("button")).toHaveLength(3);
+    expect(within(nav as HTMLElement).getAllByRole("button")).toHaveLength(4);
+  });
+
+  it("uses a horizontal mobile rail and the desktop vertical sidebar contract", () => {
+    const { container } = render(
+      <Sidebar activeSection="networking" onSectionChange={onSectionChange} />,
+    );
+
+    const nav = container.querySelector("nav");
+    const list = screen.getByRole("list");
+    expect(nav?.className).toContain("w-full");
+    expect(nav?.className).toContain("sm:w-56");
+    expect(nav?.className).toContain("sm:flex-col");
+    expect(list.className).toContain("overflow-x-auto");
+    expect(list.className).toContain("sm:overflow-visible");
+    expect(screen.getByRole("button", { name: "Networking" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   it("marks Commands row with active styling and aria-current", () => {
