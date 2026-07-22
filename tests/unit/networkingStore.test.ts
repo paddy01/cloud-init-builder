@@ -8,6 +8,7 @@ import {
   createIpv4DhcpExample,
   createSpecificRoute,
   createStaticIpv4Example,
+  type BuilderNetworkInterface,
   type NetworkingConfig,
 } from "../../src/models/networking.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
@@ -146,12 +147,12 @@ describe("networking store actions", () => {
       nameservers: [
         createBuilderValueRow("nameserver-a", "192.0.2.53", true),
       ],
-      exampleFields: ["name", "macAddress", "dhcp4", "mtu"] as const,
+      exampleFields: ["name", "macAddress", "dhcp4", "mtu"] satisfies BuilderNetworkInterface["exampleFields"],
     };
     const sibling = {
       ...createIpv4DhcpExample("interface-b"),
       macAddress: "00:11:22:33:44:55",
-      exampleFields: ["name", "macAddress", "dhcp4"] as const,
+      exampleFields: ["name", "macAddress", "dhcp4"] satisfies BuilderNetworkInterface["exampleFields"],
     };
     project.networking.interfaces = [exampleInterface, sibling];
     useProjectStore.getState().loadProject(project);
@@ -189,7 +190,7 @@ describe("networking store actions", () => {
       name: "ens18",
       macAddress: "aa:bb:cc:dd:ee:ff",
       dhcp6: true,
-      exampleFields: ["name", "macAddress", "dhcp6"] as const,
+      exampleFields: ["name", "macAddress", "dhcp6"] satisfies BuilderNetworkInterface["exampleFields"],
     };
     project.networking.interfaces = [exampleInterface];
     useProjectStore.getState().loadProject(project);
