@@ -196,4 +196,141 @@ describe("RoutesPanel", () => {
     );
     expect(addDefault).toHaveFocus();
   });
+
+  it("keeps Advanced collapsed, keyboard operable, route-associated, and transient", () => {
+    render(<RoutesHarness />);
+    const ipv4 = screen.getByRole("group", { name: "IPv4 routes" });
+    const addDefault = within(ipv4).getByRole("button", {
+      name: "Add default route",
+    });
+    const addSpecific = within(ipv4).getByRole("button", {
+      name: "Add specific route",
+    });
+
+    fireEvent.click(addDefault);
+    fireEvent.click(addSpecific);
+    useProjectStore.setState({ isDirty: false });
+    const projectBefore = useProjectStore.getState().project;
+
+    const firstAdvanced = within(ipv4).getByRole("button", {
+      name: "Advanced for IPv4 default route 1 for ens18",
+    });
+    const secondAdvanced = within(ipv4).getByRole("button", {
+      name: "Advanced for IPv4 specific route 2 for ens18",
+    });
+    expect(firstAdvanced).toHaveAttribute("aria-expanded", "false");
+    expect(secondAdvanced).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("textbox", { name: /Metric/ })).toBeNull();
+
+    firstAdvanced.focus();
+    fireEvent.keyDown(firstAdvanced, { key: "Enter" });
+    expect(firstAdvanced).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(ipv4).getByRole("textbox", {
+        name: "Metric (optional) for IPv4 default route 1 for ens18",
+      }),
+    ).toBeInTheDocument();
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    expect(useProjectStore.getState().project).toBe(projectBefore);
+
+    fireEvent.click(
+      within(ipv4).getByRole("button", {
+        name: "Remove default route 1 for ens18",
+      }),
+    );
+    expect(secondAdvanced).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("textbox", { name: /Metric/ })).toBeNull();
+  });
+
+  it("preserves raw metric drafts without semantic validation", () => {
+    render(<RoutesHarness />);
+    const ipv6 = screen.getByRole("group", { name: "IPv6 routes" });
+    fireEvent.click(
+      within(ipv6).getByRole("button", { name: "Add specific route" }),
+    );
+    const advanced = within(ipv6).getByRole("button", {
+      name: "Advanced for IPv6 specific route 1 for ens18",
+    });
+    fireEvent.click(advanced);
+
+    const metric = within(ipv6).getByRole("textbox", {
+      name: "Metric (optional) for IPv6 specific route 1 for ens18",
+    });
+    expect(metric).toHaveAttribute("inputmode", "numeric");
+    expect(metric).toHaveAttribute("placeholder", "100");
+    fireEvent.change(metric, { target: { value: " -1x " } });
+
+    expect(currentInterface().ipv6Routes[0]).toMatchObject({
+      metric: " -1x ",
+    });
+    expect(metric).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("links field-local example markers and clears only the changed metric marker", () => {
+    useProjectStore.getState().addNetworkRoute(
+      interfaceId,
+      "ipv4",
+      "default",
+      "route-example",
+    );
+    useProjectStore.setState((state) => {
+      const project = state.project;
+      if (!project) return state;
+      return {
+        project: {
+          ...project,
+          networking: {
+            interfaces: project.networking.interfaces.map((entry) =>
+              entry.id === interfaceId
+                ? {
+                    ...entry,
+                    ipv4Routes: entry.ipv4Routes.map((route) =>
+                      route.id === "route-example"
+                        ? {
+                            ...route,
+                            gateway: "192.0.2.1",
+                            metric: "100",
+                            exampleFields: ["gateway", "metric"],
+                          }
+                        : route,
+                    ),
+                  }
+                : entry,
+            ),
+          },
+        },
+      };
+    });
+
+    render(<RoutesHarness />);
+    const ipv4 = screen.getByRole("group", { name: "IPv4 routes" });
+    const gateway = within(ipv4).getByRole("textbox", {
+      name: "Gateway for IPv4 default route 1 for ens18",
+    });
+    const gatewayDescription = gateway.getAttribute("aria-describedby");
+    expect(gatewayDescription).toBeTruthy();
+    expect(document.getElementById(gatewayDescription!)).toHaveTextContent(
+      "Example value—replace for your network",
+    );
+
+    fireEvent.click(
+      within(ipv4).getByRole("button", {
+        name: "Advanced for IPv4 default route 1 for ens18",
+      }),
+    );
+    const metric = within(ipv4).getByRole("textbox", {
+      name: "Metric (optional) for IPv4 default route 1 for ens18",
+    });
+    const metricDescription = metric.getAttribute("aria-describedby");
+    expect(metricDescription).toBeTruthy();
+    expect(metricDescription).not.toBe(gatewayDescription);
+
+    fireEvent.change(metric, { target: { value: "100" } });
+    expect(metric).toHaveAttribute("aria-describedby", metricDescription!);
+    fireEvent.change(metric, { target: { value: "101" } });
+    expect(metric).not.toHaveAttribute("aria-describedby");
+    expect(gateway).toHaveAttribute("aria-describedby", gatewayDescription!);
+    expect(metric).toHaveFocus();
+  });
 });
