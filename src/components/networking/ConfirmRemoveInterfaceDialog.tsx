@@ -46,8 +46,8 @@ export function ConfirmRemoveInterfaceDialog({
     >
       <div className="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-xl">
         <h3 id={headingId} className="text-base font-semibold text-gray-900">
-          Remove interface &quot;{title}&quot;? This removes it from the project and
-          changes interface order.
+          Remove interface &quot;{title}&quot;? This removes its addressing, routes,
+          DNS, and link settings from the project.
         </h3>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button

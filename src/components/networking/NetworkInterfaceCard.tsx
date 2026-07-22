@@ -5,7 +5,11 @@ import {
   type BuilderNetworkInterface,
 } from "../../models/networking.ts";
 import { ConfirmRemoveInterfaceDialog } from "./ConfirmRemoveInterfaceDialog.tsx";
+import { AddressingPanel } from "./AddressingPanel.tsx";
+import { DnsPanel } from "./DnsPanel.tsx";
+import { LinkSettingsPanel } from "./LinkSettingsPanel.tsx";
 import { NetworkIdentitySelector } from "./NetworkIdentitySelector.tsx";
+import { RoutesPanel } from "./RoutesPanel.tsx";
 
 interface NetworkInterfaceCardProps {
   entry: BuilderNetworkInterface;
@@ -99,7 +103,7 @@ export function NetworkInterfaceCard({
     <article
       ref={cardRef}
       aria-labelledby={`network-interface-title-${entry.id}`}
-      className="rounded border border-gray-200 bg-white p-4 sm:p-6"
+      className="min-w-0 rounded border border-gray-200 bg-white p-4 sm:p-6"
     >
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <h3
@@ -146,7 +150,15 @@ export function NetworkInterfaceCard({
         </div>
       </div>
 
-      <NetworkIdentitySelector entry={entry} inputRef={activeInputRef} />
+      <div className="min-w-0 space-y-8">
+        <NetworkIdentitySelector entry={entry} inputRef={activeInputRef} />
+        <AddressingPanel entry={entry} />
+        <RoutesPanel entry={entry} />
+        <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
+          <DnsPanel entry={entry} />
+          <LinkSettingsPanel entry={entry} />
+        </div>
+      </div>
 
       {showRemoveDialog ? (
         <ConfirmRemoveInterfaceDialog

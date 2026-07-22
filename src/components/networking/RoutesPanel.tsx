@@ -62,8 +62,8 @@ function RouteRow({
   const gatewayMarkerId = `${gatewayId}-example`;
   const metricMarkerId = `${metricId}-example`;
   const advancedPanelId = `network-${entry.id}-${family}-route-${route.id}-advanced`;
-  const marker = (
-    <span className="text-xs font-normal text-amber-700">
+  const marker = (id: string) => (
+    <span id={id} className="text-xs font-normal text-amber-700">
       Example value—replace for your network
     </span>
   );
@@ -85,7 +85,7 @@ function RouteRow({
               >
                 <span>Destination</span>
                 {route.exampleFields.includes("destination") ? (
-                  <span id={destinationMarkerId}>{marker}</span>
+                  marker(destinationMarkerId)
                 ) : null}
               </label>
               <input
@@ -123,7 +123,7 @@ function RouteRow({
                 {route.kind === "default" ? "Gateway" : "Gateway (optional)"}
               </span>
               {route.exampleFields.includes("gateway") ? (
-                <span id={gatewayMarkerId}>{marker}</span>
+                marker(gatewayMarkerId)
               ) : null}
             </label>
             <input
@@ -175,7 +175,7 @@ function RouteRow({
             >
               <span>Metric (optional)</span>
               {route.exampleFields.includes("metric") ? (
-                <span id={metricMarkerId}>{marker}</span>
+                marker(metricMarkerId)
               ) : null}
             </label>
             <input
