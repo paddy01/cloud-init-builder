@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultProject } from "../../src/models/project.ts";
 import {
+  createBuilderValueRow,
   createBlankNetworkInterface,
+  createDefaultRoute,
+  createSpecificRoute,
   type NetworkingConfig,
 } from "../../src/models/networking.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
@@ -275,5 +278,312 @@ describe("networking store actions", () => {
     ).toBeUndefined();
     expect(useProjectStore.getState().project).toBe(before);
     expect(useProjectStore.getState().isDirty).toBe(false);
+  });
+
+  it("updates DHCP by exact interface and family while clearing only its marker", () => {
+    const project = createDefaultProject("DHCP targeting");
+    project.networking.interfaces = [
+      {
+        ...createBlankNetworkInterface("interface-a"),
+        exampleFields: ["name", "dhcp4", "dhcp6"],
+      },
+      createBlankNetworkInterface("interface-b"),
+    ];
+    useProjectStore.getState().loadProject(project);
+
+    useProjectStore
+      .getState()
+      .setNetworkDhcp("interface-a", "ipv4", true);
+
+    expect(networking().interfaces).toEqual([
+      {
+        ...createBlankNetworkInterface("interface-a"),
+        dhcp4: true,
+        exampleFields: ["name", "dhcp6"],
+      },
+      createBlankNetworkInterface("interface-b"),
+    ]);
+  });
+
+  it("adds, updates, and removes family-owned addresses by stable ID", () => {
+    useProjectStore.getState().addNetworkInterface("interface-a");
+    useProjectStore.getState().addNetworkInterface("interface-b");
+
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkAddress("interface-a", "ipv4", "address-a"),
+    ).toBe("address-a");
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkAddress("interface-a", "ipv4", "address-b"),
+    ).toBe("address-b");
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkAddress("interface-a", "ipv6", "address-v6"),
+    ).toBe("address-v6");
+
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("interface-a", "ipv4", "address-a", "192.0.2.10/24");
+    useProjectStore
+      .getState()
+      .removeNetworkAddress("interface-a", "ipv4", "address-b");
+
+    expect(networking().interfaces[0]).toMatchObject({
+      ipv4Addresses: [
+        createBuilderValueRow("address-a", "192.0.2.10/24", false),
+      ],
+      ipv6Addresses: [createBuilderValueRow("address-v6")],
+    });
+    expect(networking().interfaces[1]).toEqual(
+      createBlankNetworkInterface("interface-b"),
+    );
+  });
+
+  it("adds discriminated routes and edits only the requested route field", () => {
+    useProjectStore.getState().addNetworkInterface("interface-a");
+
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkRoute("interface-a", "ipv4", "default", "route-default"),
+    ).toBe("route-default");
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkRoute("interface-a", "ipv4", "specific", "route-specific"),
+    ).toBe("route-specific");
+
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "interface-a",
+        "ipv4",
+        "route-specific",
+        "destination",
+        "198.51.100.0/24",
+      );
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "interface-a",
+        "ipv4",
+        "route-default",
+        "gateway",
+        "192.0.2.1",
+      );
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "interface-a",
+        "ipv4",
+        "route-default",
+        "metric",
+        "001",
+      );
+
+    expect(networking().interfaces[0]?.ipv4Routes).toEqual([
+      createDefaultRoute("route-default", "192.0.2.1", "001"),
+      createSpecificRoute("route-specific", "198.51.100.0/24"),
+    ]);
+
+    useProjectStore
+      .getState()
+      .removeNetworkRoute("interface-a", "ipv4", "route-default");
+    expect(networking().interfaces[0]?.ipv4Routes.map((route) => route.id)).toEqual([
+      "route-specific",
+    ]);
+  });
+
+  it("targets mixed-family nameservers and search domains independently", () => {
+    useProjectStore.getState().addNetworkInterface("interface-a");
+
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkNameserver("interface-a", "nameserver-a"),
+    ).toBe("nameserver-a");
+    expect(
+      useProjectStore
+        .getState()
+        .addNetworkSearchDomain("interface-a", "search-a"),
+    ).toBe("search-a");
+
+    useProjectStore
+      .getState()
+      .updateNetworkNameserver("interface-a", "nameserver-a", "2001:db8::53");
+    useProjectStore
+      .getState()
+      .updateNetworkSearchDomain("interface-a", "search-a", "lab.example");
+
+    expect(networking().interfaces[0]).toMatchObject({
+      nameservers: [
+        createBuilderValueRow("nameserver-a", "2001:db8::53", false),
+      ],
+      searchDomains: [
+        createBuilderValueRow("search-a", "lab.example", false),
+      ],
+    });
+
+    useProjectStore
+      .getState()
+      .removeNetworkNameserver("interface-a", "nameserver-a");
+    useProjectStore
+      .getState()
+      .removeNetworkSearchDomain("interface-a", "search-a");
+    expect(networking().interfaces[0]).toMatchObject({
+      nameservers: [],
+      searchDomains: [],
+    });
+  });
+
+  it("preserves raw MTU drafts and clears the draft atomically when disabled", () => {
+    useProjectStore.getState().addNetworkInterface("interface-a");
+
+    useProjectStore.getState().setNetworkMtuEnabled("interface-a", true);
+    useProjectStore.getState().updateNetworkMtu("interface-a", "001500");
+    expect(networking().interfaces[0]).toMatchObject({
+      mtuEnabled: true,
+      mtu: "001500",
+    });
+
+    useProjectStore.getState().setNetworkMtuEnabled("interface-a", false);
+    expect(networking().interfaces[0]).toMatchObject({
+      mtuEnabled: false,
+      mtu: "",
+    });
+  });
+
+  it("clears provenance locally and keeps unresolved, duplicate, and equal nested writes as no-ops", () => {
+    const project = createDefaultProject("No-op networking");
+    project.networking.interfaces = [
+      {
+        ...createBlankNetworkInterface("interface-a"),
+        ipv4Addresses: [
+          createBuilderValueRow("address-a", "192.0.2.10/24", true),
+        ],
+        ipv4Routes: [
+          createSpecificRoute(
+            "route-a",
+            "198.51.100.0/24",
+            "192.0.2.1",
+            "10",
+            true,
+          ),
+        ],
+        nameservers: [
+          createBuilderValueRow("nameserver-a", "192.0.2.53", true),
+        ],
+        searchDomains: [
+          createBuilderValueRow("search-a", "lab.example", true),
+        ],
+        mtuEnabled: true,
+        mtu: "1500",
+        exampleFields: ["name", "mtu"],
+      },
+    ];
+    useProjectStore.getState().loadProject(project);
+
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("interface-a", "ipv4", "address-a", "192.0.2.11/24");
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "interface-a",
+        "ipv4",
+        "route-a",
+        "gateway",
+        "192.0.2.254",
+      );
+    useProjectStore
+      .getState()
+      .updateNetworkNameserver("interface-a", "nameserver-a", "2001:db8::53");
+    useProjectStore.getState().updateNetworkMtu("interface-a", "9000");
+
+    expect(networking().interfaces[0]).toMatchObject({
+      ipv4Addresses: [expect.objectContaining({ isExampleValue: false })],
+      ipv4Routes: [
+        expect.objectContaining({
+          exampleFields: ["destination", "metric"],
+        }),
+      ],
+      nameservers: [expect.objectContaining({ isExampleValue: false })],
+      searchDomains: [expect.objectContaining({ isExampleValue: true })],
+      exampleFields: ["name"],
+    });
+    useProjectStore.getState().markSaved();
+
+    const assertNoOp = (action: () => unknown) => {
+      const stateBefore = useProjectStore.getState();
+      const projectBefore = stateBefore.project;
+      const updatedAtBefore = projectBefore?.metadata.updatedAt;
+      vi.advanceTimersByTime(1_000);
+      action();
+      expectCurrentStateUnchanged(
+        projectBefore,
+        stateBefore.isDirty,
+        updatedAtBefore,
+      );
+    };
+
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .addNetworkAddress("interface-a", "ipv4", "address-a"),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .addNetworkRoute("interface-a", "ipv4", "default", "route-a"),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .addNetworkNameserver("interface-a", "nameserver-a"),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .addNetworkSearchDomain("interface-a", "search-a"),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .updateNetworkAddress("missing", "ipv4", "address-a", "ignored"),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .updateNetworkRouteField(
+          "interface-a",
+          "ipv4",
+          "missing",
+          "metric",
+          "10",
+        ),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .updateNetworkSearchDomain("interface-a", "search-a", "lab.example"),
+    );
+    assertNoOp(() =>
+      useProjectStore.getState().updateNetworkMtu("interface-a", "9000"),
+    );
+    assertNoOp(() =>
+      useProjectStore
+        .getState()
+        .updateNetworkRouteField(
+          "interface-a",
+          "ipv4",
+          "route-a",
+          "destination",
+          "198.51.100.0/24",
+        ),
+    );
   });
 });
