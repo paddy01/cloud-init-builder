@@ -21,17 +21,17 @@ export function NetworkInterfaceCardList({
     direction: "up" | "down";
   } | null>(null);
   const [moveAnnouncement, setMoveAnnouncement] = useState("");
-  const [shouldFocusAdd, setShouldFocusAdd] = useState(false);
+  const shouldFocusAddRef = useRef(false);
   const clearPendingFocus = useCallback(() => setPendingFocusId(null), []);
   const clearReorderFocus = useCallback(() => setPendingReorderFocus(null), []);
 
   const focusCreatedInterface = (id: string) => setPendingFocusId(id);
 
   useLayoutEffect(() => {
-    if (!shouldFocusAdd || interfaces.length !== 0) return;
+    if (!shouldFocusAddRef.current || interfaces.length !== 0) return;
     addButtonRef.current?.focus({ preventScroll: true });
-    setShouldFocusAdd(false);
-  }, [interfaces.length, shouldFocusAdd]);
+    shouldFocusAddRef.current = false;
+  }, [interfaces.length]);
 
   const handleAdd = () => {
     const id = addNetworkInterface();
@@ -44,14 +44,13 @@ export function NetworkInterfaceCardList({
     const remaining = interfaces.filter((entry) => entry.id !== id);
     const next = remaining[index];
     const previous = remaining[index - 1];
+    if (!next && !previous) shouldFocusAddRef.current = true;
     removeNetworkInterface(id);
 
     if (next) {
       setPendingFocusId(next.id);
     } else if (previous) {
       setPendingFocusId(previous.id);
-    } else {
-      setShouldFocusAdd(true);
     }
   };
 
