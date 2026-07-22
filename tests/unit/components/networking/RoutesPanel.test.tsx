@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { RoutesPanel } from "../../../../src/components/networking/RoutesPanel.tsx";
 import { createDefaultProject } from "../../../../src/models/project.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
@@ -197,7 +198,8 @@ describe("RoutesPanel", () => {
     expect(addDefault).toHaveFocus();
   });
 
-  it("keeps Advanced collapsed, keyboard operable, route-associated, and transient", () => {
+  it("keeps Advanced collapsed, keyboard operable, route-associated, and transient", async () => {
+    const user = userEvent.setup();
     render(<RoutesHarness />);
     const ipv4 = screen.getByRole("group", { name: "IPv4 routes" });
     const addDefault = within(ipv4).getByRole("button", {
@@ -223,7 +225,7 @@ describe("RoutesPanel", () => {
     expect(screen.queryByRole("textbox", { name: /Metric/ })).toBeNull();
 
     firstAdvanced.focus();
-    fireEvent.keyDown(firstAdvanced, { key: "Enter" });
+    await user.keyboard("{Enter}");
     expect(firstAdvanced).toHaveAttribute("aria-expanded", "true");
     expect(
       within(ipv4).getByRole("textbox", {
@@ -326,6 +328,7 @@ describe("RoutesPanel", () => {
     expect(metricDescription).toBeTruthy();
     expect(metricDescription).not.toBe(gatewayDescription);
 
+    metric.focus();
     fireEvent.change(metric, { target: { value: "100" } });
     expect(metric).toHaveAttribute("aria-describedby", metricDescription!);
     fireEvent.change(metric, { target: { value: "101" } });

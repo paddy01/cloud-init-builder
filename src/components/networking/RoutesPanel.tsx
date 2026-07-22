@@ -32,8 +32,10 @@ interface RouteRowProps {
   family: NetworkFamily;
   route: BuilderRoute;
   position: number;
+  isExpanded: boolean;
   firstFieldRef: (node: HTMLInputElement | null) => void;
   onChange: (field: NetworkRouteField, value: string) => void;
+  onToggleExpanded: () => void;
   onRemove: () => void;
 }
 
@@ -42,8 +44,10 @@ function RouteRow({
   family,
   route,
   position,
+  isExpanded,
   firstFieldRef,
   onChange,
+  onToggleExpanded,
   onRemove,
 }: RouteRowProps) {
   const familyLabel = family === "ipv4" ? "IPv4" : "IPv6";
@@ -53,6 +57,16 @@ function RouteRow({
   const rowName = `${visibleTitle} ${position} for ${title}`;
   const destinationId = `network-${entry.id}-${family}-route-${route.id}-destination`;
   const gatewayId = `network-${entry.id}-${family}-route-${route.id}-gateway`;
+  const metricId = `network-${entry.id}-${family}-route-${route.id}-metric`;
+  const destinationMarkerId = `${destinationId}-example`;
+  const gatewayMarkerId = `${gatewayId}-example`;
+  const metricMarkerId = `${metricId}-example`;
+  const advancedPanelId = `network-${entry.id}-${family}-route-${route.id}-advanced`;
+  const marker = (
+    <span className="text-xs font-normal text-amber-700">
+      Example value—replace for your network
+    </span>
+  );
 
   return (
     <div
@@ -67,9 +81,12 @@ function RouteRow({
             <div className="min-w-0 space-y-1">
               <label
                 htmlFor={destinationId}
-                className="text-sm font-semibold text-gray-700"
+                className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
               >
-                Destination
+                <span>Destination</span>
+                {route.exampleFields.includes("destination") ? (
+                  <span id={destinationMarkerId}>{marker}</span>
+                ) : null}
               </label>
               <input
                 ref={firstFieldRef}
@@ -79,6 +96,11 @@ function RouteRow({
                 spellCheck={false}
                 className={inputClass}
                 aria-label={`Destination for ${familyLabel} ${intent} route ${position} for ${title}`}
+                aria-describedby={
+                  route.exampleFields.includes("destination")
+                    ? destinationMarkerId
+                    : undefined
+                }
                 placeholder={
                   family === "ipv4"
                     ? "198.51.100.0/24"
@@ -95,9 +117,14 @@ function RouteRow({
           <div className="min-w-0 space-y-1">
             <label
               htmlFor={gatewayId}
-              className="text-sm font-semibold text-gray-700"
+              className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
             >
-              {route.kind === "default" ? "Gateway" : "Gateway (optional)"}
+              <span>
+                {route.kind === "default" ? "Gateway" : "Gateway (optional)"}
+              </span>
+              {route.exampleFields.includes("gateway") ? (
+                <span id={gatewayMarkerId}>{marker}</span>
+              ) : null}
             </label>
             <input
               ref={route.kind === "default" ? firstFieldRef : undefined}
@@ -107,6 +134,11 @@ function RouteRow({
               spellCheck={false}
               className={inputClass}
               aria-label={`${route.kind === "default" ? "Gateway" : "Gateway (optional)"} for ${familyLabel} ${intent} route ${position} for ${title}`}
+              aria-describedby={
+                route.exampleFields.includes("gateway")
+                  ? gatewayMarkerId
+                  : undefined
+              }
               placeholder={family === "ipv4" ? "192.0.2.1" : "2001:db8::1"}
               value={route.gateway}
               onChange={(event) => onChange("gateway", event.target.value)}
@@ -122,6 +154,48 @@ function RouteRow({
         >
           Remove {intent} route
         </button>
+      </div>
+
+      <div className="space-y-2">
+        <button
+          type="button"
+          className="min-h-10 rounded px-2 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={`Advanced for ${familyLabel} ${intent} route ${position} for ${title}`}
+          aria-expanded={isExpanded}
+          aria-controls={advancedPanelId}
+          onClick={onToggleExpanded}
+        >
+          Advanced
+        </button>
+        {isExpanded ? (
+          <div id={advancedPanelId} className="min-w-0 space-y-1">
+            <label
+              htmlFor={metricId}
+              className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+            >
+              <span>Metric (optional)</span>
+              {route.exampleFields.includes("metric") ? (
+                <span id={metricMarkerId}>{marker}</span>
+              ) : null}
+            </label>
+            <input
+              id={metricId}
+              type="text"
+              inputMode="numeric"
+              spellCheck={false}
+              className={inputClass}
+              aria-label={`Metric (optional) for ${familyLabel} ${intent} route ${position} for ${title}`}
+              aria-describedby={
+                route.exampleFields.includes("metric")
+                  ? metricMarkerId
+                  : undefined
+              }
+              placeholder="100"
+              value={route.metric}
+              onChange={(event) => onChange("metric", event.target.value)}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -143,6 +217,9 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
   const [focusTarget, setFocusTarget] = useState<
     { kind: "row"; id: string } | { kind: "add-default" } | null
   >(null);
+  const [expandedRouteIds, setExpandedRouteIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const firstFieldRefs = useRef(new Map<string, HTMLInputElement>());
   const addDefaultRef = useRef<HTMLButtonElement>(null);
   const familyLabel = family === "ipv4" ? "IPv4" : "IPv6";
@@ -170,6 +247,12 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
     if (index === -1) return;
     const nextTarget = routes[index + 1]?.id ?? routes[index - 1]?.id;
     removeNetworkRoute(entry.id, family, rowId);
+    setExpandedRouteIds((current) => {
+      if (!current.has(rowId)) return current;
+      const next = new Set(current);
+      next.delete(rowId);
+      return next;
+    });
     setFocusTarget(
       nextTarget
         ? { kind: "row", id: nextTarget }
@@ -200,6 +283,7 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
               family={family}
               route={route}
               position={index + 1}
+              isExpanded={expandedRouteIds.has(route.id)}
               firstFieldRef={(node) => {
                 if (node) firstFieldRefs.current.set(route.id, node);
                 else firstFieldRefs.current.delete(route.id);
@@ -212,6 +296,14 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
                   field,
                   value,
                 )
+              }
+              onToggleExpanded={() =>
+                setExpandedRouteIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(route.id)) next.delete(route.id);
+                  else next.add(route.id);
+                  return next;
+                })
               }
               onRemove={() => handleRemove(route.id)}
             />
