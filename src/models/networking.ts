@@ -2,6 +2,44 @@ import { z } from "zod";
 
 export const networkIdentityModeSchema = z.enum(["name", "mac"]);
 
+export const builderValueRowSchema = z.object({
+  id: z.string(),
+  value: z.string(),
+  isExampleValue: z.boolean(),
+});
+
+const routeExampleFieldSchema = z.enum(["destination", "gateway", "metric"]);
+const routeBaseShape = {
+  id: z.string(),
+  gateway: z.string(),
+  metric: z.string(),
+  exampleFields: z.array(routeExampleFieldSchema),
+};
+
+export const builderDefaultRouteSchema = z.object({
+  ...routeBaseShape,
+  kind: z.literal("default"),
+});
+
+export const builderSpecificRouteSchema = z.object({
+  ...routeBaseShape,
+  kind: z.literal("specific"),
+  destination: z.string(),
+});
+
+export const builderRouteSchema = z.discriminatedUnion("kind", [
+  builderDefaultRouteSchema,
+  builderSpecificRouteSchema,
+]);
+
+export const networkInterfaceExampleFieldSchema = z.enum([
+  "name",
+  "macAddress",
+  "dhcp4",
+  "dhcp6",
+  "mtu",
+]);
+
 const COMPLETE_MAC_ADDRESS = /^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/;
 
 export function normalizeMacAddressDraft(value: string): string {
@@ -13,6 +51,17 @@ export const builderNetworkInterfaceSchema = z.object({
   identityMode: networkIdentityModeSchema,
   name: z.string(),
   macAddress: z.string().transform(normalizeMacAddressDraft),
+  dhcp4: z.boolean(),
+  dhcp6: z.boolean(),
+  ipv4Addresses: z.array(builderValueRowSchema),
+  ipv6Addresses: z.array(builderValueRowSchema),
+  ipv4Routes: z.array(builderRouteSchema),
+  ipv6Routes: z.array(builderRouteSchema),
+  nameservers: z.array(builderValueRowSchema),
+  searchDomains: z.array(builderValueRowSchema),
+  mtuEnabled: z.boolean(),
+  mtu: z.string(),
+  exampleFields: z.array(networkInterfaceExampleFieldSchema),
 });
 
 export const networkingConfigSchema = z.object({
@@ -20,6 +69,13 @@ export const networkingConfigSchema = z.object({
 });
 
 export type NetworkIdentityMode = z.infer<typeof networkIdentityModeSchema>;
+export type BuilderValueRow = z.infer<typeof builderValueRowSchema>;
+export type BuilderDefaultRoute = z.infer<typeof builderDefaultRouteSchema>;
+export type BuilderSpecificRoute = z.infer<typeof builderSpecificRouteSchema>;
+export type BuilderRoute = z.infer<typeof builderRouteSchema>;
+export type NetworkInterfaceExampleField = z.infer<
+  typeof networkInterfaceExampleFieldSchema
+>;
 export type BuilderNetworkInterface = z.infer<
   typeof builderNetworkInterfaceSchema
 >;
@@ -35,13 +91,94 @@ export const DEFAULT_NETWORKING_CONFIG: NetworkingConfig = {
 
 let fallbackIdCounter = 0;
 
-export function createNetworkInterfaceId(): string {
+function createOpaqueId(prefix: string): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
-    return `network-interface-${globalThis.crypto.randomUUID()}`;
+    return `${prefix}-${globalThis.crypto.randomUUID()}`;
   }
 
   fallbackIdCounter += 1;
-  return `network-interface-${Date.now().toString(36)}-${fallbackIdCounter.toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}-${Date.now().toString(36)}-${fallbackIdCounter.toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+export function createNetworkInterfaceId(): string {
+  return createOpaqueId("network-interface");
+}
+
+export function createNetworkDraftId(prefix = "network-field"): string {
+  return createOpaqueId(prefix);
+}
+
+export function allocateUniqueNetworkDraftId(
+  usedIds: Set<string>,
+  prefix = "network-field",
+): string {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = createNetworkDraftId(prefix);
+    if (SAFE_INTERFACE_ID.test(candidate) && !usedIds.has(candidate)) {
+      usedIds.add(candidate);
+      return candidate;
+    }
+  }
+
+  let suffix = usedIds.size + 1;
+  let candidate = `${prefix}-${suffix}`;
+  while (usedIds.has(candidate)) {
+    suffix += 1;
+    candidate = `${prefix}-${suffix}`;
+  }
+  usedIds.add(candidate);
+  return candidate;
+}
+
+export function createBuilderValueRow(
+  id = createNetworkDraftId("network-value"),
+  value = "",
+  isExampleValue = false,
+): BuilderValueRow {
+  return { id, value, isExampleValue };
+}
+
+export function createDefaultRoute(
+  id = createNetworkDraftId("network-route"),
+  gateway = "",
+  metric = "",
+  isExampleValue = false,
+): BuilderDefaultRoute {
+  return {
+    id,
+    kind: "default",
+    gateway,
+    metric,
+    exampleFields: isExampleValue
+      ? [
+          ...(gateway === "" ? [] : (["gateway"] as const)),
+          ...(metric === "" ? [] : (["metric"] as const)),
+        ]
+      : [],
+  };
+}
+
+export function createSpecificRoute(
+  id = createNetworkDraftId("network-route"),
+  destination = "",
+  gateway = "",
+  metric = "",
+  isExampleValue = false,
+): BuilderSpecificRoute {
+  return {
+    id,
+    kind: "specific",
+    destination,
+    gateway,
+    metric,
+    exampleFields: isExampleValue
+      ? [
+          ...(destination === "" ? [] : (["destination"] as const)),
+          ...(gateway === "" ? [] : (["gateway"] as const)),
+          ...(metric === "" ? [] : (["metric"] as const)),
+        ]
+      : [],
+  };
 }
 
 export function createBlankNetworkInterface(
@@ -52,13 +189,95 @@ export function createBlankNetworkInterface(
     identityMode: "name",
     name: "",
     macAddress: "",
+    dhcp4: false,
+    dhcp6: false,
+    ipv4Addresses: [],
+    ipv6Addresses: [],
+    ipv4Routes: [],
+    ipv6Routes: [],
+    nameservers: [],
+    searchDomains: [],
+    mtuEnabled: false,
+    mtu: "",
+    exampleFields: [],
+  };
+}
+
+export function createIpv4DhcpExample(
+  id = createNetworkInterfaceId(),
+): BuilderNetworkInterface {
+  return {
+    ...createBlankNetworkInterface(id),
+    name: "ens18",
+    dhcp4: true,
+    exampleFields: ["name", "dhcp4"],
+  };
+}
+
+export interface StaticIpv4ExampleIds {
+  address: string;
+  route: string;
+  nameserver: string;
+  searchDomain: string;
+}
+
+export function createStaticIpv4Example(
+  id = createNetworkInterfaceId(),
+  ids: StaticIpv4ExampleIds = {
+    address: createNetworkDraftId("network-address"),
+    route: createNetworkDraftId("network-route"),
+    nameserver: createNetworkDraftId("network-nameserver"),
+    searchDomain: createNetworkDraftId("network-search-domain"),
+  },
+): BuilderNetworkInterface {
+  return {
+    ...createBlankNetworkInterface(id),
+    name: "ens18",
+    ipv4Addresses: [
+      createBuilderValueRow(ids.address, "192.0.2.10/24", true),
+    ],
+    ipv4Routes: [
+      createDefaultRoute(ids.route, "192.0.2.1", "", true),
+    ],
+    nameservers: [
+      createBuilderValueRow(ids.nameserver, "192.0.2.53", true),
+    ],
+    searchDomains: [
+      createBuilderValueRow(ids.searchDomain, "lab.example", true),
+    ],
+    exampleFields: ["name"],
+  };
+}
+
+export function createDualStackDhcpExample(
+  id = createNetworkInterfaceId(),
+): BuilderNetworkInterface {
+  return {
+    ...createBlankNetworkInterface(id),
+    name: "ens18",
+    dhcp4: true,
+    dhcp6: true,
+    exampleFields: ["name", "dhcp4", "dhcp6"],
   };
 }
 
 export function isSemanticallyBlankNetworkInterface(
   entry: BuilderNetworkInterface,
 ): boolean {
-  return entry.name.trim() === "" && entry.macAddress.trim() === "";
+  return (
+    entry.name.trim() === "" &&
+    entry.macAddress.trim() === "" &&
+    !entry.dhcp4 &&
+    !entry.dhcp6 &&
+    entry.ipv4Addresses.length === 0 &&
+    entry.ipv6Addresses.length === 0 &&
+    entry.ipv4Routes.length === 0 &&
+    entry.ipv6Routes.length === 0 &&
+    entry.nameservers.length === 0 &&
+    entry.searchDomains.length === 0 &&
+    !entry.mtuEnabled &&
+    entry.mtu.trim() === ""
+  );
 }
 
 export interface NetworkingImportWarning {
@@ -207,7 +426,7 @@ function normalizeInterfaceEntry(
   const macAddress = identityMode === "mac" ? raw.macAddress : inactiveValue;
 
   return {
-    id: preserveOrRepairId(raw.id, usedIds),
+    ...createBlankNetworkInterface(preserveOrRepairId(raw.id, usedIds)),
     identityMode,
     name: name as string,
     macAddress: normalizeMacAddressDraft(macAddress as string),
