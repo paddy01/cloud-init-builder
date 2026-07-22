@@ -708,6 +708,59 @@ describe("networking import normalization", () => {
     expect(reopened.warnings).toEqual([]);
     expect(reopened.project.networking).toEqual(first.project.networking);
   });
+
+  it("does not let an omitted malformed route reserve a valid sibling ID", async () => {
+    const first = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          {
+            id: "route-recovery",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            ipv4Routes: [
+              {
+                id: "route-a",
+                kind: "specific",
+                destination: 123,
+                gateway: "192.0.2.1",
+                metric: "10",
+                exampleFields: [],
+              },
+              {
+                id: "route-a",
+                kind: "specific",
+                destination: "198.51.100.0/24",
+                gateway: "192.0.2.254",
+                metric: "20",
+                exampleFields: ["destination", "gateway", "metric"],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const reopened = await importNetworking(first.project);
+    const routes = first.project.networking.interfaces[0]?.ipv4Routes;
+
+    expect(first.warnings).toContainEqual({
+      path: "networking.interfaces.0.ipv4Routes.0.destination",
+      message: "Invalid route destination draft was omitted during import.",
+    });
+    expect(routes).toEqual([
+      {
+        id: "route-a",
+        kind: "specific",
+        destination: "198.51.100.0/24",
+        gateway: "192.0.2.254",
+        metric: "20",
+        exampleFields: ["destination", "gateway", "metric"],
+      },
+    ]);
+    expect(reopened.warnings).toEqual([]);
+    expect(reopened.project.networking).toEqual(first.project.networking);
+  });
 });
 
 describe("metadata name normalization", () => {
