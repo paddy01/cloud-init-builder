@@ -298,6 +298,7 @@ describe("DnsPanel", () => {
       domain.getAttribute("aria-describedby"),
     );
 
+    nameserver.focus();
     fireEvent.change(nameserver, { target: { value: "192.0.2.54" } });
     expect(nameserver).not.toHaveAttribute("aria-describedby");
     expect(domain).toHaveAttribute("aria-describedby");
@@ -359,6 +360,7 @@ describe("LinkSettingsPanel", () => {
       "Example value—replace for your network",
     );
 
+    input.focus();
     fireEvent.change(input, { target: { value: "1501" } });
     expect(input).not.toHaveAttribute("aria-describedby");
     expect(input).toHaveFocus();
