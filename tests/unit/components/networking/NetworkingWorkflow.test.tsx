@@ -390,7 +390,7 @@ describe("NetworkingWorkflow", () => {
     rerender(<NetworkingSection />);
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Networking couldn't be displayed. Reopen the project and review any import warnings.",
+      "Networking settings couldn't be displayed. Reopen the project and review any import warnings.",
     );
     expect(
       screen.queryByRole("button", { name: "Add blank interface" }),

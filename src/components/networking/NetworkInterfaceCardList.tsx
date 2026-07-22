@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { BuilderNetworkInterface } from "../../models/networking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { NetworkInterfaceCard } from "./NetworkInterfaceCard.tsx";
+import { NetworkingExamples } from "./NetworkingExamples.tsx";
 
 interface NetworkInterfaceCardListProps {
   interfaces: BuilderNetworkInterface[];
@@ -20,12 +21,21 @@ export function NetworkInterfaceCardList({
     direction: "up" | "down";
   } | null>(null);
   const [moveAnnouncement, setMoveAnnouncement] = useState("");
+  const [shouldFocusAdd, setShouldFocusAdd] = useState(false);
   const clearPendingFocus = useCallback(() => setPendingFocusId(null), []);
   const clearReorderFocus = useCallback(() => setPendingReorderFocus(null), []);
 
+  const focusCreatedInterface = (id: string) => setPendingFocusId(id);
+
+  useLayoutEffect(() => {
+    if (!shouldFocusAdd || interfaces.length !== 0) return;
+    addButtonRef.current?.focus({ preventScroll: true });
+    setShouldFocusAdd(false);
+  }, [interfaces.length, shouldFocusAdd]);
+
   const handleAdd = () => {
     const id = addNetworkInterface();
-    if (id) setPendingFocusId(id);
+    if (id) focusCreatedInterface(id);
   };
 
   const handleRemove = (id: string) => {
@@ -41,7 +51,7 @@ export function NetworkInterfaceCardList({
     } else if (previous) {
       setPendingFocusId(previous.id);
     } else {
-      addButtonRef.current?.focus({ preventScroll: true });
+      setShouldFocusAdd(true);
     }
   };
 
@@ -71,6 +81,13 @@ export function NetworkInterfaceCardList({
         {moveAnnouncement}
       </div>
 
+      {interfaces.length === 0 ? (
+        <NetworkingExamples
+          addButtonRef={addButtonRef}
+          onInterfaceCreated={focusCreatedInterface}
+        />
+      ) : null}
+
       {interfaces.map((entry, index) => (
         <NetworkInterfaceCard
           key={entry.id}
@@ -90,14 +107,16 @@ export function NetworkInterfaceCardList({
         />
       ))}
 
-      <button
-        ref={addButtonRef}
-        type="button"
-        className="mt-6 min-h-10 w-full rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
-        onClick={handleAdd}
-      >
-        Add interface
-      </button>
+      {interfaces.length > 0 ? (
+        <button
+          ref={addButtonRef}
+          type="button"
+          className="mt-6 min-h-10 w-full rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
+          onClick={handleAdd}
+        >
+          Add blank interface
+        </button>
+      ) : null}
     </div>
   );
 }

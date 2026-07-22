@@ -18,6 +18,8 @@ export function NetworkIdentitySelector({
   );
   const nameInputId = `network-interface-${entry.id}-name`;
   const macInputId = `network-interface-${entry.id}-mac`;
+  const nameMarkerId = `${nameInputId}-example-marker`;
+  const macMarkerId = `${macInputId}-example-marker`;
   const radioName = `network-interface-${entry.id}-identity-mode`;
 
   return (
@@ -68,9 +70,16 @@ export function NetworkIdentitySelector({
 
       {entry.identityMode === "name" ? (
         <div className="space-y-2">
-          <label htmlFor={nameInputId} className="block text-sm font-medium text-gray-700">
-            Device name
-          </label>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <label htmlFor={nameInputId} className="text-sm font-medium text-gray-700">
+              Device name
+            </label>
+            {entry.exampleFields.includes("name") ? (
+              <span id={nameMarkerId} className="text-xs text-amber-700">
+                Example value—replace for your network
+              </span>
+            ) : null}
+          </div>
           <input
             ref={inputRef}
             id={nameInputId}
@@ -80,6 +89,9 @@ export function NetworkIdentitySelector({
             className="min-h-10 w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="e.g. ens18"
             value={entry.name}
+            aria-describedby={
+              entry.exampleFields.includes("name") ? nameMarkerId : undefined
+            }
             onChange={(event) =>
               updateNetworkInterface(entry.id, { name: event.target.value })
             }
@@ -87,9 +99,16 @@ export function NetworkIdentitySelector({
         </div>
       ) : (
         <div className="space-y-2">
-          <label htmlFor={macInputId} className="block text-sm font-medium text-gray-700">
-            MAC address
-          </label>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <label htmlFor={macInputId} className="text-sm font-medium text-gray-700">
+              MAC address
+            </label>
+            {entry.exampleFields.includes("macAddress") ? (
+              <span id={macMarkerId} className="text-xs text-amber-700">
+                Example value—replace for your network
+              </span>
+            ) : null}
+          </div>
           <input
             ref={inputRef}
             id={macInputId}
@@ -99,6 +118,9 @@ export function NetworkIdentitySelector({
             className="min-h-10 w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="52:54:00:12:34:56"
             value={entry.macAddress}
+            aria-describedby={
+              entry.exampleFields.includes("macAddress") ? macMarkerId : undefined
+            }
             onChange={(event) =>
               updateNetworkInterface(entry.id, {
                 macAddress: event.target.value,

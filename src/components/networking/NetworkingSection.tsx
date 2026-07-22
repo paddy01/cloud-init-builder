@@ -20,8 +20,8 @@ export function NetworkingSection() {
     return (
       <section className="p-4 sm:p-6">
         <p role="alert" className="text-sm text-red-700">
-          Networking couldn&apos;t be displayed. Reopen the project and review any
-          import warnings.
+          Networking settings couldn&apos;t be displayed. Reopen the project and
+          review any import warnings.
         </p>
       </section>
     );
@@ -34,18 +34,10 @@ export function NetworkingSection() {
           Networking
         </h2>
         <p className="text-sm text-gray-500">
-          Configure physical interfaces by device name or MAC address.
+          Configure addressing, routes, DNS, and link settings for each physical
+          interface.
         </p>
       </div>
-
-      {project.networking.interfaces.length === 0 ? (
-        <div className="rounded border border-dashed border-gray-300 bg-white p-6 text-left">
-          <p className="text-sm font-semibold text-gray-900">No interfaces yet</p>
-          <p className="text-sm text-gray-500">
-            Add a physical interface target by device name or MAC address.
-          </p>
-        </div>
-      ) : null}
 
       <NetworkInterfaceCardList interfaces={project.networking.interfaces} />
     </section>
