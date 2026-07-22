@@ -49,22 +49,104 @@ describe("NetworkingWorkflow", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows one add action and focuses the appended name-mode card", () => {
+  it("renders the exact empty decision surface and focuses a blank interface", () => {
     render(<NetworkingSection />);
 
-    expect(screen.getByText("No interfaces yet")).toBeInTheDocument();
-    const addButtons = screen.getAllByRole("button", { name: "Add interface" });
+    expect(
+      screen.getByRole("heading", { name: "Start your network configuration" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Add a blank physical interface or start from a portable Proxmox-oriented example. You can replace every sample value.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Start from an example" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use IPv4 DHCP" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use static IPv4" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Use dual-stack DHCP" }),
+    ).toBeInTheDocument();
+    const addButtons = screen.getAllByRole("button", {
+      name: "Add blank interface",
+    });
     expect(addButtons).toHaveLength(1);
 
     fireEvent.click(addButtons[0]!);
 
     expect(networking().interfaces).toHaveLength(1);
-    expect(networking().interfaces[0]?.identityMode).toBe("name");
+    expect(networking().interfaces[0]).toMatchObject({
+      identityMode: "name",
+      dhcp4: false,
+      dhcp6: false,
+    });
     expect(screen.getByRole("textbox", { name: "Device name" })).toHaveFocus();
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
       block: "center",
     });
+    expect(screen.queryByRole("button", { name: "Use IPv4 DHCP" })).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: "Add blank interface" }),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      "Use IPv4 DHCP",
+      {
+        dhcp4: true,
+        dhcp6: false,
+        ipv4Addresses: [],
+        ipv4Routes: [],
+        nameservers: [],
+        searchDomains: [],
+      },
+    ],
+    [
+      "Use static IPv4",
+      {
+        dhcp4: false,
+        dhcp6: false,
+        ipv4Addresses: [expect.objectContaining({ value: "192.0.2.10/24" })],
+        ipv4Routes: [
+          expect.objectContaining({ kind: "default", gateway: "192.0.2.1" }),
+        ],
+        nameservers: [expect.objectContaining({ value: "192.0.2.53" })],
+        searchDomains: [expect.objectContaining({ value: "lab.example" })],
+      },
+    ],
+    [
+      "Use dual-stack DHCP",
+      {
+        dhcp4: true,
+        dhcp6: true,
+        ipv4Addresses: [],
+        ipv4Routes: [],
+        nameservers: [],
+        searchDomains: [],
+      },
+    ],
+  ])("applies %s atomically with portable state and focus", (action, outcome) => {
+    render(<NetworkingSection />);
+
+    fireEvent.click(screen.getByRole("button", { name: action }));
+
+    const entry = networking().interfaces[0];
+    expect(entry).toMatchObject({ name: "ens18", ...outcome });
+    expect(entry).not.toHaveProperty("provider");
+    expect(entry).not.toHaveProperty("exampleType");
+    expect(entry).not.toHaveProperty("proxmox");
+    expect(screen.getByRole("textbox", { name: "Device name" })).toHaveFocus();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "center",
+    });
+    expect(screen.queryByRole("button", { name: action })).toBeNull();
+    expect(
+      screen.getAllByText("Example value—replace for your network").length,
+    ).toBeGreaterThan(0);
   });
 
   it("preserves exact selector drafts and derives the title from the active draft", () => {
@@ -131,7 +213,9 @@ describe("NetworkingWorkflow", () => {
 
     expect(networking().interfaces).toHaveLength(0);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add interface" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Add blank interface" }),
+    ).toHaveFocus();
   });
 
   it("cancels populated removal and restores focus to the originating control", () => {
@@ -233,7 +317,9 @@ describe("NetworkingWorkflow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove ens18" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove interface" }));
-    expect(screen.getByRole("button", { name: "Add interface" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Add blank interface" }),
+    ).toHaveFocus();
     expect(networking().interfaces).toHaveLength(0);
   });
 
@@ -274,7 +360,7 @@ describe("NetworkingWorkflow", () => {
     }));
     render(<NetworkingSection />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add interface" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add blank interface" }));
 
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
       behavior: "auto",
@@ -290,7 +376,9 @@ describe("NetworkingWorkflow", () => {
     expect(
       screen.getByText("Create or open a project to configure networking."),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add interface" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Add blank interface" }),
+    ).toBeNull();
 
     const invalidProject = createDefaultProject("Invalid networking");
     invalidProject.networking = {
@@ -304,6 +392,8 @@ describe("NetworkingWorkflow", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Networking couldn't be displayed. Reopen the project and review any import warnings.",
     );
-    expect(screen.queryByRole("button", { name: "Add interface" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Add blank interface" }),
+    ).toBeNull();
   });
 });
