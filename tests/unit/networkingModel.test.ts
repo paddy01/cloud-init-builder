@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   builderNetworkInterfaceSchema,
   createBlankNetworkInterface,
+  createBuilderValueRow,
+  createDefaultRoute,
+  createDualStackDhcpExample,
+  createIpv4DhcpExample,
+  createSpecificRoute,
+  createStaticIpv4Example,
   isSemanticallyBlankNetworkInterface,
   networkingConfigSchema,
 } from "../../src/models/networking.ts";
@@ -13,6 +19,17 @@ describe("networking model", () => {
       identityMode: "name",
       name: "",
       macAddress: "",
+      dhcp4: false,
+      dhcp6: false,
+      ipv4Addresses: [],
+      ipv6Addresses: [],
+      ipv4Routes: [],
+      ipv6Routes: [],
+      nameservers: [],
+      searchDomains: [],
+      mtuEnabled: false,
+      mtu: "",
+      exampleFields: [],
     });
   });
 
@@ -27,12 +44,34 @@ describe("networking model", () => {
         identityMode: "mac",
         name: " ens18 ",
         macAddress: "AA:BB:CC:DD:EE:FF",
+        dhcp4: false,
+        dhcp6: false,
+        ipv4Addresses: [],
+        ipv6Addresses: [],
+        ipv4Routes: [],
+        ipv6Routes: [],
+        nameservers: [],
+        searchDomains: [],
+        mtuEnabled: false,
+        mtu: "",
+        exampleFields: [],
       }),
     ).toEqual({
       id: "interface-1",
       identityMode: "mac",
       name: " ens18 ",
       macAddress: "aa:bb:cc:dd:ee:ff",
+      dhcp4: false,
+      dhcp6: false,
+      ipv4Addresses: [],
+      ipv6Addresses: [],
+      ipv4Routes: [],
+      ipv6Routes: [],
+      nameservers: [],
+      searchDomains: [],
+      mtuEnabled: false,
+      mtu: "",
+      exampleFields: [],
     });
   });
 
@@ -43,6 +82,17 @@ describe("networking model", () => {
         identityMode: "mac",
         name: "",
         macAddress: "AA:BB:C",
+        dhcp4: false,
+        dhcp6: false,
+        ipv4Addresses: [],
+        ipv6Addresses: [],
+        ipv4Routes: [],
+        ipv6Routes: [],
+        nameservers: [],
+        searchDomains: [],
+        mtuEnabled: false,
+        mtu: "",
+        exampleFields: [],
       }).macAddress,
     ).toBe("AA:BB:C");
   });
@@ -52,8 +102,8 @@ describe("networking model", () => {
     const decomposed = "cafe\u0301";
     const parsed = networkingConfigSchema.parse({
       interfaces: [
-        { id: "a", identityMode: "name", name: composed, macAddress: "" },
-        { id: "b", identityMode: "name", name: decomposed, macAddress: "" },
+        { ...createBlankNetworkInterface("a"), name: composed },
+        { ...createBlankNetworkInterface("b"), name: decomposed },
       ],
     });
 
@@ -65,18 +115,132 @@ describe("networking model", () => {
   it("uses trimmed drafts only to determine semantic blankness", () => {
     expect(
       isSemanticallyBlankNetworkInterface({
-        id: "blank",
-        identityMode: "name",
+        ...createBlankNetworkInterface("blank"),
         name: "  ",
         macAddress: "\t",
       }),
     ).toBe(true);
     expect(
       isSemanticallyBlankNetworkInterface({
-        id: "populated",
-        identityMode: "name",
+        ...createBlankNetworkInterface("populated"),
         name: " ens18 ",
-        macAddress: "",
+      }),
+    ).toBe(false);
+  });
+
+  it("preserves stable IDs and raw drafts in value and route factories", () => {
+    expect(createBuilderValueRow("address-1", " 192.0.2. ", true)).toEqual({
+      id: "address-1",
+      value: " 192.0.2. ",
+      isExampleValue: true,
+    });
+    expect(createDefaultRoute("route-default", " 192.0.2.1 ", "00", true)).toEqual({
+      id: "route-default",
+      kind: "default",
+      gateway: " 192.0.2.1 ",
+      metric: "00",
+      exampleFields: ["gateway", "metric"],
+    });
+    expect(createSpecificRoute("route-specific", "10.0./", "", "-1")).toEqual({
+      id: "route-specific",
+      kind: "specific",
+      destination: "10.0./",
+      gateway: "",
+      metric: "-1",
+      exampleFields: [],
+    });
+  });
+
+  it("keeps default and specific route shapes discriminated", () => {
+    const blank = createBlankNetworkInterface("interface-routes");
+    const parsed = builderNetworkInterfaceSchema.parse({
+      ...blank,
+      ipv4Routes: [
+        createDefaultRoute("default", "", "nonnumeric"),
+        createSpecificRoute("specific", "", "", "-20"),
+      ],
+    });
+
+    expect(parsed.ipv4Routes[0]).not.toHaveProperty("destination");
+    expect(parsed.ipv4Routes[1]).toMatchObject({
+      kind: "specific",
+      destination: "",
+      gateway: "",
+      metric: "-20",
+    });
+  });
+
+  it("creates exactly the three portable examples with field-local provenance", () => {
+    expect(createIpv4DhcpExample("example-dhcp4")).toEqual({
+      ...createBlankNetworkInterface("example-dhcp4"),
+      name: "ens18",
+      dhcp4: true,
+      exampleFields: ["name", "dhcp4"],
+    });
+
+    const staticExample = createStaticIpv4Example("example-static", {
+      address: "address-example",
+      route: "route-example",
+      nameserver: "nameserver-example",
+      searchDomain: "search-example",
+    });
+    expect(staticExample).toEqual({
+      ...createBlankNetworkInterface("example-static"),
+      name: "ens18",
+      ipv4Addresses: [
+        { id: "address-example", value: "192.0.2.10/24", isExampleValue: true },
+      ],
+      ipv4Routes: [
+        {
+          id: "route-example",
+          kind: "default",
+          gateway: "192.0.2.1",
+          metric: "",
+          exampleFields: ["gateway"],
+        },
+      ],
+      nameservers: [
+        { id: "nameserver-example", value: "192.0.2.53", isExampleValue: true },
+      ],
+      searchDomains: [
+        { id: "search-example", value: "lab.example", isExampleValue: true },
+      ],
+      exampleFields: ["name"],
+    });
+
+    expect(createDualStackDhcpExample("example-dual")).toEqual({
+      ...createBlankNetworkInterface("example-dual"),
+      name: "ens18",
+      dhcp4: true,
+      dhcp6: true,
+      exampleFields: ["name", "dhcp4", "dhcp6"],
+    });
+    for (const example of [
+      createIpv4DhcpExample(),
+      createStaticIpv4Example(),
+      createDualStackDhcpExample(),
+    ]) {
+      expect(example).not.toHaveProperty("provider");
+      expect(example).not.toHaveProperty("proxmox");
+    }
+  });
+
+  it.each([
+    ["DHCP4", { dhcp4: true }],
+    ["DHCP6", { dhcp6: true }],
+    ["an IPv4 address", { ipv4Addresses: [createBuilderValueRow("a")] }],
+    ["an IPv6 address", { ipv6Addresses: [createBuilderValueRow("a")] }],
+    ["an IPv4 route", { ipv4Routes: [createDefaultRoute("r")] }],
+    ["an IPv6 route", { ipv6Routes: [createSpecificRoute("r")] }],
+    ["a nameserver", { nameservers: [createBuilderValueRow("n")] }],
+    ["a search domain", { searchDomains: [createBuilderValueRow("s")] }],
+    ["enabled MTU", { mtuEnabled: true }],
+    ["an MTU draft", { mtu: " 15" }],
+  ])("is nonblank when it contains %s", (_label, patch) => {
+    expect(
+      isSemanticallyBlankNetworkInterface({
+        ...createBlankNetworkInterface("populated"),
+        ...patch,
       }),
     ).toBe(false);
   });
