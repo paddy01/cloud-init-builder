@@ -122,6 +122,112 @@ describe("networking store actions", () => {
     ]);
   });
 
+  it("clears only changed identity provenance while preserving sibling markers", () => {
+    const project = createDefaultProject("Identity provenance");
+    const exampleInterface = {
+      ...createBlankNetworkInterface("interface-a"),
+      name: "ens18",
+      macAddress: "aa:bb:cc:dd:ee:ff",
+      dhcp4: true,
+      mtuEnabled: true,
+      mtu: "1500",
+      ipv4Addresses: [
+        createBuilderValueRow("address-a", "192.0.2.10/24", true),
+      ],
+      ipv4Routes: [
+        createSpecificRoute(
+          "route-a",
+          "198.51.100.0/24",
+          "192.0.2.1",
+          "10",
+          true,
+        ),
+      ],
+      nameservers: [
+        createBuilderValueRow("nameserver-a", "192.0.2.53", true),
+      ],
+      exampleFields: ["name", "macAddress", "dhcp4", "mtu"] as const,
+    };
+    const sibling = {
+      ...createIpv4DhcpExample("interface-b"),
+      macAddress: "00:11:22:33:44:55",
+      exampleFields: ["name", "macAddress", "dhcp4"] as const,
+    };
+    project.networking.interfaces = [exampleInterface, sibling];
+    useProjectStore.getState().loadProject(project);
+
+    useProjectStore
+      .getState()
+      .updateNetworkInterface("interface-a", { name: "eno1" });
+
+    expect(networking().interfaces[0]).toEqual({
+      ...exampleInterface,
+      name: "eno1",
+      exampleFields: ["macAddress", "dhcp4", "mtu"],
+    });
+    expect(networking().interfaces[1]).toEqual(sibling);
+
+    useProjectStore
+      .getState()
+      .updateNetworkInterface("interface-a", {
+        macAddress: "aa:bb:cc:dd:ee:00",
+      });
+
+    expect(networking().interfaces[0]).toEqual({
+      ...exampleInterface,
+      name: "eno1",
+      macAddress: "aa:bb:cc:dd:ee:00",
+      exampleFields: ["dhcp4", "mtu"],
+    });
+    expect(networking().interfaces[1]).toEqual(sibling);
+  });
+
+  it("clears both identity markers for combined changes but preserves them for mode-only and equal writes", () => {
+    const project = createDefaultProject("Identity no-ops");
+    const exampleInterface = {
+      ...createBlankNetworkInterface("interface-a"),
+      name: "ens18",
+      macAddress: "aa:bb:cc:dd:ee:ff",
+      dhcp6: true,
+      exampleFields: ["name", "macAddress", "dhcp6"] as const,
+    };
+    project.networking.interfaces = [exampleInterface];
+    useProjectStore.getState().loadProject(project);
+
+    useProjectStore
+      .getState()
+      .updateNetworkInterface("interface-a", { identityMode: "mac" });
+    expect(networking().interfaces[0]?.exampleFields).toEqual([
+      "name",
+      "macAddress",
+      "dhcp6",
+    ]);
+
+    useProjectStore.getState().markSaved();
+    const projectBefore = useProjectStore.getState().project;
+    const updatedAtBefore = projectBefore?.metadata.updatedAt;
+    vi.advanceTimersByTime(1_000);
+
+    useProjectStore.getState().updateNetworkInterface("interface-a", {
+      name: "ens18",
+      macAddress: "aa:bb:cc:dd:ee:ff",
+    });
+
+    expectCurrentStateUnchanged(projectBefore, false, updatedAtBefore);
+
+    useProjectStore.getState().updateNetworkInterface("interface-a", {
+      name: "eno1",
+      macAddress: "aa:bb:cc:dd:ee:00",
+    });
+    expect(networking().interfaces[0]).toEqual({
+      ...exampleInterface,
+      identityMode: "mac",
+      name: "eno1",
+      macAddress: "aa:bb:cc:dd:ee:00",
+      exampleFields: ["dhcp6"],
+    });
+  });
+
   it("moves an interface exactly one position", () => {
     useProjectStore.getState().addNetworkInterface("interface-a");
     useProjectStore.getState().addNetworkInterface("interface-b");
