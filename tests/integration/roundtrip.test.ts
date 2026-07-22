@@ -14,6 +14,7 @@ import {
 } from "../../src/models/project.ts";
 import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
+import { createBlankNetworkInterface } from "../../src/models/networking.ts";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import {
   exportProject,
@@ -77,13 +78,12 @@ describe("networking project round-trip", () => {
     expect(firstImport.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
     expect(firstImport.project.networking.interfaces).toEqual([
       {
-        id: "network-interface-uplink",
-        identityMode: "name",
+        ...createBlankNetworkInterface("network-interface-uplink"),
         name: "uplink-\u00e9",
         macAddress: "52:54:00:12:34:56",
       },
       {
-        id: "network-interface-failover",
+        ...createBlankNetworkInterface("network-interface-failover"),
         identityMode: "mac",
         name: "uplink-e\u0301",
         macAddress: "02:42:ac:11:00:02",
