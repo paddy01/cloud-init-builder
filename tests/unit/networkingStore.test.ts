@@ -4,7 +4,10 @@ import {
   createBuilderValueRow,
   createBlankNetworkInterface,
   createDefaultRoute,
+  createDualStackDhcpExample,
+  createIpv4DhcpExample,
   createSpecificRoute,
+  createStaticIpv4Example,
   type NetworkingConfig,
 } from "../../src/models/networking.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
@@ -585,5 +588,93 @@ describe("networking store actions", () => {
           "198.51.100.0/24",
         ),
     );
+  });
+
+  it.each([
+    {
+      kind: "ipv4-dhcp" as const,
+      uuids: ["00000000-0000-4000-8000-000000000101"],
+      expected: () =>
+        createIpv4DhcpExample(
+          "network-interface-00000000-0000-4000-8000-000000000101",
+        ),
+    },
+    {
+      kind: "static-ipv4" as const,
+      uuids: [
+        "00000000-0000-4000-8000-000000000201",
+        "00000000-0000-4000-8000-000000000202",
+        "00000000-0000-4000-8000-000000000203",
+        "00000000-0000-4000-8000-000000000204",
+        "00000000-0000-4000-8000-000000000205",
+      ],
+      expected: () =>
+        createStaticIpv4Example(
+          "network-interface-00000000-0000-4000-8000-000000000201",
+          {
+            address:
+              "network-address-00000000-0000-4000-8000-000000000202",
+            route: "network-route-00000000-0000-4000-8000-000000000203",
+            nameserver:
+              "network-nameserver-00000000-0000-4000-8000-000000000204",
+            searchDomain:
+              "network-search-domain-00000000-0000-4000-8000-000000000205",
+          },
+        ),
+    },
+    {
+      kind: "dual-stack-dhcp" as const,
+      uuids: ["00000000-0000-4000-8000-000000000301"],
+      expected: () =>
+        createDualStackDhcpExample(
+          "network-interface-00000000-0000-4000-8000-000000000301",
+        ),
+    },
+  ])("applies the $kind example as one canonical interface", ({
+    kind,
+    uuids,
+    expected,
+  }) => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockImplementation(() => {
+      const next = uuids.shift();
+      if (!next) throw new Error("unexpected example ID allocation");
+      return next;
+    });
+    let updates = 0;
+    const unsubscribe = useProjectStore.subscribe(() => {
+      updates += 1;
+    });
+    const before = useProjectStore.getState().project?.metadata.updatedAt;
+    vi.advanceTimersByTime(1_000);
+
+    const interfaceId = useProjectStore.getState().applyNetworkExample(kind);
+
+    unsubscribe();
+    const state = useProjectStore.getState();
+    expect(interfaceId).toBe(expected().id);
+    expect(networking().interfaces).toEqual([expected()]);
+    expect(state.isDirty).toBe(true);
+    expect(state.project?.metadata.updatedAt).not.toBe(before);
+    expect(updates).toBe(1);
+    expect(networking().interfaces[0]).not.toHaveProperty("provider");
+    expect(networking().interfaces[0]).not.toHaveProperty("exampleType");
+  });
+
+  it("keeps nonempty and unknown example requests as exact no-ops", () => {
+    useProjectStore.getState().addNetworkInterface("interface-a");
+    useProjectStore.getState().markSaved();
+    const projectBefore = useProjectStore.getState().project;
+    const updatedAtBefore = projectBefore?.metadata.updatedAt;
+    vi.advanceTimersByTime(1_000);
+
+    expect(
+      useProjectStore.getState().applyNetworkExample("ipv4-dhcp"),
+    ).toBeUndefined();
+    expect(
+      useProjectStore
+        .getState()
+        .applyNetworkExample("unknown" as "ipv4-dhcp"),
+    ).toBeUndefined();
+    expectCurrentStateUnchanged(projectBefore, false, updatedAtBefore);
   });
 });
