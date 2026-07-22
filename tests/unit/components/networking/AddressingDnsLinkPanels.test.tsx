@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { AddressingPanel } from "../../../../src/components/networking/AddressingPanel.tsx";
+import { DnsPanel } from "../../../../src/components/networking/DnsPanel.tsx";
+import { LinkSettingsPanel } from "../../../../src/components/networking/LinkSettingsPanel.tsx";
 import { createDefaultProject } from "../../../../src/models/project.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
 
@@ -26,18 +28,42 @@ function currentInterface() {
   return entry;
 }
 
+function DnsHarness() {
+  const entry = useProjectStore((state) =>
+    state.project?.networking.interfaces.find(
+      (candidate) => candidate.id === interfaceId,
+    ),
+  );
+  if (!entry) throw new Error("expected interface fixture");
+  return <DnsPanel entry={entry} />;
+}
+
+function LinkHarness() {
+  const entry = useProjectStore((state) =>
+    state.project?.networking.interfaces.find(
+      (candidate) => candidate.id === interfaceId,
+    ),
+  );
+  if (!entry) throw new Error("expected interface fixture");
+  return <LinkSettingsPanel entry={entry} />;
+}
+
+function resetInterface() {
+  useProjectStore.setState({
+    project: createDefaultProject("Panel contract"),
+    lastSavedProject: null,
+    isDirty: false,
+    importWarnings: [],
+  });
+  useProjectStore.getState().addNetworkInterface(interfaceId);
+  useProjectStore.getState().updateNetworkInterface(interfaceId, {
+    name: "ens18",
+  });
+}
+
 describe("AddressingPanel", () => {
   beforeEach(() => {
-    useProjectStore.setState({
-      project: createDefaultProject("Panel contract"),
-      lastSavedProject: null,
-      isDirty: false,
-      importWarnings: [],
-    });
-    useProjectStore.getState().addNetworkInterface(interfaceId);
-    useProjectStore.getState().updateNetworkInterface(interfaceId, {
-      name: "ens18",
-    });
+    resetInterface();
   });
 
   it("exposes independently labeled native DHCP controls", () => {
@@ -165,5 +191,176 @@ describe("AddressingPanel", () => {
     expect(
       screen.getByRole("button", { name: "Add IPv4 address" }),
     ).toHaveFocus();
+  });
+});
+
+describe("DnsPanel", () => {
+  beforeEach(resetInterface);
+
+  it("keeps mixed-family nameservers and search domains as raw ordered drafts", () => {
+    render(<DnsHarness />);
+
+    expect(
+      screen.getByText("No nameserver addresses added."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No search domains added.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    const ipv4 = screen.getByRole("textbox", {
+      name: "Nameserver 1 for ens18",
+    });
+    expect(ipv4).toHaveFocus();
+    expect(ipv4).toHaveAttribute(
+      "placeholder",
+      "192.0.2.53 or 2001:db8::53",
+    );
+    fireEvent.change(ipv4, { target: { value: " 192.0.2. " } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    const ipv6 = screen.getByRole("textbox", {
+      name: "Nameserver 2 for ens18",
+    });
+    fireEvent.change(ipv6, { target: { value: " 2001:db8::53 " } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add search domain" }));
+    const domain = screen.getByRole("textbox", {
+      name: "Search domain 1 for ens18",
+    });
+    expect(domain).toHaveFocus();
+    fireEvent.change(domain, { target: { value: " lab.example. " } });
+
+    expect(currentInterface().nameservers.map((row) => row.value)).toEqual([
+      " 192.0.2. ",
+      " 2001:db8::53 ",
+    ]);
+    expect(currentInterface().searchDomains.map((row) => row.value)).toEqual([
+      " lab.example. ",
+    ]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("uses independent stable next-previous-add focus for both DNS lists", () => {
+    render(<DnsHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove nameserver 2 for ens18" }),
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Nameserver 2 for ens18" }),
+    ).toHaveFocus();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove nameserver 2 for ens18" }),
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Nameserver 1 for ens18" }),
+    ).toHaveFocus();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove nameserver 1 for ens18" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Add nameserver" }),
+    ).toHaveFocus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add search domain" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove search domain 1 for ens18" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Add search domain" }),
+    ).toHaveFocus();
+  });
+
+  it("links example markers uniquely and clears only the edited field", () => {
+    useProjectStore.getState().removeNetworkInterface(interfaceId);
+    useProjectStore.getState().applyNetworkExample("static-ipv4");
+
+    function ExampleDnsHarness() {
+      const entry = useProjectStore(
+        (state) => state.project?.networking.interfaces[0],
+      );
+      if (!entry) throw new Error("expected example interface fixture");
+      return <DnsPanel entry={entry} />;
+    }
+
+    render(<ExampleDnsHarness />);
+    const nameserver = screen.getByRole("textbox", {
+      name: "Nameserver 1 for ens18",
+    });
+    const domain = screen.getByRole("textbox", {
+      name: "Search domain 1 for ens18",
+    });
+    expect(nameserver.getAttribute("aria-describedby")).toBeTruthy();
+    expect(domain.getAttribute("aria-describedby")).toBeTruthy();
+    expect(nameserver.getAttribute("aria-describedby")).not.toBe(
+      domain.getAttribute("aria-describedby"),
+    );
+
+    fireEvent.change(nameserver, { target: { value: "192.0.2.54" } });
+    expect(nameserver).not.toHaveAttribute("aria-describedby");
+    expect(domain).toHaveAttribute("aria-describedby");
+    expect(nameserver).toHaveFocus();
+  });
+});
+
+describe("LinkSettingsPanel", () => {
+  beforeEach(resetInterface);
+
+  it("represents off, enabled-blank, typed, and destructive-disable MTU states", () => {
+    render(<LinkHarness />);
+    const toggle = screen.getByRole("checkbox", { name: "Set custom MTU" });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByRole("textbox", { name: "MTU" })).toBeNull();
+
+    fireEvent.click(toggle);
+    const input = screen.getByRole("textbox", { name: "MTU" });
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute("inputmode", "numeric");
+    expect(input).toHaveAttribute("placeholder", "1500");
+    expect(currentInterface()).toMatchObject({ mtuEnabled: true, mtu: "" });
+
+    fireEvent.change(input, { target: { value: " 14x0 " } });
+    expect(currentInterface().mtu).toBe(" 14x0 ");
+    fireEvent.click(toggle);
+    expect(currentInterface()).toMatchObject({ mtuEnabled: false, mtu: "" });
+    expect(screen.queryByRole("textbox", { name: "MTU" })).toBeNull();
+  });
+
+  it("describes an example MTU uniquely until that exact draft is edited", () => {
+    useProjectStore.setState((state) => {
+      const project = state.project;
+      if (!project) return state;
+      return {
+        project: {
+          ...project,
+          networking: {
+            interfaces: project.networking.interfaces.map((entry) =>
+              entry.id === interfaceId
+                ? {
+                    ...entry,
+                    mtuEnabled: true,
+                    mtu: "1500",
+                    exampleFields: ["mtu"],
+                  }
+                : entry,
+            ),
+          },
+        },
+      };
+    });
+
+    render(<LinkHarness />);
+    const input = screen.getByRole("textbox", { name: "MTU" });
+    const markerId = input.getAttribute("aria-describedby");
+    expect(markerId).toBeTruthy();
+    expect(document.getElementById(markerId!)).toHaveTextContent(
+      "Example value—replace for your network",
+    );
+
+    fireEvent.change(input, { target: { value: "1501" } });
+    expect(input).not.toHaveAttribute("aria-describedby");
+    expect(input).toHaveFocus();
   });
 });
