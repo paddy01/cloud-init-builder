@@ -670,11 +670,17 @@ describe("networking store actions", () => {
     expect(
       useProjectStore.getState().applyNetworkExample("ipv4-dhcp"),
     ).toBeUndefined();
+    expectCurrentStateUnchanged(projectBefore, false, updatedAtBefore);
+
+    useProjectStore.getState().newProject("Unknown example");
+    const emptyProjectBefore = useProjectStore.getState().project;
+    const emptyUpdatedAtBefore = emptyProjectBefore?.metadata.updatedAt;
+    vi.advanceTimersByTime(1_000);
     expect(
       useProjectStore
         .getState()
         .applyNetworkExample("unknown" as "ipv4-dhcp"),
     ).toBeUndefined();
-    expectCurrentStateUnchanged(projectBefore, false, updatedAtBefore);
+    expectCurrentStateUnchanged(emptyProjectBefore, false, emptyUpdatedAtBefore);
   });
 });
