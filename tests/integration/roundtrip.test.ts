@@ -6,6 +6,7 @@ import legacyProjectUsersArray from "../fixtures/legacy-project-users-array.cib.
 import validProjectIdentityFull from "../fixtures/valid-project-identity-full.cib.json?raw";
 import validProjectCommandsFull from "../fixtures/valid-project-commands-full.cib.json?raw";
 import validProjectNetworkingV2 from "../fixtures/valid-project-networking-v2.cib.json?raw";
+import validProjectNetworkingAddressing from "../fixtures/valid-project-networking-addressing.cib.json?raw";
 import validProjectUsersFull from "../fixtures/valid-project-users-full.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
@@ -111,6 +112,61 @@ describe("networking project round-trip", () => {
     expect(secondImport.project.networking.interfaces[0]?.name).not.toBe(
       secondImport.project.networking.interfaces[1]?.name,
     );
+  });
+
+  it("preserves rich addressing drafts and provenance through two round trips without lowering networking", async () => {
+    const firstImport = await importProject(
+      fileFromJson(
+        validProjectNetworkingAddressing,
+        "valid-project-networking-addressing.cib.json",
+      ),
+    );
+    const expectedNetworking = JSON.parse(
+      validProjectNetworkingAddressing,
+    ).networking;
+
+    expect(firstImport.warnings).toEqual([]);
+    expect(firstImport.project.networking).toEqual(expectedNetworking);
+
+    const secondImport = await importProject(
+      fileFromJson(JSON.stringify(firstImport.project, null, 2)),
+    );
+    const thirdImport = await importProject(
+      fileFromJson(JSON.stringify(secondImport.project, null, 2)),
+    );
+
+    expect(secondImport.warnings).toEqual([]);
+    expect(thirdImport.warnings).toEqual([]);
+    expect(secondImport.project).toEqual(firstImport.project);
+    expect(thirdImport.project).toEqual(firstImport.project);
+    expect(thirdImport.project.networking).toEqual(expectedNetworking);
+
+    const generatorInput = {
+      identity: thirdImport.project.identity,
+      users: isUsersConfig(thirdImport.project.users)
+        ? thirdImport.project.users
+        : undefined,
+      commands: isCommandsConfig(thirdImport.project.commands)
+        ? thirdImport.project.commands
+        : undefined,
+    };
+    const yamlWithNetworkingState = generateCloudInit(generatorInput).yaml;
+    const yamlWithoutNetworkingState = generateCloudInit({
+      identity: firstImport.project.identity,
+      users: isUsersConfig(firstImport.project.users)
+        ? firstImport.project.users
+        : undefined,
+      commands: isCommandsConfig(firstImport.project.commands)
+        ? firstImport.project.commands
+        : undefined,
+    }).yaml;
+
+    expect(yamlWithNetworkingState).toBe(yamlWithoutNetworkingState);
+    expect(yamlWithNetworkingState).toBe("#cloud-config\nusers:\n  - default\n");
+    expect(yamlWithNetworkingState).not.toMatch(/^network:/m);
+    expect(yamlWithNetworkingState).not.toContain("isExampleValue");
+    expect(yamlWithNetworkingState).not.toContain("exampleFields");
+    expect(yamlWithNetworkingState).not.toContain("network-interface-rich");
   });
 
   it("keeps networking outside generated cloud-init YAML", async () => {
