@@ -107,6 +107,13 @@ describe("AddressingPanel", () => {
     expect(currentInterface().ipv6Addresses.map((row) => row.value)).toEqual([
       " 2001:db8:: ",
     ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove IPv6 address 1 for ens18" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Add IPv6 address" }),
+    ).toHaveFocus();
   });
 
   it("links example markers and removes rows with stable next-previous-add focus", () => {
