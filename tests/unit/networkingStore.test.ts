@@ -638,7 +638,7 @@ describe("networking store actions", () => {
     vi.spyOn(globalThis.crypto, "randomUUID").mockImplementation(() => {
       const next = uuids.shift();
       if (!next) throw new Error("unexpected example ID allocation");
-      return next;
+      return next as `${string}-${string}-${string}-${string}-${string}`;
     });
     let updates = 0;
     const unsubscribe = useProjectStore.subscribe(() => {

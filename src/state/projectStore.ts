@@ -22,7 +22,10 @@ import {
   createBuilderValueRow,
   createBlankNetworkInterface,
   createDefaultRoute,
+  createDualStackDhcpExample,
+  createIpv4DhcpExample,
   createSpecificRoute,
+  createStaticIpv4Example,
   isNetworkingConfig,
   type BuilderNetworkInterface,
   type BuilderRoute,
@@ -38,6 +41,10 @@ type NetworkInterfacePatch = Partial<
 export type NetworkFamily = "ipv4" | "ipv6";
 export type NetworkRouteKind = BuilderRoute["kind"];
 export type NetworkRouteField = "destination" | "gateway" | "metric";
+export type NetworkExampleKind =
+  | "ipv4-dhcp"
+  | "static-ipv4"
+  | "dual-stack-dhcp";
 
 const ADDRESS_COLLECTIONS = {
   ipv4: "ipv4Addresses",
@@ -164,6 +171,7 @@ export interface ProjectState {
   removeNetworkSearchDomain: (interfaceId: string, rowId: string) => void;
   setNetworkMtuEnabled: (interfaceId: string, enabled: boolean) => void;
   updateNetworkMtu: (interfaceId: string, value: string) => void;
+  applyNetworkExample: (kind: NetworkExampleKind) => string | undefined;
   addCommand: (stage: CommandStage, id?: string) => string | undefined;
   updateShellCommand: (
     stage: CommandStage,
@@ -853,6 +861,32 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         };
       }),
     );
+  },
+
+  applyNetworkExample: (kind) => {
+    let interfaceId: string | undefined;
+    updateProjectNetworking(set, get, (networking) => {
+      if (networking.interfaces.length !== 0) return networking;
+
+      let networkInterface: BuilderNetworkInterface | undefined;
+      switch (kind) {
+        case "ipv4-dhcp":
+          networkInterface = createIpv4DhcpExample();
+          break;
+        case "static-ipv4":
+          networkInterface = createStaticIpv4Example();
+          break;
+        case "dual-stack-dhcp":
+          networkInterface = createDualStackDhcpExample();
+          break;
+        default:
+          return networking;
+      }
+
+      interfaceId = networkInterface.id;
+      return { ...networking, interfaces: [networkInterface] };
+    });
+    return interfaceId;
   },
 
   addCommand: (stage, id) => {
