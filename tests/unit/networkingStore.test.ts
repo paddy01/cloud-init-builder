@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultProject } from "../../src/models/project.ts";
-import type { NetworkingConfig } from "../../src/models/networking.ts";
+import {
+  createBlankNetworkInterface,
+  type NetworkingConfig,
+} from "../../src/models/networking.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
 
 const initialState = {
@@ -52,18 +55,8 @@ describe("networking store actions", () => {
     expect(firstId).toBe("interface-a");
     expect(secondId).toBe("interface-b");
     expect(networking().interfaces).toEqual([
-      {
-        id: "interface-a",
-        identityMode: "name",
-        name: "",
-        macAddress: "",
-      },
-      {
-        id: "interface-b",
-        identityMode: "name",
-        name: "",
-        macAddress: "",
-      },
+      createBlankNetworkInterface("interface-a"),
+      createBlankNetworkInterface("interface-b"),
     ]);
   });
 
@@ -73,10 +66,8 @@ describe("networking store actions", () => {
     const loadedId = `network-interface-${collidingUuid}`;
     const project = createDefaultProject("Loaded Networking");
     project.networking.interfaces.push({
-      id: loadedId,
-      identityMode: "name",
+      ...createBlankNetworkInterface(loadedId),
       name: "ens18",
-      macAddress: "",
     });
     useProjectStore.getState().loadProject(project);
     vi.spyOn(globalThis.crypto, "randomUUID")
@@ -116,17 +107,12 @@ describe("networking store actions", () => {
 
     expect(networking().interfaces).toEqual([
       {
-        id: "interface-a",
+        ...createBlankNetworkInterface("interface-a"),
         identityMode: "mac",
         name: "eno1",
         macAddress: "AA:BB:CC:DD:EE:FF",
       },
-      {
-        id: "interface-b",
-        identityMode: "name",
-        name: "",
-        macAddress: "",
-      },
+      createBlankNetworkInterface("interface-b"),
     ]);
   });
 
@@ -232,16 +218,13 @@ describe("networking store actions", () => {
 
     expect(networking().interfaces).toEqual([
       {
-        id: "interface-b",
-        identityMode: "name",
-        name: "",
+        ...createBlankNetworkInterface("interface-b"),
         macAddress: "aa:bb:cc:dd:ee:ff",
       },
       {
-        id: "interface-a",
+        ...createBlankNetworkInterface("interface-a"),
         identityMode: "mac",
         name: "eno1",
-        macAddress: "",
       },
     ]);
   });

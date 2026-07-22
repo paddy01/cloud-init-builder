@@ -7,6 +7,7 @@ import {
 import type { CommandsConfig } from "../../../src/models/commands.ts";
 import { isCommandsConfig } from "../../../src/models/commands.ts";
 import { isUsersConfig, SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
+import { createBlankNetworkInterface } from "../../../src/models/networking.ts";
 import {
   copyCloudInitYaml,
   exportCloudInitYaml,
@@ -56,10 +57,8 @@ describe("networking authoring boundary", () => {
       networking: {
         interfaces: [
           {
-            id: "interface-1",
-            identityMode: "name",
+            ...createBlankNetworkInterface("interface-1"),
             name: "ens18",
-            macAddress: "",
           },
         ],
       },

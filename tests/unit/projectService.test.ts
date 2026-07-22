@@ -607,6 +607,7 @@ describe("networking import normalization", () => {
       exampleFields: ["name", "dhcp6", "mtu"],
       ipv4Addresses: [
         { id: "address-v4-1", value: " 192.0.2.10/24 ", isExampleValue: true },
+        { id: "address-v4-2", value: "partial", isExampleValue: false },
       ],
       ipv6Routes: [
         {

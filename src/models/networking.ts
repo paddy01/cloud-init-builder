@@ -296,6 +296,26 @@ const INTERFACE_KEYS = new Set([
   "identityMode",
   "name",
   "macAddress",
+  "dhcp4",
+  "dhcp6",
+  "ipv4Addresses",
+  "ipv6Addresses",
+  "ipv4Routes",
+  "ipv6Routes",
+  "nameservers",
+  "searchDomains",
+  "mtuEnabled",
+  "mtu",
+  "exampleFields",
+]);
+const VALUE_ROW_KEYS = new Set(["id", "value", "isExampleValue"]);
+const ROUTE_KEYS = new Set([
+  "id",
+  "kind",
+  "destination",
+  "gateway",
+  "metric",
+  "exampleFields",
 ]);
 const SAFE_INTERFACE_ID = /^[A-Za-z][A-Za-z0-9_-]{0,127}$/;
 
@@ -368,6 +388,206 @@ function preserveOrRepairId(
   return allocateUniqueInterfaceId(usedIds);
 }
 
+function preserveOrRepairDraftId(
+  rawId: unknown,
+  usedIds: Set<string>,
+  prefix: string,
+): string {
+  if (
+    typeof rawId === "string" &&
+    SAFE_INTERFACE_ID.test(rawId) &&
+    !usedIds.has(rawId)
+  ) {
+    usedIds.add(rawId);
+    return rawId;
+  }
+
+  return allocateUniqueNetworkDraftId(usedIds, prefix);
+}
+
+function warning(
+  warnings: NetworkingImportWarning[],
+  path: string,
+  message: string,
+): void {
+  warnings.push({ path, message });
+}
+
+function normalizeBooleanDraft(
+  value: unknown,
+  fallback: boolean,
+  path: string,
+  warnings: NetworkingImportWarning[],
+): boolean {
+  if (value === undefined) return fallback;
+  if (typeof value === "boolean") return value;
+  warning(warnings, path, "Invalid networking boolean was reset during import.");
+  return fallback;
+}
+
+function normalizeStringDraft(
+  value: unknown,
+  fallback: string,
+  path: string,
+  warnings: NetworkingImportWarning[],
+): string {
+  if (value === undefined) return fallback;
+  if (typeof value === "string") return value;
+  warning(warnings, path, "Invalid networking draft was cleared during import.");
+  return fallback;
+}
+
+function normalizeExampleFields<T extends string>(
+  value: unknown,
+  allowed: ReadonlySet<string>,
+  path: string,
+  warnings: NetworkingImportWarning[],
+): T[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    warning(warnings, path, "Invalid example provenance was cleared during import.");
+    return [];
+  }
+
+  const normalized: T[] = [];
+  const seen = new Set<string>();
+  value.forEach((field, index) => {
+    if (typeof field !== "string" || !allowed.has(field)) {
+      warning(
+        warnings,
+        `${path}.${index}`,
+        "Unsupported example provenance field was omitted during import.",
+      );
+      return;
+    }
+    if (!seen.has(field)) {
+      seen.add(field);
+      normalized.push(field as T);
+    }
+  });
+  return normalized;
+}
+
+function normalizeValueRows(
+  value: unknown,
+  path: string,
+  idPrefix: string,
+  warnings: NetworkingImportWarning[],
+): BuilderValueRow[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    warning(warnings, path, "Invalid networking value collection was replaced with an empty list.");
+    return [];
+  }
+
+  const usedIds = new Set<string>();
+  const rows: BuilderValueRow[] = [];
+  value.forEach((candidate, index) => {
+    const rowPath = `${path}.${index}`;
+    if (!isPlainObject(candidate)) {
+      warning(warnings, rowPath, "Invalid networking value row was omitted during import.");
+      return;
+    }
+    addUnknownKeyWarnings(candidate, VALUE_ROW_KEYS, rowPath, warnings);
+    if (typeof candidate.value !== "string") {
+      warning(warnings, `${rowPath}.value`, "Invalid networking value draft was omitted during import.");
+      return;
+    }
+    const isExampleValue = normalizeBooleanDraft(
+      candidate.isExampleValue,
+      false,
+      `${rowPath}.isExampleValue`,
+      warnings,
+    );
+    rows.push({
+      id: preserveOrRepairDraftId(candidate.id, usedIds, idPrefix),
+      value: candidate.value,
+      isExampleValue,
+    });
+  });
+  return rows;
+}
+
+function normalizeRoutes(
+  value: unknown,
+  path: string,
+  warnings: NetworkingImportWarning[],
+): BuilderRoute[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    warning(warnings, path, "Invalid route collection was replaced with an empty list.");
+    return [];
+  }
+
+  const usedIds = new Set<string>();
+  const routes: BuilderRoute[] = [];
+  value.forEach((candidate, index) => {
+    const routePath = `${path}.${index}`;
+    if (!isPlainObject(candidate)) {
+      warning(warnings, routePath, "Invalid route row was omitted during import.");
+      return;
+    }
+    addUnknownKeyWarnings(candidate, ROUTE_KEYS, routePath, warnings);
+    if (candidate.kind !== "default" && candidate.kind !== "specific") {
+      warning(warnings, `${routePath}.kind`, "Invalid route kind was omitted during import.");
+      return;
+    }
+    if (typeof candidate.gateway !== "string") {
+      warning(warnings, `${routePath}.gateway`, "Invalid route gateway draft was omitted during import.");
+      return;
+    }
+    if (typeof candidate.metric !== "string") {
+      warning(warnings, `${routePath}.metric`, "Invalid route metric draft was omitted during import.");
+      return;
+    }
+
+    const id = preserveOrRepairDraftId(candidate.id, usedIds, "network-route");
+    if (candidate.kind === "default") {
+      if (Object.prototype.hasOwnProperty.call(candidate, "destination")) {
+        warning(
+          warnings,
+          `${routePath}.destination`,
+          "Default-route destination draft was omitted during import.",
+        );
+      }
+      routes.push({
+        id,
+        kind: "default",
+        gateway: candidate.gateway,
+        metric: candidate.metric,
+        exampleFields: normalizeExampleFields<"gateway" | "metric">(
+          candidate.exampleFields,
+          new Set(["gateway", "metric"]),
+          `${routePath}.exampleFields`,
+          warnings,
+        ),
+      });
+      return;
+    }
+
+    if (typeof candidate.destination !== "string") {
+      warning(warnings, `${routePath}.destination`, "Invalid route destination draft was omitted during import.");
+      return;
+    }
+    routes.push({
+      id,
+      kind: "specific",
+      destination: candidate.destination,
+      gateway: candidate.gateway,
+      metric: candidate.metric,
+      exampleFields: normalizeExampleFields<
+        "destination" | "gateway" | "metric"
+      >(
+        candidate.exampleFields,
+        new Set(["destination", "gateway", "metric"]),
+        `${routePath}.exampleFields`,
+        warnings,
+      ),
+    });
+  });
+  return routes;
+}
+
 function normalizeInterfaceEntry(
   raw: unknown,
   index: number,
@@ -425,11 +645,66 @@ function normalizeInterfaceEntry(
   const name = identityMode === "name" ? raw.name : inactiveValue;
   const macAddress = identityMode === "mac" ? raw.macAddress : inactiveValue;
 
+  const normalized = createBlankNetworkInterface(
+    preserveOrRepairId(raw.id, usedIds),
+  );
+
   return {
-    ...createBlankNetworkInterface(preserveOrRepairId(raw.id, usedIds)),
+    ...normalized,
     identityMode,
     name: name as string,
     macAddress: normalizeMacAddressDraft(macAddress as string),
+    dhcp4: normalizeBooleanDraft(
+      raw.dhcp4,
+      normalized.dhcp4,
+      `${path}.dhcp4`,
+      warnings,
+    ),
+    dhcp6: normalizeBooleanDraft(
+      raw.dhcp6,
+      normalized.dhcp6,
+      `${path}.dhcp6`,
+      warnings,
+    ),
+    ipv4Addresses: normalizeValueRows(
+      raw.ipv4Addresses,
+      `${path}.ipv4Addresses`,
+      "network-address",
+      warnings,
+    ),
+    ipv6Addresses: normalizeValueRows(
+      raw.ipv6Addresses,
+      `${path}.ipv6Addresses`,
+      "network-address",
+      warnings,
+    ),
+    ipv4Routes: normalizeRoutes(raw.ipv4Routes, `${path}.ipv4Routes`, warnings),
+    ipv6Routes: normalizeRoutes(raw.ipv6Routes, `${path}.ipv6Routes`, warnings),
+    nameservers: normalizeValueRows(
+      raw.nameservers,
+      `${path}.nameservers`,
+      "network-nameserver",
+      warnings,
+    ),
+    searchDomains: normalizeValueRows(
+      raw.searchDomains,
+      `${path}.searchDomains`,
+      "network-search-domain",
+      warnings,
+    ),
+    mtuEnabled: normalizeBooleanDraft(
+      raw.mtuEnabled,
+      normalized.mtuEnabled,
+      `${path}.mtuEnabled`,
+      warnings,
+    ),
+    mtu: normalizeStringDraft(raw.mtu, normalized.mtu, `${path}.mtu`, warnings),
+    exampleFields: normalizeExampleFields<NetworkInterfaceExampleField>(
+      raw.exampleFields,
+      new Set(["name", "macAddress", "dhcp4", "dhcp6", "mtu"]),
+      `${path}.exampleFields`,
+      warnings,
+    ),
   };
 }
 
