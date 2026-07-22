@@ -55,9 +55,11 @@ test.describe("networking foundation", () => {
     await expect(
       page.getByRole("button", { name: "Networking" }),
     ).toHaveAttribute("aria-current", "page");
-    await expect(page.getByText("No interfaces yet")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Add interface" }),
+      page.getByRole("heading", { name: "Start your network configuration" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Add blank interface" }),
     ).toHaveCount(1);
 
     const navBox = await navigation.boundingBox();
@@ -65,7 +67,27 @@ test.describe("networking foundation", () => {
     expect(navBox?.width).toBe(224);
     expect(previewBox?.width).toBe(320);
 
-    await page.getByRole("button", { name: "Add interface" }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const label of [
+      "Use IPv4 DHCP",
+      "Use static IPv4",
+      "Use dual-stack DHCP",
+    ]) {
+      const buttonBox = await page
+        .getByRole("button", { name: label })
+        .boundingBox();
+      expect(buttonBox?.x).toBeGreaterThanOrEqual(0);
+      expect((buttonBox?.x ?? 0) + (buttonBox?.width ?? 0)).toBeLessThanOrEqual(
+        390,
+      );
+    }
+    await page.screenshot({
+      path: testInfo.outputPath("networking-empty-mobile-390x844.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await page.getByRole("button", { name: "Add blank interface" }).click();
     const firstCard = page.getByRole("article").first();
     const firstNameInput = firstCard.getByRole("textbox", {
       name: "Device name",
@@ -83,7 +105,7 @@ test.describe("networking foundation", () => {
       .check({ force: true });
     await expect(firstNameInput).toHaveValue(LONG_DEVICE_NAME);
 
-    await page.getByRole("button", { name: "Add interface" }).click();
+    await page.getByRole("button", { name: "Add blank interface" }).click();
     const secondCard = page.getByRole("article").nth(1);
     await secondCard
       .getByRole("textbox", { name: "Device name" })
@@ -103,6 +125,70 @@ test.describe("networking foundation", () => {
     await expect(cards.nth(0)).toHaveAccessibleName(SECOND_MAC_DRAFT);
     await expect(cards.nth(1)).toHaveAccessibleName(LONG_DEVICE_NAME);
     await expect(page.locator("article article")).toHaveCount(0);
+
+    const ipv6Routes = cards.nth(0).getByRole("group", {
+      name: "IPv6 routes",
+    });
+    await cards.nth(0).getByRole("button", { name: "Add IPv6 address" }).click();
+    await cards
+      .nth(0)
+      .getByRole("textbox", {
+        name: `IPv6 address 1 for ${SECOND_MAC_DRAFT}`,
+      })
+      .fill("2001:db8:ffff:ffff:ffff:ffff:ffff:10/64");
+    await ipv6Routes
+      .getByRole("button", { name: "Add specific route" })
+      .click();
+    await ipv6Routes
+      .getByRole("textbox", {
+        name: `Destination for IPv6 specific route 1 for ${SECOND_MAC_DRAFT}`,
+      })
+      .fill("2001:db8:1::/64");
+    await ipv6Routes
+      .getByRole("textbox", {
+        name: `Gateway (optional) for IPv6 specific route 1 for ${SECOND_MAC_DRAFT}`,
+      })
+      .fill("2001:db8::1");
+    await ipv6Routes
+      .getByRole("button", {
+        name: `Advanced for IPv6 specific route 1 for ${SECOND_MAC_DRAFT}`,
+      })
+      .click();
+    await ipv6Routes
+      .getByRole("textbox", {
+        name: `Metric (optional) for IPv6 specific route 1 for ${SECOND_MAC_DRAFT}`,
+      })
+      .fill("100");
+
+    const ipv4Routes = cards.nth(1).getByRole("group", {
+      name: "IPv4 routes",
+    });
+    await cards.nth(1).getByRole("button", { name: "Add IPv4 address" }).click();
+    await cards
+      .nth(1)
+      .getByRole("textbox", {
+        name: `IPv4 address 1 for ${LONG_DEVICE_NAME}`,
+      })
+      .fill("192.0.2.10/24");
+    await ipv4Routes
+      .getByRole("button", { name: "Add default route" })
+      .click();
+    await ipv4Routes
+      .getByRole("textbox", {
+        name: `Gateway for IPv4 default route 1 for ${LONG_DEVICE_NAME}`,
+      })
+      .fill("192.0.2.1");
+    await ipv4Routes
+      .getByRole("button", {
+        name: `Advanced for IPv4 default route 1 for ${LONG_DEVICE_NAME}`,
+      })
+      .click();
+    await ipv4Routes
+      .getByRole("textbox", {
+        name: `Metric (optional) for IPv4 default route 1 for ${LONG_DEVICE_NAME}`,
+      })
+      .fill("200");
+
     await page.screenshot({
       path: testInfo.outputPath("networking-desktop-1440x900.png"),
       fullPage: true,
