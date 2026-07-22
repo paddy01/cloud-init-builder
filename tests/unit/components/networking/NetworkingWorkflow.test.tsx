@@ -95,6 +95,7 @@ describe("NetworkingWorkflow", () => {
   it.each([
     [
       "Use IPv4 DHCP",
+      2,
       {
         dhcp4: true,
         dhcp6: false,
@@ -106,6 +107,7 @@ describe("NetworkingWorkflow", () => {
     ],
     [
       "Use static IPv4",
+      5,
       {
         dhcp4: false,
         dhcp6: false,
@@ -119,6 +121,7 @@ describe("NetworkingWorkflow", () => {
     ],
     [
       "Use dual-stack DHCP",
+      3,
       {
         dhcp4: true,
         dhcp6: true,
@@ -128,7 +131,9 @@ describe("NetworkingWorkflow", () => {
         searchDomains: [],
       },
     ],
-  ])("applies %s atomically with portable state and focus", (action, outcome) => {
+  ])(
+    "applies %s atomically with portable state and focus",
+    (action, markerCount, outcome) => {
     render(<NetworkingSection />);
 
     fireEvent.click(screen.getByRole("button", { name: action }));
@@ -144,9 +149,71 @@ describe("NetworkingWorkflow", () => {
       block: "center",
     });
     expect(screen.queryByRole("button", { name: action })).toBeNull();
+      const markers = screen.getAllByText(
+        "Example value—replace for your network",
+      );
+      expect(markers).toHaveLength(markerCount);
+      for (const marker of markers) {
+        expect(marker.id).not.toBe("");
+        expect(
+          document.querySelector(`[aria-describedby~="${marker.id}"]`),
+        ).not.toBeNull();
+      }
+    },
+  );
+
+  it("composes the complete interface editor in its locked order", () => {
+    seedInterface("interface-a");
+    render(<NetworkingSection />);
+
+    const article = screen.getByRole("article", { name: "Interface 1" });
+    const orderedLabels = [
+      within(article).getByText("Interface identity"),
+      within(article).getByRole("heading", { name: "Addressing" }),
+      within(article).getByRole("heading", { name: "Routes" }),
+      within(article).getByRole("heading", { name: "DNS" }),
+      within(article).getByRole("heading", { name: "Link settings" }),
+    ];
+
+    for (let index = 1; index < orderedLabels.length; index += 1) {
+      expect(
+        orderedLabels[index - 1]!.compareDocumentPosition(orderedLabels[index]!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+    }
+    expect(within(article).getByRole("checkbox", { name: "Enable DHCP4" })).toBeVisible();
+    expect(within(article).getByRole("checkbox", { name: "Enable DHCP6" })).toBeVisible();
+    expect(within(article).getByText("No static IPv4 addresses added.")).toBeVisible();
+    expect(within(article).getByText("No static IPv6 addresses added.")).toBeVisible();
+    expect(within(article).getByText("No IPv4 routes added.")).toBeVisible();
+    expect(within(article).getByText("No IPv6 routes added.")).toBeVisible();
+    expect(within(article).getByText("No nameserver addresses added.")).toBeVisible();
+    expect(within(article).getByText("No search domains added.")).toBeVisible();
+    expect(within(article).getByRole("checkbox", { name: "Set custom MTU" })).toBeVisible();
+  });
+
+  it.each([
+    ["DHCP", () => useProjectStore.getState().setNetworkDhcp("interface-a", "ipv4", true)],
+    ["an address row", () => useProjectStore.getState().addNetworkAddress("interface-a", "ipv4")],
+    ["a route row", () => useProjectStore.getState().addNetworkRoute("interface-a", "ipv6", "default")],
+    ["a nameserver row", () => useProjectStore.getState().addNetworkNameserver("interface-a")],
+    ["a search-domain row", () => useProjectStore.getState().addNetworkSearchDomain("interface-a")],
+    ["custom MTU enablement", () => useProjectStore.getState().setNetworkMtuEnabled("interface-a", true)],
+    ["a custom MTU draft", () => useProjectStore.getState().updateNetworkMtu("interface-a", "9000")],
+  ])("treats %s as populated during interface removal", (_description, populate) => {
+    seedInterface("interface-a");
+    populate();
+    render(<NetworkingSection />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Interface 1" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent(
+      'Remove interface "Interface 1"? This removes its addressing, routes, DNS, and link settings from the project.',
+    );
     expect(
-      screen.getAllByText("Example value—replace for your network").length,
-    ).toBeGreaterThan(0);
+      within(dialog).getByRole("button", { name: "Keep interface" }),
+    ).toHaveFocus();
   });
 
   it("preserves exact selector drafts and derives the title from the active draft", () => {
