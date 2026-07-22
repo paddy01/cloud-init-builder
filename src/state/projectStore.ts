@@ -580,12 +580,22 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const identityMode = patch.identityMode ?? current.identityMode;
       const name = patch.name ?? current.name;
       const macAddress = patch.macAddress ?? current.macAddress;
+      const nameChanged = name !== current.name;
+      const macAddressChanged = macAddress !== current.macAddress;
       if (
         identityMode === current.identityMode &&
-        name === current.name &&
-        macAddress === current.macAddress
+        !nameChanged &&
+        !macAddressChanged
       ) {
         return networking;
+      }
+
+      let exampleFields = current.exampleFields;
+      if (nameChanged) {
+        exampleFields = removeExampleField(exampleFields, "name");
+      }
+      if (macAddressChanged) {
+        exampleFields = removeExampleField(exampleFields, "macAddress");
       }
 
       const interfaces = [...networking.interfaces];
@@ -594,6 +604,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         identityMode,
         name,
         macAddress,
+        exampleFields,
       };
       return { ...networking, interfaces };
     });
