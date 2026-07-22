@@ -541,7 +541,6 @@ function normalizeRoutes(
       return;
     }
 
-    const id = preserveOrRepairDraftId(candidate.id, usedIds, "network-route");
     if (candidate.kind === "default") {
       if (Object.prototype.hasOwnProperty.call(candidate, "destination")) {
         warning(
@@ -550,6 +549,7 @@ function normalizeRoutes(
           "Default-route destination draft was omitted during import.",
         );
       }
+      const id = preserveOrRepairDraftId(candidate.id, usedIds, "network-route");
       routes.push({
         id,
         kind: "default",
@@ -569,6 +569,7 @@ function normalizeRoutes(
       warning(warnings, `${routePath}.destination`, "Invalid route destination draft was omitted during import.");
       return;
     }
+    const id = preserveOrRepairDraftId(candidate.id, usedIds, "network-route");
     routes.push({
       id,
       kind: "specific",
