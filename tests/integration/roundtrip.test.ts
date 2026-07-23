@@ -15,7 +15,9 @@ import {
 } from "../../src/models/project.ts";
 import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
-import { createBlankNetworkInterface } from "../../src/models/networking.ts";
+import { createBlankNetworkInterface, createDefaultRoute } from "../../src/models/networking.ts";
+import { RISK_CODES } from "../../src/models/networkingCodes.ts";
+import { validateNetworking } from "../../src/validators/validateNetworking.ts";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import {
   exportProject,
@@ -121,9 +123,16 @@ describe("networking project round-trip", () => {
         "valid-project-networking-addressing.cib.json",
       ),
     );
-    const expectedNetworking = JSON.parse(
-      validProjectNetworkingAddressing,
-    ).networking;
+    const expectedNetworking = {
+      interfaces: (
+        JSON.parse(validProjectNetworkingAddressing).networking.interfaces as Array<
+          Record<string, unknown>
+        >
+      ).map((iface) => ({
+        ...iface,
+        acknowledgedRiskWarnings: [],
+      })),
+    };
 
     expect(firstImport.warnings).toEqual([]);
     expect(firstImport.project.networking).toEqual(expectedNetworking);
@@ -189,6 +198,82 @@ describe("networking project round-trip", () => {
     expect(yamlAfter).toBe(yamlBefore);
     expect(yamlAfter).not.toMatch(/^network:/m);
     expect(yamlAfter).not.toContain("network-interface-");
+  });
+
+  it("preserves dismissed risk-warning acknowledgements across save and reopen", async () => {
+    const project = createDefaultProject("Risk Ack Roundtrip");
+    project.networking.interfaces = [
+      {
+        ...createBlankNetworkInterface("iface-risk"),
+        name: "ens18",
+        dhcp4: true,
+        dhcp6: true,
+        ipv4Routes: [createDefaultRoute("v4-default", "192.0.2.1")],
+        ipv6Routes: [createDefaultRoute("v6-default", "2001:db8::1")],
+        acknowledgedRiskWarnings: [RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE],
+      },
+    ];
+
+    const beforeExport = validateNetworking(project.networking);
+    expect(
+      beforeExport.some(
+        (issue) => issue.code === RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE,
+      ),
+    ).toBe(false);
+    expect(
+      beforeExport.some(
+        (issue) => issue.code === RISK_CODES.NET_RISK_DHCP6_DEFAULT_ROUTE,
+      ),
+    ).toBe(true);
+
+    const json = JSON.stringify(project, null, 2);
+    const reopened = await importProject(fileFromJson(json));
+    expect(
+      reopened.project.networking.interfaces[0]?.acknowledgedRiskWarnings,
+    ).toEqual([RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE]);
+
+    const afterReopen = validateNetworking(reopened.project.networking);
+    expect(
+      afterReopen.some(
+        (issue) => issue.code === RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE,
+      ),
+    ).toBe(false);
+    expect(
+      afterReopen.some(
+        (issue) => issue.code === RISK_CODES.NET_RISK_DHCP6_DEFAULT_ROUTE,
+      ),
+    ).toBe(true);
+
+    reopened.project.networking.interfaces[0] = {
+      ...reopened.project.networking.interfaces[0]!,
+      dhcp4: false,
+      dhcp6: false,
+      ipv4Routes: [],
+      ipv6Routes: [],
+    };
+    const inert = validateNetworking(reopened.project.networking);
+    expect(
+      inert.some((issue) => Object.values(RISK_CODES).includes(issue.code as typeof RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE)),
+    ).toBe(false);
+
+    reopened.project.networking.interfaces[0] = {
+      ...reopened.project.networking.interfaces[0]!,
+      dhcp4: true,
+      dhcp6: true,
+      ipv4Routes: [createDefaultRoute("v4-default", "192.0.2.1")],
+      ipv6Routes: [createDefaultRoute("v6-default", "2001:db8::1")],
+    };
+    const sticky = validateNetworking(reopened.project.networking);
+    expect(
+      sticky.some(
+        (issue) => issue.code === RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE,
+      ),
+    ).toBe(false);
+    expect(
+      sticky.some(
+        (issue) => issue.code === RISK_CODES.NET_RISK_DHCP6_DEFAULT_ROUTE,
+      ),
+    ).toBe(true);
   });
 
   it("serializes an invocation-time snapshot without mutating live project state", async () => {

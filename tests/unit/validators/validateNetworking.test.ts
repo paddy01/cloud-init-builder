@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   createBlankNetworkInterface,
+  createBuilderValueRow,
+  createDefaultRoute,
   createNetworkDraftId,
+  createSpecificRoute,
   type NetworkingConfig,
 } from "../../../src/models/networking.ts";
+import { RISK_CODES } from "../../../src/models/networkingCodes.ts";
 import { createDefaultProject } from "../../../src/models/project.ts";
 import {
   NETWORKING_VALIDATION_MESSAGES,
@@ -685,6 +689,122 @@ describe("validateNetworking", () => {
       expect(isCrossInterfaceNetworkingCode("NET_DUP_ADDRESS_SAME_INTERFACE")).toBe(
         false,
       );
+    });
+  });
+
+  describe("risk warnings (VALD-07)", () => {
+    function interfacePath(id: string): string {
+      return `networking.interfaces.${id}`;
+    }
+
+    it("emits all six family-specific risk warnings at interface level", () => {
+      const entry = configuredInterface("risk-all", {
+        dhcp4: true,
+        dhcp6: true,
+        ipv4Addresses: [createBuilderValueRow("v4", "192.0.2.10/24")],
+        ipv6Addresses: [createBuilderValueRow("v6", "2001:db8::10/64")],
+        ipv4Routes: [
+          createDefaultRoute("v4-default", "192.0.2.1"),
+          createSpecificRoute("v4-specific", "198.51.100.0/24", "192.0.2.254"),
+        ],
+        ipv6Routes: [
+          createDefaultRoute("v6-default", "2001:db8::1"),
+          createSpecificRoute("v6-specific", "2001:db8:1::/64", "2001:db8::254"),
+        ],
+      });
+
+      const issues = validateNetworking(networkingConfig([entry]));
+      const riskIssues = issues.filter((issue) => issue.severity === "warning");
+
+      for (const code of Object.values(RISK_CODES)) {
+        expect(riskIssues).toContainEqual({
+          path: interfacePath("risk-all"),
+          code,
+          message: NETWORKING_VALIDATION_MESSAGES[code],
+          severity: "warning",
+        });
+      }
+    });
+
+    it("does not emit risk warnings for blank or invalid same-family drafts", () => {
+      const entry = configuredInterface("risk-draft", {
+        dhcp4: true,
+        dhcp6: true,
+        ipv4Addresses: [createBuilderValueRow("blank-v4", "")],
+        ipv6Addresses: [createBuilderValueRow("bad-v6", "not-a-cidr")],
+        ipv4Routes: [createDefaultRoute("blank-default", "")],
+        ipv6Routes: [
+          createSpecificRoute("blank-specific", "", "2001:db8::1"),
+        ],
+      });
+
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(
+        issues.filter((issue) => Object.values(RISK_CODES).includes(issue.code as typeof RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4)),
+      ).toEqual([]);
+    });
+
+    it("keeps IPv4 and IPv6 route-warning suppression independent", () => {
+      const entry = configuredInterface("dual-route-risk", {
+        dhcp4: true,
+        dhcp6: true,
+        ipv4Routes: [createDefaultRoute("v4-default", "192.0.2.1")],
+        ipv6Routes: [createDefaultRoute("v6-default", "2001:db8::1")],
+        acknowledgedRiskWarnings: [RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE],
+      });
+
+      const issues = validateNetworking(networkingConfig([entry]));
+      const codes = issues.map((issue) => issue.code);
+
+      expect(codes).not.toContain(RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE);
+      expect(codes).toContain(RISK_CODES.NET_RISK_DHCP6_DEFAULT_ROUTE);
+    });
+
+    it("suppresses acknowledged warnings and keeps stored acks inert until combo returns", () => {
+      const withAck = configuredInterface("sticky-ack", {
+        dhcp4: true,
+        ipv4Addresses: [createBuilderValueRow("v4", "192.0.2.10/24")],
+        acknowledgedRiskWarnings: [RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4],
+      });
+      const suppressed = validateNetworking(networkingConfig([withAck]));
+      expect(
+        suppressed.some((issue) => issue.code === RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4),
+      ).toBe(false);
+
+      const comboRemoved = configuredInterface("sticky-ack", {
+        acknowledgedRiskWarnings: [RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4],
+      });
+      const inert = validateNetworking(networkingConfig([comboRemoved]));
+      expect(
+        inert.some((issue) => issue.code === RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4),
+      ).toBe(false);
+
+      const comboRestored = configuredInterface("sticky-ack", {
+        dhcp4: true,
+        ipv4Addresses: [createBuilderValueRow("v4", "192.0.2.10/24")],
+        acknowledgedRiskWarnings: [RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4],
+      });
+      const reSuppressed = validateNetworking(networkingConfig([comboRestored]));
+      expect(
+        reSuppressed.some(
+          (issue) => issue.code === RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+        ),
+      ).toBe(false);
+    });
+
+    it("never emits VALD-07 issues as blocking errors", () => {
+      const entry = configuredInterface("risk-severity", {
+        dhcp4: true,
+        ipv4Addresses: [createBuilderValueRow("v4", "192.0.2.10/24")],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      const riskIssues = issues.filter((issue) =>
+        Object.values(RISK_CODES).includes(issue.code as typeof RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4),
+      );
+
+      expect(riskIssues.length).toBeGreaterThan(0);
+      expect(riskIssues.every((issue) => issue.severity === "warning")).toBe(true);
+      expect(riskIssues.some((issue) => issue.severity === "error")).toBe(false);
     });
   });
 });

@@ -6,6 +6,7 @@ import {
   type BuilderValueRow,
   type NetworkingConfig,
 } from "../models/networking.ts";
+import { RISK_CODES, type RiskCode } from "../models/networkingCodes.ts";
 import { isValidFqdn, isValidHostname } from "./hostname.ts";
 import {
   isCidrv4,
@@ -65,10 +66,26 @@ export const NETWORKING_VALIDATION_MESSAGES = {
     `Add ${family} addressing (a static address or DHCP) so this gateway is reachable.`,
   NET_DEFAULT_ROUTE_CONFLICT: (family: "IPv4" | "IPv6") =>
     `Multiple ${family} default routes conflict. Give each a distinct positive metric, or keep only one.`,
+  NET_RISK_DHCP4_STATIC_IPV4:
+    "DHCP4 is on with static IPv4 addresses. cloud-init applies both; confirm this is intended.",
+  NET_RISK_DHCP6_STATIC_IPV6:
+    "DHCP6 is on with static IPv6 addresses. cloud-init applies both; confirm this is intended.",
+  NET_RISK_DHCP4_DEFAULT_ROUTE:
+    "DHCP is on with an explicit default route. DHCP usually provides its own gateway.",
+  NET_RISK_DHCP6_DEFAULT_ROUTE:
+    "DHCP is on with an explicit default route. DHCP usually provides its own gateway.",
+  NET_RISK_DHCP4_SPECIFIC_ROUTE:
+    "DHCP is on with explicit routes. DHCP may already supply routing for this family.",
+  NET_RISK_DHCP6_SPECIFIC_ROUTE:
+    "DHCP is on with explicit routes. DHCP may already supply routing for this family.",
 } as const;
 
 export function networkFieldPath(interfaceId: string, field: string): string {
   return `networking.interfaces.${interfaceId}.${field}`;
+}
+
+function networkInterfacePath(interfaceId: string): string {
+  return `networking.interfaces.${interfaceId}`;
 }
 
 function addressRowPath(
@@ -795,6 +812,111 @@ function validateInterfaceMtu(entry: BuilderNetworkInterface): ValidationIssue[]
   return [];
 }
 
+function hasValidStaticAddresses(
+  entry: BuilderNetworkInterface,
+  family: IpFamily,
+): boolean {
+  const rows = family === "ipv4" ? entry.ipv4Addresses : entry.ipv6Addresses;
+  return rows.some((row) => {
+    const value = row.value.trim();
+    return family === "ipv4" ? isCidrv4(value) : isCidrv6(value);
+  });
+}
+
+function hasValidDefaultRoute(
+  entry: BuilderNetworkInterface,
+  family: IpFamily,
+): boolean {
+  const routes = family === "ipv4" ? entry.ipv4Routes : entry.ipv6Routes;
+  return routes.some((route) => {
+    if (route.kind !== "default") {
+      return false;
+    }
+    const gateway = route.gateway.trim();
+    if (gateway === "") {
+      return false;
+    }
+    return family === "ipv4" ? isIpv4(gateway) : isIpv6(gateway);
+  });
+}
+
+function hasValidSpecificRoute(
+  entry: BuilderNetworkInterface,
+  family: IpFamily,
+): boolean {
+  const routes = family === "ipv4" ? entry.ipv4Routes : entry.ipv6Routes;
+  return routes.some((route) => {
+    if (route.kind !== "specific") {
+      return false;
+    }
+    const destination = route.destination.trim();
+    if (destination === "") {
+      return false;
+    }
+    return family === "ipv4" ? isCidrv4(destination) : isCidrv6(destination);
+  });
+}
+
+function validateRiskWarnings(
+  interfaces: BuilderNetworkInterface[],
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const entry of interfaces) {
+    if (isSemanticallyBlankNetworkInterface(entry)) {
+      continue;
+    }
+
+    const path = networkInterfacePath(entry.id);
+    const acknowledged = new Set(entry.acknowledgedRiskWarnings);
+
+    const pushWarning = (code: RiskCode, message: string, trigger: boolean) => {
+      if (!trigger || acknowledged.has(code)) {
+        return;
+      }
+      issues.push({
+        path,
+        code,
+        message,
+        severity: "warning",
+      });
+    };
+
+    pushWarning(
+      RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+      NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4,
+      entry.dhcp4 && hasValidStaticAddresses(entry, "ipv4"),
+    );
+    pushWarning(
+      RISK_CODES.NET_RISK_DHCP6_STATIC_IPV6,
+      NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP6_STATIC_IPV6,
+      entry.dhcp6 && hasValidStaticAddresses(entry, "ipv6"),
+    );
+    pushWarning(
+      RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE,
+      NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_DEFAULT_ROUTE,
+      entry.dhcp4 && hasValidDefaultRoute(entry, "ipv4"),
+    );
+    pushWarning(
+      RISK_CODES.NET_RISK_DHCP6_DEFAULT_ROUTE,
+      NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP6_DEFAULT_ROUTE,
+      entry.dhcp6 && hasValidDefaultRoute(entry, "ipv6"),
+    );
+    pushWarning(
+      RISK_CODES.NET_RISK_DHCP4_SPECIFIC_ROUTE,
+      NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_SPECIFIC_ROUTE,
+      entry.dhcp4 && hasValidSpecificRoute(entry, "ipv4"),
+    );
+    pushWarning(
+      RISK_CODES.NET_RISK_DHCP6_SPECIFIC_ROUTE,
+      NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP6_SPECIFIC_ROUTE,
+      entry.dhcp6 && hasValidSpecificRoute(entry, "ipv6"),
+    );
+  }
+
+  return issues;
+}
+
 function validateSingleInterface(
   entry: BuilderNetworkInterface,
 ): ValidationIssue[] {
@@ -833,6 +955,7 @@ export function validateNetworking(
   for (const entry of networking.interfaces) {
     issues.push(...validateSingleInterface(entry));
   }
+  issues.push(...validateRiskWarnings(networking.interfaces));
   issues.push(...validateStructuralNetworking(networking.interfaces));
   return issues;
 }
