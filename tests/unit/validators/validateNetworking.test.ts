@@ -362,4 +362,291 @@ describe("validateNetworking", () => {
       issues.some((issue) => issue.path.endsWith(`.${valid}`)),
     ).toBe(false);
   });
+
+  describe("structural blockers (VALD-06)", () => {
+    function defaultRoute(
+      id: string,
+      gateway = "192.0.2.1",
+      metric = "",
+    ) {
+      return {
+        id,
+        kind: "default" as const,
+        gateway,
+        metric,
+        exampleFields: [] as const,
+      };
+    }
+
+    it("flags both members of a duplicate device name (case-insensitive)", () => {
+      const ifaceA = configuredInterface("dup-a", { name: "eth0" });
+      const ifaceB = configuredInterface("dup-b", { name: "ETH0" });
+      const issues = validateNetworking(networkingConfig([ifaceA, ifaceB]));
+      const dupIssues = issues.filter((issue) => issue.code === "NET_DUP_TARGET");
+      expect(dupIssues).toHaveLength(2);
+      expect(dupIssues).toContainEqual({
+        path: "networking.interfaces.dup-a.name",
+        code: "NET_DUP_TARGET",
+        message: NETWORKING_VALIDATION_MESSAGES.NET_DUP_TARGET("device name"),
+        severity: "error",
+      });
+      expect(dupIssues).toContainEqual({
+        path: "networking.interfaces.dup-b.name",
+        code: "NET_DUP_TARGET",
+        message: NETWORKING_VALIDATION_MESSAGES.NET_DUP_TARGET("device name"),
+        severity: "error",
+      });
+    });
+
+    it("flags both members of a duplicate MAC address", () => {
+      const mac = "52:54:00:12:34:56";
+      const ifaceA = configuredInterface("mac-a", {
+        identityMode: "mac",
+        macAddress: mac,
+      });
+      const ifaceB = configuredInterface("mac-b", {
+        identityMode: "mac",
+        macAddress: mac.toUpperCase(),
+      });
+      const issues = validateNetworking(networkingConfig([ifaceA, ifaceB]));
+      const dupIssues = issues.filter((issue) => issue.code === "NET_DUP_TARGET");
+      expect(dupIssues).toHaveLength(2);
+      expect(dupIssues[0]?.path).toMatch(/\.macAddress$/);
+      expect(dupIssues[1]?.path).toMatch(/\.macAddress$/);
+    });
+
+    it("allows distinct interface targets", () => {
+      const ifaceA = configuredInterface("distinct-a", { name: "eth0" });
+      const ifaceB = configuredInterface("distinct-b", { name: "eth1" });
+      const issues = validateNetworking(networkingConfig([ifaceA, ifaceB]));
+      expect(issues.filter((issue) => issue.code === "NET_DUP_TARGET")).toEqual(
+        [],
+      );
+    });
+
+    it("flags same-interface duplicate addresses on both rows", () => {
+      const rowA = createNetworkDraftId("addr");
+      const rowB = createNetworkDraftId("addr");
+      const entry = configuredInterface("same-iface-dup", {
+        ipv4Addresses: [
+          { id: rowA, value: "192.0.2.10/24", isExampleValue: false },
+          { id: rowB, value: "192.0.2.10/24", isExampleValue: false },
+        ],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      const dupIssues = issues.filter(
+        (issue) => issue.code === "NET_DUP_ADDRESS_SAME_INTERFACE",
+      );
+      expect(dupIssues).toHaveLength(2);
+    });
+
+    it("flags cross-interface duplicate addresses on both interfaces", () => {
+      const rowA = createNetworkDraftId("addr");
+      const rowB = createNetworkDraftId("addr");
+      const ifaceA = configuredInterface("cross-a", {
+        ipv4Addresses: [
+          { id: rowA, value: "192.0.2.10/24", isExampleValue: false },
+        ],
+      });
+      const ifaceB = configuredInterface("cross-b", {
+        ipv4Addresses: [
+          { id: rowB, value: "192.0.2.10/24", isExampleValue: false },
+        ],
+      });
+      const issues = validateNetworking(networkingConfig([ifaceA, ifaceB]));
+      const dupIssues = issues.filter(
+        (issue) => issue.code === "NET_DUP_ADDRESS_CROSS_INTERFACE",
+      );
+      expect(dupIssues).toHaveLength(2);
+    });
+
+    it("detects IPv6 semantic duplicate addresses after canonicalization", () => {
+      const rowA = createNetworkDraftId("addr");
+      const rowB = createNetworkDraftId("addr");
+      const ifaceA = configuredInterface("ipv6-a", {
+        ipv6Addresses: [
+          { id: rowA, value: "2001:db8::1/64", isExampleValue: false },
+        ],
+      });
+      const ifaceB = configuredInterface("ipv6-b", {
+        ipv6Addresses: [
+          { id: rowB, value: "2001:0db8:0000::1/64", isExampleValue: false },
+        ],
+      });
+      const issues = validateNetworking(networkingConfig([ifaceA, ifaceB]));
+      expect(
+        issues.filter((issue) => issue.code === "NET_DUP_ADDRESS_CROSS_INTERFACE"),
+      ).toHaveLength(2);
+    });
+
+    it("skips malformed and blank address rows for duplicate detection", () => {
+      const rowA = createNetworkDraftId("addr");
+      const rowB = createNetworkDraftId("addr");
+      const entry = configuredInterface("skip-dup", {
+        ipv4Addresses: [
+          { id: rowA, value: "", isExampleValue: false },
+          { id: rowB, value: "not-a-cidr", isExampleValue: false },
+        ],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(
+        issues.filter((issue) => issue.code.startsWith("NET_DUP_ADDRESS")),
+      ).toEqual([]);
+    });
+
+    it("emits NET_ROUTE_FAMILY_MISMATCH for opposite-family valid gateway", () => {
+      const routeId = createNetworkDraftId("route");
+      const entry = configuredInterface("family-mismatch", {
+        ipv4Routes: [
+          {
+            id: routeId,
+            kind: "default",
+            gateway: "2001:db8::1",
+            metric: "",
+            exampleFields: [],
+          },
+        ],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(issues).toContainEqual({
+        path: `networking.interfaces.family-mismatch.ipv4Routes.${routeId}.gateway`,
+        code: "NET_ROUTE_FAMILY_MISMATCH",
+        message: NETWORKING_VALIDATION_MESSAGES.NET_ROUTE_FAMILY_MISMATCH(
+          "gateway",
+          "IPv4",
+        ),
+        severity: "error",
+      });
+    });
+
+    it("does not double-flag malformed routes with structural family codes", () => {
+      const routeId = createNetworkDraftId("route");
+      const entry = configuredInterface("malformed-route", {
+        ipv4Routes: [
+          {
+            id: routeId,
+            kind: "default",
+            gateway: "not-an-ip",
+            metric: "",
+            exampleFields: [],
+          },
+        ],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(
+        issues.filter(
+          (issue) =>
+            issue.code === "NET_ROUTE_FAMILY_MISMATCH" ||
+            issue.code === "NET_ROUTE_UNREACHABLE_FAMILY",
+        ),
+      ).toEqual([]);
+      expect(issues).toContainEqual(
+        expect.objectContaining({ code: "NET_ROUTE_GATEWAY_INVALID" }),
+      );
+    });
+
+    it("emits NET_ROUTE_UNREACHABLE_FAMILY when gateway is valid but family is unaddressed", () => {
+      const routeId = createNetworkDraftId("route");
+      const entry = configuredInterface("unreachable", {
+        dhcp4: false,
+        ipv4Routes: [defaultRoute(routeId, "192.0.2.1")],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(issues).toContainEqual({
+        path: `networking.interfaces.unreachable.ipv4Routes.${routeId}.gateway`,
+        code: "NET_ROUTE_UNREACHABLE_FAMILY",
+        message: NETWORKING_VALIDATION_MESSAGES.NET_ROUTE_UNREACHABLE_FAMILY("IPv4"),
+        severity: "error",
+      });
+    });
+
+    it("skips unreachable-family for blank gateway", () => {
+      const routeId = createNetworkDraftId("route");
+      const entry = configuredInterface("blank-gateway", {
+        ipv4Routes: [defaultRoute(routeId, "")],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(
+        issues.some((issue) => issue.code === "NET_ROUTE_UNREACHABLE_FAMILY"),
+      ).toBe(false);
+    });
+
+    it("allows reachable default route when static same-family address exists", () => {
+      const routeId = createNetworkDraftId("route");
+      const addrId = createNetworkDraftId("addr");
+      const entry = configuredInterface("reachable-static", {
+        dhcp4: false,
+        ipv4Addresses: [
+          { id: addrId, value: "192.0.2.10/24", isExampleValue: false },
+        ],
+        ipv4Routes: [defaultRoute(routeId, "192.0.2.1")],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(
+        issues.filter(
+          (issue) =>
+            issue.code === "NET_ROUTE_UNREACHABLE_FAMILY" ||
+            issue.code.startsWith("NET_DEFAULT_ROUTE_CONFLICT"),
+        ),
+      ).toEqual([]);
+    });
+
+    it.each([
+      ["100", "200", false],
+      ["100", "100", true],
+      ["100", "", true],
+      ["", "", true],
+    ] as const)(
+      "default-route metric conflict metrics %j and %j → conflict=%s",
+      (metricA, metricB, shouldConflict) => {
+        const routeA = createNetworkDraftId("route");
+        const routeB = createNetworkDraftId("route");
+        const entry = configuredInterface("metric-conflict", {
+          ipv4Routes: [
+            defaultRoute(routeA, "192.0.2.1", metricA),
+            defaultRoute(routeB, "192.0.2.2", metricB),
+          ],
+        });
+        const issues = validateNetworking(networkingConfig([entry]));
+        const conflictIssues = issues.filter((issue) =>
+          issue.code.startsWith("NET_DEFAULT_ROUTE_CONFLICT"),
+        );
+        if (shouldConflict) {
+          expect(conflictIssues).toHaveLength(2);
+          expect(conflictIssues[0]?.code).toBe(
+            "NET_DEFAULT_ROUTE_CONFLICT_SAME_INTERFACE",
+          );
+        } else {
+          expect(conflictIssues).toEqual([]);
+        }
+      },
+    );
+
+    it("uses cross-interface code for conflicting defaults on different interfaces", () => {
+      const routeA = createNetworkDraftId("route");
+      const routeB = createNetworkDraftId("route");
+      const ifaceA = configuredInterface("def-a", {
+        ipv4Routes: [defaultRoute(routeA, "192.0.2.1", "100")],
+      });
+      const ifaceB = configuredInterface("def-b", {
+        ipv4Routes: [defaultRoute(routeB, "192.0.2.2", "100")],
+      });
+      const issues = validateNetworking(networkingConfig([ifaceA, ifaceB]));
+      const conflictIssues = issues.filter(
+        (issue) => issue.code === "NET_DEFAULT_ROUTE_CONFLICT_CROSS_INTERFACE",
+      );
+      expect(conflictIssues).toHaveLength(2);
+    });
+
+    it("allows a single default route", () => {
+      const routeId = createNetworkDraftId("route");
+      const entry = configuredInterface("single-default", {
+        ipv4Routes: [defaultRoute(routeId, "192.0.2.1", "100")],
+      });
+      const issues = validateNetworking(networkingConfig([entry]));
+      expect(
+        issues.filter((issue) => issue.code.startsWith("NET_DEFAULT_ROUTE_CONFLICT")),
+      ).toEqual([]);
+    });
+  });
 });
