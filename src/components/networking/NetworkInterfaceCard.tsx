@@ -4,6 +4,8 @@ import {
   isSemanticallyBlankNetworkInterface,
   type BuilderNetworkInterface,
 } from "../../models/networking.ts";
+import { RISK_CODE_SET, type RiskCode } from "../../models/networkingCodes.ts";
+import { useProjectStore } from "../../state/projectStore.ts";
 import { ConfirmRemoveInterfaceDialog } from "./ConfirmRemoveInterfaceDialog.tsx";
 import { AddressingPanel } from "./AddressingPanel.tsx";
 import { DnsPanel } from "./DnsPanel.tsx";
@@ -52,9 +54,16 @@ export function NetworkInterfaceCard({
   onRemove,
   onMove,
 }: NetworkInterfaceCardProps) {
-  const { consumeFocusRequest, hasCrossInterfaceStructuralConflict } =
+  const { consumeFocusRequest, hasCrossInterfaceStructuralConflict, getVisibleIssuesForPath } =
     useValidation();
+  const acknowledgeNetworkRiskWarning = useProjectStore(
+    (state) => state.acknowledgeNetworkRiskWarning,
+  );
   const showCrossInterfaceAlert = hasCrossInterfaceStructuralConflict(entry.id);
+  const interfacePath = `networking.interfaces.${entry.id}`;
+  const riskWarnings = getVisibleIssuesForPath(interfacePath).filter((issue) =>
+    RISK_CODE_SET.has(issue.code),
+  );
   const cardRef = useRef<HTMLElement>(null);
   const activeInputRef = useRef<HTMLInputElement>(null);
   const moveUpRef = useRef<HTMLButtonElement>(null);
@@ -202,6 +211,35 @@ export function NetworkInterfaceCard({
           </button>
         </div>
       </div>
+
+      {riskWarnings.length > 0 ? (
+        <div
+          id={`network-${entry.id}-risk-warnings`}
+          tabIndex={-1}
+          className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+        >
+          <ul className="space-y-3">
+            {riskWarnings.map((issue) => (
+              <li
+                key={issue.code}
+                className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <p className="text-sm">{issue.message}</p>
+                <button
+                  type="button"
+                  className="shrink-0 rounded border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label={`Dismiss ${issue.message} for ${title}`}
+                  onClick={() =>
+                    acknowledgeNetworkRiskWarning(entry.id, issue.code as RiskCode)
+                  }
+                >
+                  Dismiss warning
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="min-w-0 space-y-8">
         <NetworkIdentitySelector entry={entry} inputRef={activeInputRef} />

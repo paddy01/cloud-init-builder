@@ -15,6 +15,7 @@ import { TopBar } from "../../../../src/layouts/TopBar.tsx";
 import {
   createBlankNetworkInterface,
 } from "../../../../src/models/networking.ts";
+import { RISK_CODES } from "../../../../src/models/networkingCodes.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
 import { NETWORKING_VALIDATION_MESSAGES } from "../../../../src/validators/validateNetworking.ts";
 
@@ -476,5 +477,135 @@ describe("NetworkingValidation", () => {
         screen.getByText(NETWORKING_VALIDATION_MESSAGES.NET_MTU_INVALID),
       ).toBeInTheDocument();
     });
+  });
+
+  it("renders the amber risk-warning container for a risky DHCP and static combo", async () => {
+    seedInterface("risk-ui", { name: "ens18" });
+    useProjectStore.getState().setNetworkDhcp("risk-ui", "ipv4", true);
+    const addressId = useProjectStore
+      .getState()
+      .addNetworkAddress("risk-ui", "ipv4", "addr-risk");
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("risk-ui", "ipv4", addressId!, "192.0.2.10/24");
+
+    renderNetworkingSection();
+
+    const container = await waitFor(() => {
+      const element = document.getElementById("network-risk-ui-risk-warnings");
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    expect(container).toHaveAttribute("id", "network-risk-ui-risk-warnings");
+    expect(container).toHaveAttribute("tabindex", "-1");
+    expect(
+      screen.getByText(NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: `Dismiss ${NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4} for ens18`,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("focuses the risk-warning container from the networking summary", async () => {
+    seedInterface("risk-focus", { name: "ens18" });
+    useProjectStore.getState().setNetworkDhcp("risk-focus", "ipv4", true);
+    const addressId = useProjectStore
+      .getState()
+      .addNetworkAddress("risk-focus", "ipv4", "addr-focus");
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("risk-focus", "ipv4", addressId!, "192.0.2.10/24");
+
+    renderNetworkingSection();
+
+    const summaryButton = await screen.findByRole("button", {
+      name: new RegExp(
+        `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4}`,
+      ),
+    });
+    fireEvent.click(summaryButton);
+
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute(
+        "id",
+        "network-risk-focus-risk-warnings",
+      );
+    });
+  });
+
+  it("dismisses a risk warning from the card and summary without confirmation", async () => {
+    seedInterface("risk-dismiss", { name: "ens18" });
+    useProjectStore.getState().setNetworkDhcp("risk-dismiss", "ipv4", true);
+    const addressId = useProjectStore
+      .getState()
+      .addNetworkAddress("risk-dismiss", "ipv4", "addr-dismiss");
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("risk-dismiss", "ipv4", addressId!, "192.0.2.10/24");
+
+    renderNetworkingSection();
+
+    const dismissButton = await screen.findByRole("button", {
+      name: `Dismiss ${NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4} for ens18`,
+    });
+    fireEvent.click(dismissButton);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4,
+        ),
+      ).toBeNull();
+    });
+    expect(document.getElementById("network-risk-dismiss-risk-warnings")).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: new RegExp(NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4),
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps the IPv6 risk warning visible after dismissing the IPv4 warning", async () => {
+    seedInterface("dual-risk", { name: "ens18" });
+    useProjectStore.getState().setNetworkDhcp("dual-risk", "ipv4", true);
+    useProjectStore.getState().setNetworkDhcp("dual-risk", "ipv6", true);
+    const v4RouteId = useProjectStore
+      .getState()
+      .addNetworkRoute("dual-risk", "ipv4", "default", "route-v4");
+    const v6RouteId = useProjectStore
+      .getState()
+      .addNetworkRoute("dual-risk", "ipv6", "default", "route-v6");
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField("dual-risk", "ipv4", v4RouteId!, "gateway", "192.0.2.1");
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField("dual-risk", "ipv6", v6RouteId!, "gateway", "2001:db8::1");
+
+    renderNetworkingSection();
+
+    const container = await waitFor(() => {
+      const element = document.getElementById("network-dual-risk-risk-warnings");
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    const dismissButtons = within(container).getAllByRole("button", {
+      name: /Dismiss DHCP is on with an explicit default route/,
+    });
+    expect(dismissButtons).toHaveLength(2);
+    fireEvent.click(dismissButtons[0]!);
+
+    await waitFor(() => {
+      expect(
+        useProjectStore.getState().project?.networking.interfaces[0]
+          ?.acknowledgedRiskWarnings,
+      ).toEqual([RISK_CODES.NET_RISK_DHCP4_DEFAULT_ROUTE]);
+      expect(within(container).getAllByRole("button", { name: /Dismiss/ })).toHaveLength(
+        1,
+      );
+    });
+    expect(screen.getByText("1 warning")).toBeInTheDocument();
   });
 });

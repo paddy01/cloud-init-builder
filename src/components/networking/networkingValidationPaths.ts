@@ -9,11 +9,21 @@ export function isNetworkingIssuePath(path: string): boolean {
 }
 
 export function getInterfaceIdFromIssuePath(path: string): string | null {
+  const bareMatch = path.match(/^networking\.interfaces\.([^.]+)$/);
+  if (bareMatch) {
+    return bareMatch[1] ?? null;
+  }
+
   const match = path.match(/^networking\.interfaces\.([^.]+)\./);
   return match?.[1] ?? null;
 }
 
 export function pathToFocusTargetId(path: string): string | null {
+  const bareMatch = path.match(/^networking\.interfaces\.([^.]+)$/);
+  if (bareMatch) {
+    return `network-${bareMatch[1]}-risk-warnings`;
+  }
+
   const interfaceId = getInterfaceIdFromIssuePath(path);
   if (!interfaceId) {
     return null;
