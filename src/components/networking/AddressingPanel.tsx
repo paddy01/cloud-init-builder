@@ -7,6 +7,8 @@ import {
   useProjectStore,
   type NetworkFamily,
 } from "../../state/projectStore.ts";
+import { useValidation } from "../validation/validationContext.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
 
 const inputClass =
   "min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -178,11 +180,22 @@ function AddressRow({
   onChange,
   onRemove,
 }: AddressRowProps) {
+  const {
+    getVisibleIssuesForPath,
+    getFieldMessageId,
+    markTouched,
+  } = useValidation();
   const familyLabel = family === "ipv4" ? "IPv4" : "IPv6";
   const title = interfaceTitle(entry);
   const inputId = `network-${entry.id}-${family}-address-${row.id}`;
   const markerId = `${inputId}-example`;
   const accessibleName = `${familyLabel} address ${position} for ${title}`;
+  const path = `networking.interfaces.${entry.id}.${family}Addresses.${row.id}`;
+  const issues = getVisibleIssuesForPath(path);
+  const messageIds = issues.map((issue) => getFieldMessageId(path, issue.code));
+  const describedBy = [row.isExampleValue ? markerId : null, ...messageIds]
+    .filter((value): value is string => value !== null)
+    .join(" ");
 
   return (
     <div
@@ -210,13 +223,22 @@ function AddressRow({
           spellCheck={false}
           className={inputClass}
           aria-label={accessibleName}
-          aria-describedby={row.isExampleValue ? markerId : undefined}
+          aria-describedby={describedBy || undefined}
           placeholder={
             family === "ipv4" ? "192.0.2.10/24" : "2001:db8::10/64"
           }
           value={row.value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={() => markTouched(path)}
         />
+        {issues.map((issue) => (
+          <FieldMessage
+            key={issue.code}
+            id={getFieldMessageId(path, issue.code)}
+            message={issue.message}
+            severity={issue.severity}
+          />
+        ))}
       </div>
       <button
         type="button"

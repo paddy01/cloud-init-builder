@@ -1,5 +1,8 @@
 import type { BuilderNetworkInterface } from "../../models/networking.ts";
+import { networkFieldPath } from "../../validators/validateNetworking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { useValidation } from "../validation/validationContext.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
 
 const segmentBase =
   "relative flex min-h-10 items-center justify-center rounded px-4 py-2 text-center text-sm focus-within:ring-2 focus-within:ring-blue-500";
@@ -16,11 +19,38 @@ export function NetworkIdentitySelector({
   const updateNetworkInterface = useProjectStore(
     (state) => state.updateNetworkInterface,
   );
+  const {
+    getVisibleIssuesForPath,
+    getFieldMessageId,
+    markTouched,
+  } = useValidation();
   const nameInputId = `network-interface-${entry.id}-name`;
   const macInputId = `network-interface-${entry.id}-mac`;
   const nameMarkerId = `${nameInputId}-example-marker`;
   const macMarkerId = `${macInputId}-example-marker`;
   const radioName = `network-interface-${entry.id}-identity-mode`;
+  const namePath = networkFieldPath(entry.id, "name");
+  const macPath = networkFieldPath(entry.id, "macAddress");
+  const nameIssues = getVisibleIssuesForPath(namePath);
+  const macIssues = getVisibleIssuesForPath(macPath);
+  const nameMessageIds = nameIssues.map((issue) =>
+    getFieldMessageId(namePath, issue.code),
+  );
+  const macMessageIds = macIssues.map((issue) =>
+    getFieldMessageId(macPath, issue.code),
+  );
+  const nameDescribedBy = [
+    entry.exampleFields.includes("name") ? nameMarkerId : null,
+    ...nameMessageIds,
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" ");
+  const macDescribedBy = [
+    entry.exampleFields.includes("macAddress") ? macMarkerId : null,
+    ...macMessageIds,
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" ");
 
   return (
     <fieldset className="space-y-4">
@@ -89,13 +119,20 @@ export function NetworkIdentitySelector({
             className="min-h-10 w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="e.g. ens18"
             value={entry.name}
-            aria-describedby={
-              entry.exampleFields.includes("name") ? nameMarkerId : undefined
-            }
+            aria-describedby={nameDescribedBy || undefined}
             onChange={(event) =>
               updateNetworkInterface(entry.id, { name: event.target.value })
             }
+            onBlur={() => markTouched(namePath)}
           />
+          {nameIssues.map((issue) => (
+            <FieldMessage
+              key={issue.code}
+              id={getFieldMessageId(namePath, issue.code)}
+              message={issue.message}
+              severity={issue.severity}
+            />
+          ))}
         </div>
       ) : (
         <div className="space-y-2">
@@ -118,15 +155,22 @@ export function NetworkIdentitySelector({
             className="min-h-10 w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="52:54:00:12:34:56"
             value={entry.macAddress}
-            aria-describedby={
-              entry.exampleFields.includes("macAddress") ? macMarkerId : undefined
-            }
+            aria-describedby={macDescribedBy || undefined}
             onChange={(event) =>
               updateNetworkInterface(entry.id, {
                 macAddress: event.target.value,
               })
             }
+            onBlur={() => markTouched(macPath)}
           />
+          {macIssues.map((issue) => (
+            <FieldMessage
+              key={issue.code}
+              id={getFieldMessageId(macPath, issue.code)}
+              message={issue.message}
+              severity={issue.severity}
+            />
+          ))}
         </div>
       )}
     </fieldset>

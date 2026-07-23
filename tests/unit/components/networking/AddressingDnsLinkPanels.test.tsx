@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AddressingPanel } from "../../../../src/components/networking/AddressingPanel.tsx";
 import { DnsPanel } from "../../../../src/components/networking/DnsPanel.tsx";
 import { LinkSettingsPanel } from "../../../../src/components/networking/LinkSettingsPanel.tsx";
+import { NetworkIdentitySelector } from "../../../../src/components/networking/NetworkIdentitySelector.tsx";
+import { UserValidationProvider } from "../../../../src/components/users/UserValidationProvider.tsx";
 import { createDefaultProject } from "../../../../src/models/project.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
+import { NETWORKING_VALIDATION_MESSAGES } from "../../../../src/validators/validateNetworking.ts";
 
 const interfaceId = "interface-a";
 
@@ -46,6 +49,20 @@ function LinkHarness() {
   );
   if (!entry) throw new Error("expected interface fixture");
   return <LinkSettingsPanel entry={entry} />;
+}
+
+function IdentityHarness() {
+  const entry = useProjectStore((state) =>
+    state.project?.networking.interfaces.find(
+      (candidate) => candidate.id === interfaceId,
+    ),
+  );
+  if (!entry) throw new Error("expected interface fixture");
+  return <NetworkIdentitySelector entry={entry} inputRef={{ current: null }} />;
+}
+
+function renderWithValidation(ui: React.ReactElement) {
+  return render(<UserValidationProvider>{ui}</UserValidationProvider>);
 }
 
 function resetInterface() {
@@ -191,6 +208,61 @@ describe("AddressingPanel", () => {
     expect(
       screen.getByRole("button", { name: "Add IPv4 address" }),
     ).toHaveFocus();
+  });
+
+  it("shows touch-gated inline address errors after blur", async () => {
+    renderWithValidation(<AddressingHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "Add IPv4 address" }));
+    const input = screen.getByRole("textbox", {
+      name: "IPv4 address 1 for ens18",
+    });
+    fireEvent.change(input, { target: { value: "nonsense" } });
+
+    expect(
+      screen.queryByText(
+        NETWORKING_VALIDATION_MESSAGES.NET_ADDRESS_CIDR_INVALID("IPv4"),
+      ),
+    ).toBeNull();
+
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          NETWORKING_VALIDATION_MESSAGES.NET_ADDRESS_CIDR_INVALID("IPv4"),
+        ),
+      ).toBeInTheDocument();
+    });
+    expect(input.getAttribute("aria-describedby")).toContain(
+      "networking-interfaces-interface-a-ipv4addresses",
+    );
+  });
+});
+
+describe("NetworkIdentitySelector", () => {
+  beforeEach(() => {
+    resetInterface();
+  });
+
+  it("shows touch-gated inline name errors after blur", async () => {
+    renderWithValidation(<IdentityHarness />);
+    const input = screen.getByRole("textbox", { name: "Device name" });
+    fireEvent.change(input, { target: { value: "-bad" } });
+
+    expect(
+      screen.queryByText(NETWORKING_VALIDATION_MESSAGES.NET_NAME_INVALID),
+    ).toBeNull();
+
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(NETWORKING_VALIDATION_MESSAGES.NET_NAME_INVALID),
+      ).toBeInTheDocument();
+    });
+    expect(input.getAttribute("aria-describedby")).toContain(
+      "networking-interfaces-interface-a-name",
+    );
   });
 });
 
