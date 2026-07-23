@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  RISK_CODE_SET,
+  riskCodeSchema,
+  type RiskCode,
+} from "./networkingCodes.ts";
 
 export const networkIdentityModeSchema = z.enum(["name", "mac"]);
 
@@ -66,6 +71,7 @@ export const builderNetworkInterfaceSchema = z.object({
   mtuEnabled: z.boolean(),
   mtu: z.string(),
   exampleFields: z.array(networkInterfaceExampleFieldSchema),
+  acknowledgedRiskWarnings: z.array(riskCodeSchema).default([]),
 });
 
 export const networkingConfigSchema = z.object({
@@ -83,6 +89,7 @@ export type NetworkInterfaceExampleField = z.infer<
 export type BuilderNetworkInterface = z.infer<
   typeof builderNetworkInterfaceSchema
 >;
+export type { RiskCode };
 export type NetworkingConfig = z.infer<typeof networkingConfigSchema>;
 
 export function isNetworkingConfig(value: unknown): value is NetworkingConfig {
@@ -204,6 +211,7 @@ export function createBlankNetworkInterface(
     mtuEnabled: false,
     mtu: "",
     exampleFields: [],
+    acknowledgedRiskWarnings: [],
   };
 }
 
@@ -311,6 +319,7 @@ const INTERFACE_KEYS = new Set([
   "mtuEnabled",
   "mtu",
   "exampleFields",
+  "acknowledgedRiskWarnings",
 ]);
 const VALUE_ROW_KEYS = new Set(["id", "value", "isExampleValue"]);
 const ROUTE_KEYS = new Set([
@@ -439,6 +448,42 @@ function normalizeStringDraft(
   if (typeof value === "string") return value;
   warning(warnings, path, "Invalid networking draft was cleared during import.");
   return fallback;
+}
+
+function normalizeRiskWarningAcknowledgements(
+  value: unknown,
+  path: string,
+  warnings: NetworkingImportWarning[],
+): RiskCode[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    warning(
+      warnings,
+      path,
+      "Invalid risk-warning acknowledgement list was cleared during import.",
+    );
+    return [];
+  }
+
+  const normalized: RiskCode[] = [];
+  const seen = new Set<string>();
+  value.forEach((code, index) => {
+    if (typeof code !== "string" || !RISK_CODE_SET.has(code)) {
+      warning(
+        warnings,
+        `${path}.${index}`,
+        "Unsupported risk-warning acknowledgement was omitted during import.",
+      );
+      return;
+    }
+    if (!seen.has(code)) {
+      seen.add(code);
+      normalized.push(code as RiskCode);
+    }
+  });
+  return normalized;
 }
 
 function normalizeExampleFields<T extends string>(
@@ -708,6 +753,11 @@ function normalizeInterfaceEntry(
       raw.exampleFields,
       new Set(["name", "macAddress", "dhcp4", "dhcp6", "mtu"]),
       `${path}.exampleFields`,
+      warnings,
+    ),
+    acknowledgedRiskWarnings: normalizeRiskWarningAcknowledgements(
+      raw.acknowledgedRiskWarnings,
+      `${path}.acknowledgedRiskWarnings`,
       warnings,
     ),
   };

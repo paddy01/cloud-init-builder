@@ -10,7 +10,9 @@ import {
   createStaticIpv4Example,
   isSemanticallyBlankNetworkInterface,
   networkingConfigSchema,
+  normalizeNetworkingSection,
 } from "../../src/models/networking.ts";
+import { RISK_CODES } from "../../src/models/networkingCodes.ts";
 
 describe("networking model", () => {
   it("creates a deterministic blank name-mode interface when an ID is injected", () => {
@@ -30,6 +32,7 @@ describe("networking model", () => {
       mtuEnabled: false,
       mtu: "",
       exampleFields: [],
+      acknowledgedRiskWarnings: [],
     });
   });
 
@@ -72,6 +75,7 @@ describe("networking model", () => {
       mtuEnabled: false,
       mtu: "",
       exampleFields: [],
+      acknowledgedRiskWarnings: [],
     });
   });
 
@@ -243,5 +247,79 @@ describe("networking model", () => {
         ...patch,
       }),
     ).toBe(false);
+  });
+
+  it("defaults acknowledgedRiskWarnings to an empty list", () => {
+    expect(createBlankNetworkInterface("ack-blank").acknowledgedRiskWarnings).toEqual(
+      [],
+    );
+  });
+
+  it("normalizes risk-warning acknowledgements with acknowledgement-specific import warnings", () => {
+    const { networking, warnings } = normalizeNetworkingSection({
+      interfaces: [
+        {
+          id: "iface-ack",
+          identityMode: "name",
+          name: "ens18",
+          macAddress: "",
+          acknowledgedRiskWarnings: [
+            RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+            "UNKNOWN_RISK_CODE",
+            RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+          ],
+        },
+      ],
+    });
+
+    expect(networking.interfaces[0]?.acknowledgedRiskWarnings).toEqual([
+      RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+    ]);
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "networking.interfaces.0.acknowledgedRiskWarnings.1",
+          message:
+            "Unsupported risk-warning acknowledgement was omitted during import.",
+        }),
+      ]),
+    );
+    expect(
+      warnings.some((warning) => warning.message.includes("example provenance")),
+    ).toBe(false);
+  });
+
+  it("clears non-array acknowledgedRiskWarnings with a warning", () => {
+    const { networking, warnings } = normalizeNetworkingSection({
+      interfaces: [
+        {
+          id: "iface-bad-ack",
+          identityMode: "name",
+          name: "ens18",
+          macAddress: "",
+          acknowledgedRiskWarnings: "not-an-array",
+        },
+      ],
+    });
+
+    expect(networking.interfaces[0]?.acknowledgedRiskWarnings).toEqual([]);
+    expect(warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "networking.interfaces.0.acknowledgedRiskWarnings",
+          message:
+            "Invalid risk-warning acknowledgement list was cleared during import.",
+        }),
+      ]),
+    );
+  });
+
+  it("does not treat acknowledgedRiskWarnings as semantic content", () => {
+    expect(
+      isSemanticallyBlankNetworkInterface({
+        ...createBlankNetworkInterface("ack-only"),
+        acknowledgedRiskWarnings: [RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4],
+      }),
+    ).toBe(true);
   });
 });

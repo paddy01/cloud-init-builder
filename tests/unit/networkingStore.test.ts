@@ -12,6 +12,7 @@ import {
   type NetworkingConfig,
 } from "../../src/models/networking.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
+import { RISK_CODES } from "../../src/models/networkingCodes.ts";
 
 const initialState = {
   project: null,
@@ -789,5 +790,59 @@ describe("networking store actions", () => {
         .applyNetworkExample("unknown" as "ipv4-dhcp"),
     ).toBeUndefined();
     expectCurrentStateUnchanged(emptyProjectBefore, false, emptyUpdatedAtBefore);
+  });
+
+  it("acknowledges a network risk warning once and marks the project dirty", () => {
+    useProjectStore.getState().addNetworkInterface("iface-risk");
+    useProjectStore.getState().markSaved();
+    const before = useProjectStore.getState().project?.metadata.updatedAt;
+    vi.advanceTimersByTime(1_000);
+
+    useProjectStore
+      .getState()
+      .acknowledgeNetworkRiskWarning(
+        "iface-risk",
+        RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+      );
+    useProjectStore
+      .getState()
+      .acknowledgeNetworkRiskWarning(
+        "iface-risk",
+        RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+      );
+
+    const entry = networking().interfaces.find((iface) => iface.id === "iface-risk");
+    expect(entry?.acknowledgedRiskWarnings).toEqual([
+      RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+    ]);
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    expect(useProjectStore.getState().project?.metadata.updatedAt).not.toBe(before);
+  });
+
+  it("no-ops acknowledgeNetworkRiskWarning for unknown interface ids and invalid codes", () => {
+    useProjectStore.getState().addNetworkInterface("iface-risk");
+    useProjectStore.getState().markSaved();
+    const projectBefore = useProjectStore.getState().project;
+    const updatedAtBefore = projectBefore?.metadata.updatedAt;
+    vi.advanceTimersByTime(1_000);
+
+    useProjectStore
+      .getState()
+      .acknowledgeNetworkRiskWarning(
+        "missing-interface",
+        RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+      );
+    useProjectStore
+      .getState()
+      .acknowledgeNetworkRiskWarning(
+        "iface-risk",
+        "NOT_A_REAL_RISK_CODE" as typeof RISK_CODES.NET_RISK_DHCP4_STATIC_IPV4,
+      );
+
+    expectCurrentStateUnchanged(projectBefore, false, updatedAtBefore);
+    expect(
+      networking().interfaces.find((iface) => iface.id === "iface-risk")
+        ?.acknowledgedRiskWarnings,
+    ).toEqual([]);
   });
 });

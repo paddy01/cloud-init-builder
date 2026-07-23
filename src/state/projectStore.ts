@@ -32,6 +32,7 @@ import {
   type BuilderValueRow,
   type NetworkingConfig,
 } from "../models/networking.ts";
+import { RISK_CODE_SET, type RiskCode } from "../models/networkingCodes.ts";
 import type { ImportWarning } from "../services/projectService.ts";
 
 type NetworkInterfacePatch = Partial<
@@ -114,6 +115,10 @@ export interface ProjectState {
     interfaceId: string,
     family: NetworkFamily,
     enabled: boolean,
+  ) => void;
+  acknowledgeNetworkRiskWarning: (
+    interfaceId: string,
+    code: RiskCode,
   ) => void;
   addNetworkAddress: (
     interfaceId: string,
@@ -648,6 +653,24 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           ...entry,
           [field]: enabled,
           exampleFields: removeExampleField(entry.exampleFields, field),
+        };
+      }),
+    );
+  },
+
+  acknowledgeNetworkRiskWarning: (interfaceId, code) => {
+    if (!RISK_CODE_SET.has(code)) {
+      return;
+    }
+
+    updateProjectNetworking(set, get, (networking) =>
+      updateNetworkInterfaceById(networking, interfaceId, (entry) => {
+        if (entry.acknowledgedRiskWarnings.includes(code)) {
+          return entry;
+        }
+        return {
+          ...entry,
+          acknowledgedRiskWarnings: [...entry.acknowledgedRiskWarnings, code],
         };
       }),
     );

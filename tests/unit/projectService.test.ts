@@ -14,7 +14,7 @@ import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import { getExportFilename } from "../../src/utils/slugify.ts";
 import { CURRENT_FORMAT_VERSION } from "../../src/models/project.ts";
-import { createBlankNetworkInterface } from "../../src/models/networking.ts";
+import { createBlankNetworkInterface, builderNetworkInterfaceSchema } from "../../src/models/networking.ts";
 
 function fixtureFile(content: string, name: string): File {
   return new File([content], name, { type: "application/json" });
@@ -760,6 +760,39 @@ describe("networking import normalization", () => {
     ]);
     expect(reopened.warnings).toEqual([]);
     expect(reopened.project.networking).toEqual(first.project.networking);
+  });
+
+  it("preserves acknowledgedRiskWarnings through import normalization and rejects unknown schema codes", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          {
+            id: "iface-ack",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            acknowledgedRiskWarnings: ["NET_RISK_DHCP4_STATIC_IPV4"],
+          },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces[0]?.acknowledgedRiskWarnings).toEqual(
+      ["NET_RISK_DHCP4_STATIC_IPV4"],
+    );
+
+    const reopened = await importNetworking(result.project);
+    expect(reopened.project.networking.interfaces[0]?.acknowledgedRiskWarnings).toEqual(
+      ["NET_RISK_DHCP4_STATIC_IPV4"],
+    );
+
+    expect(() =>
+      builderNetworkInterfaceSchema.parse({
+        ...createBlankNetworkInterface("schema-ack"),
+        acknowledgedRiskWarnings: ["NOT_A_RISK_CODE"],
+      }),
+    ).toThrow();
   });
 });
 
