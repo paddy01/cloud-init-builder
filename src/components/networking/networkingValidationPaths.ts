@@ -20,6 +20,46 @@ export function pathToFocusTargetId(path: string): string | null {
     return `network-${interfaceId}-mtu`;
   }
 
+  if (path.endsWith(".name")) {
+    return `network-interface-${interfaceId}-name`;
+  }
+
+  if (path.endsWith(".macAddress")) {
+    return `network-interface-${interfaceId}-mac`;
+  }
+
+  const addressMatch = path.match(
+    /^networking\.interfaces\.([^.]+)\.(ipv4|ipv6)Addresses\.([^.]+)$/,
+  );
+  if (addressMatch) {
+    const [, id, family, rowId] = addressMatch;
+    return `network-${id}-${family}-address-${rowId}`;
+  }
+
+  const routeMatch = path.match(
+    /^networking\.interfaces\.([^.]+)\.(ipv4|ipv6)Routes\.([^.]+)\.(destination|gateway|metric)$/,
+  );
+  if (routeMatch) {
+    const [, id, family, routeId, field] = routeMatch;
+    return `network-${id}-${family}-route-${routeId}-${field}`;
+  }
+
+  const nameserverMatch = path.match(
+    /^networking\.interfaces\.([^.]+)\.nameservers\.([^.]+)$/,
+  );
+  if (nameserverMatch) {
+    const [, id, rowId] = nameserverMatch;
+    return `network-${id}-nameserver-${rowId}`;
+  }
+
+  const searchDomainMatch = path.match(
+    /^networking\.interfaces\.([^.]+)\.searchDomains\.([^.]+)$/,
+  );
+  if (searchDomainMatch) {
+    const [, id, rowId] = searchDomainMatch;
+    return `network-${id}-search-domain-${rowId}`;
+  }
+
   return null;
 }
 

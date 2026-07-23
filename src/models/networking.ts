@@ -42,6 +42,10 @@ export const networkInterfaceExampleFieldSchema = z.enum([
 
 const COMPLETE_MAC_ADDRESS = /^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$/;
 
+export function isCompleteMac(value: string): boolean {
+  return COMPLETE_MAC_ADDRESS.test(value);
+}
+
 export function normalizeMacAddressDraft(value: string): string {
   return COMPLETE_MAC_ADDRESS.test(value) ? value.toLowerCase() : value;
 }
