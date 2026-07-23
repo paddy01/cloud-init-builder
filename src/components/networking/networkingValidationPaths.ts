@@ -1,4 +1,7 @@
-import { NETWORKING_STRUCTURAL_CODES } from "../../models/networkingCodes.ts";
+import {
+  NETWORKING_CROSS_INTERFACE_CODES,
+  NETWORKING_STRUCTURAL_CODES,
+} from "../../models/networkingCodes.ts";
 import type { BuilderNetworkInterface } from "../../models/networking.ts";
 
 export function isNetworkingIssuePath(path: string): boolean {
@@ -65,6 +68,10 @@ export function pathToFocusTargetId(path: string): string | null {
 
 export function isStructuralNetworkingCode(code: string): boolean {
   return NETWORKING_STRUCTURAL_CODES.has(code);
+}
+
+export function isCrossInterfaceNetworkingCode(code: string): boolean {
+  return NETWORKING_CROSS_INTERFACE_CODES.has(code);
 }
 
 export function getNetworkInterfaceSummaryLabel(

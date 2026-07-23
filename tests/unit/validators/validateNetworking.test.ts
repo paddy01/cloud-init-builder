@@ -10,6 +10,14 @@ import {
   validateNetworking,
 } from "../../../src/validators/validateNetworking.ts";
 import { validateConfig } from "../../../src/validators/validateConfig.ts";
+import {
+  isCrossInterfaceNetworkingCode,
+  isStructuralNetworkingCode,
+} from "../../../src/components/networking/networkingValidationPaths.ts";
+import {
+  NETWORKING_CROSS_INTERFACE_CODES,
+  NETWORKING_STRUCTURAL_CODES,
+} from "../../../src/models/networkingCodes.ts";
 
 function networkingConfig(
   interfaces: NetworkingConfig["interfaces"],
@@ -647,6 +655,36 @@ describe("validateNetworking", () => {
       expect(
         issues.filter((issue) => issue.code.startsWith("NET_DEFAULT_ROUTE_CONFLICT")),
       ).toEqual([]);
+    });
+
+    it("registers structural and cross-interface code sets", () => {
+      const structural = [
+        "NET_DUP_TARGET",
+        "NET_DUP_ADDRESS_SAME_INTERFACE",
+        "NET_DUP_ADDRESS_CROSS_INTERFACE",
+        "NET_ROUTE_FAMILY_MISMATCH",
+        "NET_ROUTE_UNREACHABLE_FAMILY",
+        "NET_DEFAULT_ROUTE_CONFLICT_SAME_INTERFACE",
+        "NET_DEFAULT_ROUTE_CONFLICT_CROSS_INTERFACE",
+      ];
+      for (const code of structural) {
+        expect(NETWORKING_STRUCTURAL_CODES.has(code)).toBe(true);
+        expect(isStructuralNetworkingCode(code)).toBe(true);
+      }
+
+      const cross = [
+        "NET_DUP_TARGET",
+        "NET_DUP_ADDRESS_CROSS_INTERFACE",
+        "NET_DEFAULT_ROUTE_CONFLICT_CROSS_INTERFACE",
+      ];
+      for (const code of cross) {
+        expect(NETWORKING_CROSS_INTERFACE_CODES.has(code)).toBe(true);
+        expect(isCrossInterfaceNetworkingCode(code)).toBe(true);
+      }
+
+      expect(isCrossInterfaceNetworkingCode("NET_DUP_ADDRESS_SAME_INTERFACE")).toBe(
+        false,
+      );
     });
   });
 });
