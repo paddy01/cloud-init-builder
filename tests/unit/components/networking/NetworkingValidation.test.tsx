@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { NetworkingSection } from "../../../../src/components/networking/NetworkingSection.tsx";
 import { UserValidationProvider } from "../../../../src/components/users/UserValidationProvider.tsx";
@@ -399,6 +400,81 @@ describe("NetworkingValidation", () => {
         "id",
         `network-iface-metric-ipv4-route-${defaultRouteId}-metric`,
       );
+    });
+  });
+
+  it("renders cross-interface alerts on both duplicate-named interfaces without blur", async () => {
+    seedInterface("dup-a", { name: "eth0" });
+    seedInterface("dup-b", { name: "eth0" });
+    renderNetworkingSection();
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(
+          "Conflicts with another interface — see the networking summary above.",
+        ),
+      ).toHaveLength(2);
+    });
+    expect(screen.getByText("Networking needs attention")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /eth0:/ })).toHaveLength(2);
+  });
+
+  it("does not render cross-interface alert for same-interface duplicate address only", async () => {
+    seedInterface("local-dup");
+    const rowA = "addr-a";
+    const rowB = "addr-b";
+    useProjectStore.getState().addNetworkAddress("local-dup", "ipv4", rowA);
+    useProjectStore.getState().addNetworkAddress("local-dup", "ipv4", rowB);
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("local-dup", "ipv4", rowA, "192.0.2.10/24");
+    useProjectStore
+      .getState()
+      .updateNetworkAddress("local-dup", "ipv4", rowB, "192.0.2.10/24");
+
+    renderNetworkingSection();
+
+    const article = screen.getByRole("article");
+    await waitFor(() => {
+      expect(
+        within(article).getAllByText(
+          /Duplicate address\. 192\.0\.2\.10\/24 is already used on this interface\./,
+        ),
+      ).toHaveLength(2);
+    });
+    expect(
+      screen.queryByText(
+        "Conflicts with another interface — see the networking summary above.",
+      ),
+    ).toBeNull();
+  });
+
+  it("shows structural blockers immediately while field-format errors stay touch-gated", async () => {
+    seedInterface("mixed-visibility", { name: "eth0" });
+    seedInterface("mixed-peer", { name: "eth0" });
+    useProjectStore.getState().setNetworkMtuEnabled("mixed-visibility", true);
+    useProjectStore.getState().updateNetworkMtu("mixed-visibility", "0");
+
+    renderNetworkingSection();
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(
+          "Conflicts with another interface — see the networking summary above.",
+        ),
+      ).toHaveLength(2);
+    });
+    expect(
+      screen.queryByText(NETWORKING_VALIDATION_MESSAGES.NET_MTU_INVALID),
+    ).toBeNull();
+
+    const mtuInput = screen.getAllByLabelText("MTU")[0]!;
+    fireEvent.blur(mtuInput);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(NETWORKING_VALIDATION_MESSAGES.NET_MTU_INVALID),
+      ).toBeInTheDocument();
     });
   });
 });

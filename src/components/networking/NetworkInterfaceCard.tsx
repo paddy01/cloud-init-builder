@@ -52,7 +52,9 @@ export function NetworkInterfaceCard({
   onRemove,
   onMove,
 }: NetworkInterfaceCardProps) {
-  const { consumeFocusRequest } = useValidation();
+  const { consumeFocusRequest, hasCrossInterfaceStructuralConflict } =
+    useValidation();
+  const showCrossInterfaceAlert = hasCrossInterfaceStructuralConflict(entry.id);
   const cardRef = useRef<HTMLElement>(null);
   const activeInputRef = useRef<HTMLInputElement>(null);
   const moveUpRef = useRef<HTMLButtonElement>(null);
@@ -150,12 +152,19 @@ export function NetworkInterfaceCard({
       className="min-w-0 rounded border border-gray-200 bg-white p-4 sm:p-6"
     >
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <h3
-          id={`network-interface-title-${entry.id}`}
-          className="min-w-0 break-words text-sm font-semibold text-gray-900"
-        >
-          {title}
-        </h3>
+        <div className="min-w-0">
+          <h3
+            id={`network-interface-title-${entry.id}`}
+            className="min-w-0 break-words text-sm font-semibold text-gray-900"
+          >
+            {title}
+          </h3>
+          {showCrossInterfaceAlert ? (
+            <p role="alert" className="mt-1 text-xs text-red-600">
+              Conflicts with another interface — see the networking summary above.
+            </p>
+          ) : null}
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           <div className="flex items-center gap-2" role="group" aria-label={`Reorder ${title}`}>
             <button

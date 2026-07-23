@@ -25,6 +25,7 @@ import {
 } from "../commands/commandValidationPaths.ts";
 import {
   isNetworkingIssuePath,
+  isCrossInterfaceNetworkingCode,
   isStructuralNetworkingCode,
   sortNetworkingSummaryIssues,
 } from "../networking/networkingValidationPaths.ts";
@@ -426,6 +427,19 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     [isIssueVisible, mergedIssues],
   );
 
+  const hasCrossInterfaceStructuralConflict = useCallback(
+    (interfaceId: string) => {
+      const prefix = `networking.interfaces.${interfaceId}.`;
+      return mergedIssues.some(
+        (issue) =>
+          issue.path.startsWith(prefix) &&
+          isIssueVisible(issue) &&
+          isCrossInterfaceNetworkingCode(issue.code),
+      );
+    },
+    [isIssueVisible, mergedIssues],
+  );
+
   const getFirstBlockingIssueSection = useCallback((): "identity" | "users" | "commands" => {
     const firstError = blockingErrors[0];
     if (!firstError) {
@@ -470,6 +484,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       getVisibleCommandSummaryIssues,
       getCardIssueCounts,
       getCommandCardIssueCounts,
+      hasCrossInterfaceStructuralConflict,
       getFirstBlockingIssueSection,
       getFirstBlockingCommandStage,
     }),
@@ -498,6 +513,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       getVisibleCommandSummaryIssues,
       getCardIssueCounts,
       getCommandCardIssueCounts,
+      hasCrossInterfaceStructuralConflict,
       getFirstBlockingIssueSection,
       getFirstBlockingCommandStage,
     ],

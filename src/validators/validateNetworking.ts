@@ -472,7 +472,7 @@ function validateConflictingDefaultRoutes(
   const refs = buildDefaultRouteRefs(interfaces);
   const groups = groupBy(refs, (ref) => ref.family);
 
-  for (const [family, group] of groups) {
+  for (const [, group] of groups) {
     if (!defaultRoutesConflict(group)) {
       continue;
     }
@@ -482,7 +482,7 @@ function validateConflictingDefaultRoutes(
       interfaceIds.size === 1
         ? "NET_DEFAULT_ROUTE_CONFLICT_SAME_INTERFACE"
         : "NET_DEFAULT_ROUTE_CONFLICT_CROSS_INTERFACE";
-    const label = familyLabel(family);
+    const label = familyLabel(group[0]!.family);
     const message =
       NETWORKING_VALIDATION_MESSAGES.NET_DEFAULT_ROUTE_CONFLICT(label);
 

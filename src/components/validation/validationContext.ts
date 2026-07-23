@@ -34,6 +34,7 @@ export interface ValidationContextValue {
     stage: CommandStage,
     commandId: string,
   ) => { errors: number; warnings: number };
+  hasCrossInterfaceStructuralConflict: (interfaceId: string) => boolean;
   getFirstBlockingIssueSection: () => "identity" | "users" | "commands";
   getFirstBlockingCommandStage: () => CommandStage | null;
 }
@@ -68,6 +69,7 @@ const noopValidation: ValidationContextValue = {
   getVisibleCommandSummaryIssues: () => [],
   getCardIssueCounts: () => ({ errors: 0, warnings: 0 }),
   getCommandCardIssueCounts: () => ({ errors: 0, warnings: 0 }),
+  hasCrossInterfaceStructuralConflict: () => false,
   getFirstBlockingIssueSection: () => "identity",
   getFirstBlockingCommandStage: () => null,
 };

@@ -382,7 +382,7 @@ describe("validateNetworking", () => {
         kind: "default" as const,
         gateway,
         metric,
-        exampleFields: [] as const,
+        exampleFields: [],
       };
     }
 
