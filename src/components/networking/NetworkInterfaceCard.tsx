@@ -93,14 +93,33 @@ export function NetworkInterfaceCard({
       return;
     }
 
-    const element = document.getElementById(targetId);
-    if (!element) {
-      return;
-    }
+    let cancelled = false;
+    let attempts = 0;
 
-    element.focus({ preventScroll: true });
-    scrollCardIntoView(cardRef.current);
-    consumeFocusRequest();
+    const tryFocus = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const element = document.getElementById(targetId);
+      if (!element) {
+        attempts += 1;
+        if (attempts < 10) {
+          requestAnimationFrame(tryFocus);
+        }
+        return;
+      }
+
+      element.focus({ preventScroll: true });
+      scrollCardIntoView(cardRef.current);
+      consumeFocusRequest();
+    };
+
+    tryFocus();
+
+    return () => {
+      cancelled = true;
+    };
   }, [consumeFocusRequest, validationFocusPath]);
 
   const cancelRemoval = () => {

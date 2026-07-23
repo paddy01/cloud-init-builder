@@ -4,6 +4,8 @@ import type {
   BuilderValueRow,
 } from "../../models/networking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { useValidation } from "../validation/validationContext.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
 
 const inputClass =
   "min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -35,6 +37,11 @@ function DnsList({
   onChange,
   onRemove,
 }: DnsListProps) {
+  const {
+    getVisibleIssuesForPath,
+    getFieldMessageId,
+    markTouched,
+  } = useValidation();
   const [focusTarget, setFocusTarget] = useState<
     { kind: "row"; id: string } | { kind: "add" } | null
   >(null);
@@ -90,6 +97,15 @@ function DnsList({
             const accessibleName = `${singular} ${position} for ${title}`;
             const inputId = `network-${entry.id}-${kind}-${row.id}`;
             const markerId = `${inputId}-example`;
+            const fieldKey = isNameserver ? "nameservers" : "searchDomains";
+            const path = `networking.interfaces.${entry.id}.${fieldKey}.${row.id}`;
+            const issues = getVisibleIssuesForPath(path);
+            const messageIds = issues.map((issue) =>
+              getFieldMessageId(path, issue.code),
+            );
+            const describedBy = [row.isExampleValue ? markerId : null, ...messageIds]
+              .filter((value): value is string => value !== null)
+              .join(" ");
             return (
               <div
                 key={row.id}
@@ -123,7 +139,7 @@ function DnsList({
                     spellCheck={false}
                     className={inputClass}
                     aria-label={accessibleName}
-                    aria-describedby={row.isExampleValue ? markerId : undefined}
+                    aria-describedby={describedBy || undefined}
                     placeholder={
                       isNameserver
                         ? "192.0.2.53 or 2001:db8::53"
@@ -131,7 +147,16 @@ function DnsList({
                     }
                     value={row.value}
                     onChange={(event) => onChange(row.id, event.target.value)}
+                    onBlur={() => markTouched(path)}
                   />
+                  {issues.map((issue) => (
+                    <FieldMessage
+                      key={issue.code}
+                      id={getFieldMessageId(path, issue.code)}
+                      message={issue.message}
+                      severity={issue.severity}
+                    />
+                  ))}
                 </div>
                 <button
                   type="button"

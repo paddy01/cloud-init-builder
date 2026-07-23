@@ -9,6 +9,30 @@ import {
   type NetworkRouteField,
   type NetworkRouteKind,
 } from "../../state/projectStore.ts";
+import { useValidation } from "../validation/validationContext.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
+
+function routeFieldPath(
+  interfaceId: string,
+  family: NetworkFamily,
+  routeId: string,
+  field: NetworkRouteField,
+): string {
+  return `networking.interfaces.${interfaceId}.${family}Routes.${routeId}.${field}`;
+}
+
+function describedByIds(
+  markerId: string | null,
+  path: string,
+  issues: { code: string }[],
+  getFieldMessageId: (path: string, code: string) => string,
+): string | undefined {
+  const messageIds = issues.map((issue) => getFieldMessageId(path, issue.code));
+  const ids = [markerId, ...messageIds].filter(
+    (value): value is string => value !== null && value !== "",
+  );
+  return ids.length > 0 ? ids.join(" ") : undefined;
+}
 
 const inputClass =
   "min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -50,6 +74,11 @@ function RouteRow({
   onToggleExpanded,
   onRemove,
 }: RouteRowProps) {
+  const {
+    getVisibleIssuesForPath,
+    getFieldMessageId,
+    markTouched,
+  } = useValidation();
   const familyLabel = family === "ipv4" ? "IPv4" : "IPv6";
   const title = interfaceTitle(entry);
   const visibleTitle = routeTitle(route);
@@ -62,6 +91,17 @@ function RouteRow({
   const gatewayMarkerId = `${gatewayId}-example`;
   const metricMarkerId = `${metricId}-example`;
   const advancedPanelId = `network-${entry.id}-${family}-route-${route.id}-advanced`;
+  const destinationPath = routeFieldPath(
+    entry.id,
+    family,
+    route.id,
+    "destination",
+  );
+  const gatewayPath = routeFieldPath(entry.id, family, route.id, "gateway");
+  const metricPath = routeFieldPath(entry.id, family, route.id, "metric");
+  const destinationIssues = getVisibleIssuesForPath(destinationPath);
+  const gatewayIssues = getVisibleIssuesForPath(gatewayPath);
+  const metricIssues = getVisibleIssuesForPath(metricPath);
   const marker = (id: string) => (
     <span id={id} className="text-xs font-normal text-amber-700">
       Example value—replace for your network
@@ -96,11 +136,14 @@ function RouteRow({
                 spellCheck={false}
                 className={inputClass}
                 aria-label={`Destination for ${familyLabel} ${intent} route ${position} for ${title}`}
-                aria-describedby={
+                aria-describedby={describedByIds(
                   route.exampleFields.includes("destination")
                     ? destinationMarkerId
-                    : undefined
-                }
+                    : null,
+                  destinationPath,
+                  destinationIssues,
+                  getFieldMessageId,
+                )}
                 placeholder={
                   family === "ipv4"
                     ? "198.51.100.0/24"
@@ -110,7 +153,16 @@ function RouteRow({
                 onChange={(event) =>
                   onChange("destination", event.target.value)
                 }
+                onBlur={() => markTouched(destinationPath)}
               />
+              {destinationIssues.map((issue) => (
+                <FieldMessage
+                  key={issue.code}
+                  id={getFieldMessageId(destinationPath, issue.code)}
+                  message={issue.message}
+                  severity={issue.severity}
+                />
+              ))}
             </div>
           ) : null}
 
@@ -134,15 +186,25 @@ function RouteRow({
               spellCheck={false}
               className={inputClass}
               aria-label={`${route.kind === "default" ? "Gateway" : "Gateway (optional)"} for ${familyLabel} ${intent} route ${position} for ${title}`}
-              aria-describedby={
-                route.exampleFields.includes("gateway")
-                  ? gatewayMarkerId
-                  : undefined
-              }
+              aria-describedby={describedByIds(
+                route.exampleFields.includes("gateway") ? gatewayMarkerId : null,
+                gatewayPath,
+                gatewayIssues,
+                getFieldMessageId,
+              )}
               placeholder={family === "ipv4" ? "192.0.2.1" : "2001:db8::1"}
               value={route.gateway}
               onChange={(event) => onChange("gateway", event.target.value)}
+              onBlur={() => markTouched(gatewayPath)}
             />
+            {gatewayIssues.map((issue) => (
+              <FieldMessage
+                key={issue.code}
+                id={getFieldMessageId(gatewayPath, issue.code)}
+                message={issue.message}
+                severity={issue.severity}
+              />
+            ))}
           </div>
         </div>
 
@@ -185,15 +247,25 @@ function RouteRow({
               spellCheck={false}
               className={inputClass}
               aria-label={`Metric (optional) for ${familyLabel} ${intent} route ${position} for ${title}`}
-              aria-describedby={
-                route.exampleFields.includes("metric")
-                  ? metricMarkerId
-                  : undefined
-              }
+              aria-describedby={describedByIds(
+                route.exampleFields.includes("metric") ? metricMarkerId : null,
+                metricPath,
+                metricIssues,
+                getFieldMessageId,
+              )}
               placeholder="100"
               value={route.metric}
               onChange={(event) => onChange("metric", event.target.value)}
+              onBlur={() => markTouched(metricPath)}
             />
+            {metricIssues.map((issue) => (
+              <FieldMessage
+                key={issue.code}
+                id={getFieldMessageId(metricPath, issue.code)}
+                message={issue.message}
+                severity={issue.severity}
+              />
+            ))}
           </div>
         ) : null}
       </div>
@@ -214,6 +286,7 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
   const removeNetworkRoute = useProjectStore(
     (state) => state.removeNetworkRoute,
   );
+  const { focusRequestPath } = useValidation();
   const [focusTarget, setFocusTarget] = useState<
     { kind: "row"; id: string } | { kind: "add-default" } | null
   >(null);
@@ -225,6 +298,34 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
   const familyLabel = family === "ipv4" ? "IPv4" : "IPv6";
   const routes = family === "ipv4" ? entry.ipv4Routes : entry.ipv6Routes;
   const headingId = `network-${entry.id}-${family}-routes-heading`;
+  const metricFocusRouteId = (() => {
+    if (!focusRequestPath) {
+      return null;
+    }
+    const metricMatch = focusRequestPath.match(
+      new RegExp(
+        `^networking\\.interfaces\\.${entry.id}\\.${family}Routes\\.([^.]+)\\.metric$`,
+      ),
+    );
+    return metricMatch?.[1] ?? null;
+  })();
+
+  useLayoutEffect(() => {
+    if (!metricFocusRouteId || expandedRouteIds.has(metricFocusRouteId)) {
+      return;
+    }
+
+  // Focus-driven disclosure must persist after consumeFocusRequest clears the path.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot expand for metric focus
+    setExpandedRouteIds((current) => {
+      if (current.has(metricFocusRouteId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.add(metricFocusRouteId);
+      return next;
+    });
+  }, [expandedRouteIds, metricFocusRouteId]);
 
   useLayoutEffect(() => {
     if (!focusTarget) return;
@@ -283,7 +384,10 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
               family={family}
               route={route}
               position={index + 1}
-              isExpanded={expandedRouteIds.has(route.id)}
+              isExpanded={
+                expandedRouteIds.has(route.id) ||
+                route.id === metricFocusRouteId
+              }
               firstFieldRef={(node) => {
                 if (node) firstFieldRefs.current.set(route.id, node);
                 else firstFieldRefs.current.delete(route.id);

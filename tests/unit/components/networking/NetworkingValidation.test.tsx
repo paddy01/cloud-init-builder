@@ -231,4 +231,174 @@ describe("NetworkingValidation", () => {
     expect(screen.queryByText("Networking needs attention")).toBeNull();
     expect(screen.getByRole("article")).toBeInTheDocument();
   });
+
+  it("focuses a route destination from the networking summary", async () => {
+    seedInterface("iface-route");
+    const routeId = "route-dest";
+    useProjectStore.getState().addNetworkRoute(
+      "iface-route",
+      "ipv4",
+      "specific",
+      routeId,
+    );
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "iface-route",
+        "ipv4",
+        routeId,
+        "destination",
+        "bad",
+      );
+
+    render(
+      <UserValidationProvider>
+        <RevealAllHarness>
+          <NetworkingSection />
+        </RevealAllHarness>
+      </UserValidationProvider>,
+    );
+
+    const summaryButton = await screen.findByRole("button", {
+      name: new RegExp(
+        `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_ROUTE_DEST_INVALID("IPv4")}`,
+      ),
+    });
+    fireEvent.click(summaryButton);
+
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute(
+        "id",
+        `network-iface-route-ipv4-route-${routeId}-destination`,
+      );
+    });
+  });
+
+  it("focuses nameserver and search-domain inputs from the summary", async () => {
+    seedInterface("iface-dns");
+    const nameserverId = "ns-1";
+    const domainId = "domain-1";
+    useProjectStore.getState().addNetworkNameserver("iface-dns", nameserverId);
+    useProjectStore
+      .getState()
+      .updateNetworkNameserver("iface-dns", nameserverId, "nope");
+    useProjectStore
+      .getState()
+      .addNetworkSearchDomain("iface-dns", domainId);
+    useProjectStore
+      .getState()
+      .updateNetworkSearchDomain("iface-dns", domainId, "no dots");
+
+    render(
+      <UserValidationProvider>
+        <RevealAllHarness>
+          <NetworkingSection />
+        </RevealAllHarness>
+      </UserValidationProvider>,
+    );
+
+    const nameserverButton = await screen.findByRole("button", {
+      name: new RegExp(
+        `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_NAMESERVER_INVALID}`,
+      ),
+    });
+    fireEvent.click(nameserverButton);
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute(
+        "id",
+        `network-iface-dns-nameserver-${nameserverId}`,
+      );
+    });
+
+    const domainButton = await screen.findByRole("button", {
+      name: new RegExp(
+        `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_DOMAIN_INVALID}`,
+      ),
+    });
+    fireEvent.click(domainButton);
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute(
+        "id",
+        `network-iface-dns-search-domain-${domainId}`,
+      );
+    });
+  });
+
+  it("expands only the targeted route Advanced panel when focusing a metric issue", async () => {
+    seedInterface("iface-metric");
+    const defaultRouteId = "route-default";
+    const specificRouteId = "route-specific";
+    useProjectStore.getState().addNetworkRoute(
+      "iface-metric",
+      "ipv4",
+      "default",
+      defaultRouteId,
+    );
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "iface-metric",
+        "ipv4",
+        defaultRouteId,
+        "gateway",
+        "192.0.2.1",
+      );
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "iface-metric",
+        "ipv4",
+        defaultRouteId,
+        "metric",
+        "-1",
+      );
+    useProjectStore.getState().addNetworkRoute(
+      "iface-metric",
+      "ipv4",
+      "specific",
+      specificRouteId,
+    );
+    useProjectStore
+      .getState()
+      .updateNetworkRouteField(
+        "iface-metric",
+        "ipv4",
+        specificRouteId,
+        "destination",
+        "198.51.100.0/24",
+      );
+
+    render(
+      <UserValidationProvider>
+        <RevealAllHarness>
+          <NetworkingSection />
+        </RevealAllHarness>
+      </UserValidationProvider>,
+    );
+
+    const defaultAdvanced = await screen.findByRole("button", {
+      name: "Advanced for IPv4 default route 1 for ens18",
+    });
+    const specificAdvanced = screen.getByRole("button", {
+      name: "Advanced for IPv4 specific route 2 for ens18",
+    });
+    expect(defaultAdvanced).toHaveAttribute("aria-expanded", "false");
+    expect(specificAdvanced).toHaveAttribute("aria-expanded", "false");
+
+    const summaryButton = await screen.findByRole("button", {
+      name: new RegExp(
+        `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_ROUTE_METRIC_INVALID}`,
+      ),
+    });
+    fireEvent.click(summaryButton);
+
+    await waitFor(() => {
+      expect(defaultAdvanced).toHaveAttribute("aria-expanded", "true");
+      expect(specificAdvanced).toHaveAttribute("aria-expanded", "false");
+      expect(document.activeElement).toHaveAttribute(
+        "id",
+        `network-iface-metric-ipv4-route-${defaultRouteId}-metric`,
+      );
+    });
+  });
 });
