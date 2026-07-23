@@ -1,6 +1,11 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { BuilderNetworkInterface } from "../../models/networking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { useValidation } from "../validation/validationContext.ts";
+import {
+  getInterfaceIdFromIssuePath,
+  isNetworkingIssuePath,
+} from "./networkingValidationPaths.ts";
 import { NetworkInterfaceCard } from "./NetworkInterfaceCard.tsx";
 import { NetworkingExamples } from "./NetworkingExamples.tsx";
 
@@ -14,6 +19,7 @@ export function NetworkInterfaceCardList({
   const addNetworkInterface = useProjectStore((state) => state.addNetworkInterface);
   const removeNetworkInterface = useProjectStore((state) => state.removeNetworkInterface);
   const moveNetworkInterface = useProjectStore((state) => state.moveNetworkInterface);
+  const { focusRequestPath } = useValidation();
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const [pendingReorderFocus, setPendingReorderFocus] = useState<{
@@ -94,6 +100,13 @@ export function NetworkInterfaceCardList({
           position={index + 1}
           total={interfaces.length}
           shouldFocusInput={pendingFocusId === entry.id}
+          validationFocusPath={
+            focusRequestPath &&
+            isNetworkingIssuePath(focusRequestPath) &&
+            getInterfaceIdFromIssuePath(focusRequestPath) === entry.id
+              ? focusRequestPath
+              : null
+          }
           reorderFocusDirection={
             pendingReorderFocus?.id === entry.id
               ? pendingReorderFocus.direction

@@ -1,6 +1,7 @@
 import { isNetworkingConfig } from "../../models/networking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { NetworkInterfaceCardList } from "./NetworkInterfaceCardList.tsx";
+import { NetworkingValidationSummary } from "./NetworkingValidationSummary.tsx";
 
 export function NetworkingSection() {
   const project = useProjectStore((state) => state.project);
@@ -39,6 +40,7 @@ export function NetworkingSection() {
         </p>
       </div>
 
+      <NetworkingValidationSummary />
       <NetworkInterfaceCardList interfaces={project.networking.interfaces} />
     </section>
   );

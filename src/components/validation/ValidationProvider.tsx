@@ -23,6 +23,11 @@ import {
   isCommandIssuePath,
   sortCommandSummaryIssues,
 } from "../commands/commandValidationPaths.ts";
+import {
+  isNetworkingIssuePath,
+  isStructuralNetworkingCode,
+  sortNetworkingSummaryIssues,
+} from "../networking/networkingValidationPaths.ts";
 import { isUserIssuePath } from "../users/userValidationPaths.ts";
 import { ValidationContext } from "./validationContext.ts";
 
@@ -213,7 +218,11 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
   }, [canonicalIssues, passwordDraftByUserId]);
 
   const blockingErrors = useMemo(
-    () => mergedIssues.filter((issue) => issue.severity === "error"),
+    () =>
+      mergedIssues.filter(
+        (issue) =>
+          issue.severity === "error" && !isNetworkingIssuePath(issue.path),
+      ),
     [mergedIssues],
   );
 
@@ -302,6 +311,15 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       if (issue.severity === "warning" && isCommandIssuePath(issue.path)) {
         return true;
       }
+      if (isNetworkingIssuePath(issue.path)) {
+        if (issue.severity === "warning") {
+          return true;
+        }
+        if (isStructuralNetworkingCode(issue.code)) {
+          return true;
+        }
+        return touchedPaths.has(issue.path);
+      }
       return touchedPaths.has(issue.path);
     },
     [revealAll, touchedPaths],
@@ -339,6 +357,13 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     return mergedIssues.filter(
       (issue) => isUserIssuePath(issue.path) && isIssueVisible(issue),
     );
+  }, [isIssueVisible, mergedIssues]);
+
+  const getVisibleNetworkingSummaryIssues = useCallback(() => {
+    const visible = mergedIssues.filter(
+      (issue) => isNetworkingIssuePath(issue.path) && isIssueVisible(issue),
+    );
+    return sortNetworkingSummaryIssues(visible);
   }, [isIssueVisible, mergedIssues]);
 
   const getVisibleCommandSummaryIssues = useCallback(
@@ -441,6 +466,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       getFieldMessageId,
       clearBlockedExportAnnouncement,
       getVisibleUserSummaryIssues,
+      getVisibleNetworkingSummaryIssues,
       getVisibleCommandSummaryIssues,
       getCardIssueCounts,
       getCommandCardIssueCounts,
@@ -468,6 +494,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       getFieldMessageId,
       clearBlockedExportAnnouncement,
       getVisibleUserSummaryIssues,
+      getVisibleNetworkingSummaryIssues,
       getVisibleCommandSummaryIssues,
       getCardIssueCounts,
       getCommandCardIssueCounts,

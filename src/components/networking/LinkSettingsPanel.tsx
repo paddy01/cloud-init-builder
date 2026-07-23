@@ -1,6 +1,9 @@
 import { useLayoutEffect, useRef } from "react";
 import type { BuilderNetworkInterface } from "../../models/networking.ts";
+import { networkFieldPath } from "../../validators/validateNetworking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
+import { useValidation } from "../validation/validationContext.ts";
+import { FieldMessage } from "../users/FieldMessage.tsx";
 
 interface LinkSettingsPanelProps {
   entry: BuilderNetworkInterface;
@@ -11,11 +14,24 @@ export function LinkSettingsPanel({ entry }: LinkSettingsPanelProps) {
     (state) => state.setNetworkMtuEnabled,
   );
   const updateNetworkMtu = useProjectStore((state) => state.updateNetworkMtu);
+  const {
+    getVisibleIssuesForPath,
+    getFieldMessageId,
+    markTouched,
+  } = useValidation();
   const mtuInputRef = useRef<HTMLInputElement>(null);
   const focusMtuAfterRender = useRef(false);
   const headingId = `network-${entry.id}-link-settings`;
   const markerId = `network-${entry.id}-mtu-example`;
   const isExample = entry.exampleFields.includes("mtu");
+  const mtuPath = networkFieldPath(entry.id, "mtu");
+  const mtuIssues = getVisibleIssuesForPath(mtuPath);
+  const mtuMessageIds = mtuIssues.map((issue) =>
+    getFieldMessageId(mtuPath, issue.code),
+  );
+  const mtuDescribedBy = [isExample ? markerId : null, ...mtuMessageIds]
+    .filter((value): value is string => value !== null)
+    .join(" ");
 
   useLayoutEffect(() => {
     if (!entry.mtuEnabled || !focusMtuAfterRender.current) return;
@@ -64,11 +80,20 @@ export function LinkSettingsPanel({ entry }: LinkSettingsPanelProps) {
             inputMode="numeric"
             className="min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             aria-label="MTU"
-            aria-describedby={isExample ? markerId : undefined}
+            aria-describedby={mtuDescribedBy || undefined}
             placeholder="1500"
             value={entry.mtu}
             onChange={(event) => updateNetworkMtu(entry.id, event.target.value)}
+            onBlur={() => markTouched(mtuPath)}
           />
+          {mtuIssues.map((issue) => (
+            <FieldMessage
+              key={issue.code}
+              id={getFieldMessageId(mtuPath, issue.code)}
+              message={issue.message}
+              severity={issue.severity}
+            />
+          ))}
         </div>
       ) : null}
     </section>

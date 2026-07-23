@@ -4,8 +4,10 @@ import {
 } from "../models/identity.ts";
 import { isCommandsConfig } from "../models/commands.ts";
 import type { ProjectFile } from "../models/project.ts";
+import { isNetworkingConfig } from "../models/networking.ts";
 import { isUsersConfig } from "../models/users.ts";
 import { validateCommands } from "./validateCommands.ts";
+import { validateNetworking } from "./validateNetworking.ts";
 import { isValidFqdn, isValidHostname } from "./hostname.ts";
 import { isValidLocale } from "./locale.ts";
 import { isValidTimezone } from "./timezone.ts";
@@ -106,6 +108,9 @@ export function validateConfig(
     ),
     ...validateCommands(
       isCommandsConfig(project?.commands) ? project.commands : undefined,
+    ),
+    ...validateNetworking(
+      isNetworkingConfig(project?.networking) ? project.networking : undefined,
     ),
   ];
 }

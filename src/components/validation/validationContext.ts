@@ -25,6 +25,7 @@ export interface ValidationContextValue {
   getFieldMessageId: (path: string, code: string) => string;
   clearBlockedExportAnnouncement: () => void;
   getVisibleUserSummaryIssues: () => ValidationIssue[];
+  getVisibleNetworkingSummaryIssues: () => ValidationIssue[];
   getVisibleCommandSummaryIssues: (activeStage: CommandStage) => ValidationIssue[];
   getCardIssueCounts: (
     userId: string,
@@ -63,6 +64,7 @@ const noopValidation: ValidationContextValue = {
     `${path.replace(/\./g, "-")}-${code}`.toLowerCase(),
   clearBlockedExportAnnouncement: () => undefined,
   getVisibleUserSummaryIssues: () => [],
+  getVisibleNetworkingSummaryIssues: () => [],
   getVisibleCommandSummaryIssues: () => [],
   getCardIssueCounts: () => ({ errors: 0, warnings: 0 }),
   getCommandCardIssueCounts: () => ({ errors: 0, warnings: 0 }),

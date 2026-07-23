@@ -10,12 +10,15 @@ import { DnsPanel } from "./DnsPanel.tsx";
 import { LinkSettingsPanel } from "./LinkSettingsPanel.tsx";
 import { NetworkIdentitySelector } from "./NetworkIdentitySelector.tsx";
 import { RoutesPanel } from "./RoutesPanel.tsx";
+import { useValidation } from "../validation/validationContext.ts";
+import { pathToFocusTargetId } from "./networkingValidationPaths.ts";
 
 interface NetworkInterfaceCardProps {
   entry: BuilderNetworkInterface;
   position: number;
   total: number;
   shouldFocusInput: boolean;
+  validationFocusPath: string | null;
   reorderFocusDirection: "up" | "down" | null;
   onFocused: () => void;
   onReorderFocused: () => void;
@@ -42,12 +45,14 @@ export function NetworkInterfaceCard({
   position,
   total,
   shouldFocusInput,
+  validationFocusPath,
   reorderFocusDirection,
   onFocused,
   onReorderFocused,
   onRemove,
   onMove,
 }: NetworkInterfaceCardProps) {
+  const { consumeFocusRequest } = useValidation();
   const cardRef = useRef<HTMLElement>(null);
   const activeInputRef = useRef<HTMLInputElement>(null);
   const moveUpRef = useRef<HTMLButtonElement>(null);
@@ -77,6 +82,26 @@ export function NetworkInterfaceCard({
     }
     onReorderFocused();
   }, [isFirst, isLast, onReorderFocused, reorderFocusDirection]);
+
+  useLayoutEffect(() => {
+    if (!validationFocusPath) {
+      return;
+    }
+
+    const targetId = pathToFocusTargetId(validationFocusPath);
+    if (!targetId) {
+      return;
+    }
+
+    const element = document.getElementById(targetId);
+    if (!element) {
+      return;
+    }
+
+    element.focus({ preventScroll: true });
+    scrollCardIntoView(cardRef.current);
+    consumeFocusRequest();
+  }, [consumeFocusRequest, validationFocusPath]);
 
   const cancelRemoval = () => {
     setShowRemoveDialog(false);
