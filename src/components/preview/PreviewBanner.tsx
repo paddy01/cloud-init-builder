@@ -2,9 +2,9 @@ import type { ValidationIssue } from "../../validators/validateConfig.ts";
 
 export function formatPreviewIssueLabel(path: string): string {
   const last = path.split(".")[path.split(".").length - 1] ?? path;
-  if (path.startsWith("identity.")) return `Identity · ${path.slice(9)}`;
-  if (path.startsWith("users.entries.")) return `Users · ${last}`;
-  if (path.startsWith("commands.")) return `Commands · ${last}`;
+  if (path.startsWith("identity.")) return path.slice(9);
+  if (path.startsWith("users.entries.")) return last;
+  if (path.startsWith("commands.")) return last;
   if (path.startsWith("networking.interfaces.")) return `Networking · ${last}`;
   return path;
 }

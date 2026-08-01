@@ -1,7 +1,8 @@
-import { isNetworkingConfig } from "../../models/networking.ts";
+import { isNetworkingConfig, isSemanticallyBlankNetworkInterface } from "../../models/networking.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { NetworkInterfaceCardList } from "./NetworkInterfaceCardList.tsx";
 import { NetworkingValidationSummary } from "./NetworkingValidationSummary.tsx";
+import { NetworkingOutputDisclosure } from "./NetworkingOutputDisclosure.tsx";
 
 export function NetworkingSection() {
   const project = useProjectStore((state) => state.project);
@@ -40,6 +41,7 @@ export function NetworkingSection() {
         </p>
       </div>
 
+      {project.networking.interfaces.some((entry) => !isSemanticallyBlankNetworkInterface(entry)) && <NetworkingOutputDisclosure variant="editor" />}
       <NetworkingValidationSummary />
       <NetworkInterfaceCardList interfaces={project.networking.interfaces} />
     </section>

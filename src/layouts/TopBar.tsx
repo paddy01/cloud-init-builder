@@ -519,7 +519,7 @@ export function TopBar() {
           </span>
         )}
         <div className="hidden flex-1 sm:block" />
-        <div className="order-2 flex w-full items-center justify-between gap-1 sm:order-none sm:w-auto sm:justify-start sm:gap-3">
+        <div className="order-2 flex w-full min-w-0 flex-wrap items-center justify-between gap-1 sm:order-none sm:w-auto sm:flex-nowrap sm:justify-start sm:gap-3">
           <button
             type="button"
             onClick={handleNew}
