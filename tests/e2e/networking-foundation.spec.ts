@@ -35,7 +35,7 @@ async function expectFortyPixelSquare(locator: Locator) {
 }
 
 test.describe("networking foundation", () => {
-  test("builds, saves, reopens, and keeps networking outside YAML", async ({
+  test("builds, saves, reopens, and embeds networking in YAML", async ({
     page,
   }, testInfo) => {
     test.setTimeout(90_000);
@@ -96,13 +96,13 @@ test.describe("networking foundation", () => {
     await firstNameInput.fill(LONG_DEVICE_NAME);
     await firstCard
       .getByRole("radio", { name: "MAC address" })
-      .check({ force: true });
+      .click({ force: true });
     await firstCard
       .getByRole("textbox", { name: "MAC address" })
       .fill(FIRST_MAC_DRAFT);
     await firstCard
       .getByRole("radio", { name: "Device name" })
-      .check({ force: true });
+      .click({ force: true });
     await expect(firstNameInput).toHaveValue(LONG_DEVICE_NAME);
 
     await page.getByRole("button", { name: "Add blank interface" }).click();
@@ -112,7 +112,7 @@ test.describe("networking foundation", () => {
       .fill(SECOND_NAME_DRAFT);
     await secondCard
       .getByRole("radio", { name: "MAC address" })
-      .check({ force: true });
+      .click({ force: true });
     await secondCard
       .getByRole("textbox", { name: "MAC address" })
       .fill(SECOND_MAC_DRAFT);
@@ -272,7 +272,7 @@ test.describe("networking foundation", () => {
     await page.getByRole("button", { name: "Export YAML" }).click();
     const yaml = await downloadText(await yamlDownloadPromise);
     expect(yaml.startsWith("#cloud-config\n")).toBe(true);
-    expect(yaml).not.toMatch(/^network:/m);
+    expect(yaml).toMatch(/^network:/m);
     for (const id of savedIds) {
       expect(yaml).not.toContain(id);
     }

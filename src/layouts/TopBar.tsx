@@ -159,7 +159,7 @@ export function TopBar() {
       noProject,
       userErrorCount,
       networkingErrorCount,
-      networkingErrorCount,
+      hasNetworkingErrors,
     ],
   );
 
@@ -183,6 +183,7 @@ export function TopBar() {
       identityErrorCount,
       noProject,
       userErrorCount,
+      networkingErrorCount,
     ],
   );
 

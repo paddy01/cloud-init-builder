@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { ValidationIssue } from "../../validators/validateConfig.ts";
 
 export function formatPreviewIssueLabel(path: string): string {
