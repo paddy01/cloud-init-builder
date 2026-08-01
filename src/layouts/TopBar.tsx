@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { COMMANDS_VALIDATION_SUMMARY_HEADING_ID } from "../components/commands/CommandValidationSummary.tsx";
 import { useUserValidation } from "../components/users/UserValidationContext.ts";
 import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
+import { NETWORKING_VALIDATION_SUMMARY_HEADING_ID } from "../components/networking/NetworkingValidationSummary.tsx";
+import { isNetworkingIssuePath } from "../components/networking/networkingValidationPaths.ts";
 import type { YamlOutputChannel } from "../components/validation/validationContext.ts";
 import { exportProject, importProject } from "../services/projectService.ts";
 import { copyCloudInitYaml, exportCloudInitYaml } from "../services/yamlService.ts";
@@ -16,6 +18,10 @@ function isCommandIssue(path: string): boolean {
   return path.startsWith("commands.");
 }
 
+function isNetworkingIssue(path: string): boolean {
+  return isNetworkingIssuePath(path);
+}
+
 function buildBlockedYamlTooltip(
   channel: YamlOutputChannel,
   {
@@ -24,6 +30,8 @@ function buildBlockedYamlTooltip(
     userErrorCount,
     hasCommandErrors,
     commandErrorCount,
+    hasNetworkingErrors,
+    networkingErrorCount,
     identityErrorCount,
   }: {
     noProject: boolean;
@@ -31,6 +39,8 @@ function buildBlockedYamlTooltip(
     userErrorCount: number;
     hasCommandErrors: boolean;
     commandErrorCount: number;
+    hasNetworkingErrors: boolean;
+    networkingErrorCount: number;
     identityErrorCount: number;
   },
 ): string {
@@ -64,6 +74,10 @@ function buildBlockedYamlTooltip(
       return `${prefix}. 1 command validation error prevents YAML output. Review the Commands validation summary.`;
     }
     return `${prefix}. ${commandErrorCount} command validation errors prevent YAML output. Review the Commands validation summary.`;
+  }
+
+  if (hasNetworkingErrors) {
+    return `${prefix}. ${networkingErrorCount} networking validation ${networkingErrorCount === 1 ? "error" : "errors"} prevents ${channel === "export" ? "export" : "YAML output"}. Review the Networking validation summary.`;
   }
 
   if (channel === "export") {
@@ -116,10 +130,13 @@ export function TopBar() {
   const nativeExportDisabled = noProject;
   const userErrors = blockingErrors.filter((issue) => isUserIssue(issue.path));
   const commandErrors = blockingErrors.filter((issue) => isCommandIssue(issue.path));
+  const networkingErrors = blockingErrors.filter((issue) => isNetworkingIssue(issue.path));
   const userErrorCount = userErrors.length;
   const commandErrorCount = commandErrors.length;
   const hasUserErrors = userErrorCount > 0;
   const hasCommandErrors = commandErrorCount > 0;
+  const networkingErrorCount = networkingErrors.length;
+  const hasNetworkingErrors = networkingErrorCount > 0;
   const identityErrorCount = blockingErrors.length;
 
   const exportTooltipText = useMemo(
@@ -130,6 +147,8 @@ export function TopBar() {
         userErrorCount,
         hasCommandErrors,
         commandErrorCount,
+        hasNetworkingErrors,
+        networkingErrorCount,
         identityErrorCount,
       }),
     [
@@ -139,6 +158,8 @@ export function TopBar() {
       identityErrorCount,
       noProject,
       userErrorCount,
+      networkingErrorCount,
+      networkingErrorCount,
     ],
   );
 
@@ -150,12 +171,15 @@ export function TopBar() {
         userErrorCount,
         hasCommandErrors,
         commandErrorCount,
+        hasNetworkingErrors,
+        networkingErrorCount,
         identityErrorCount,
       }),
     [
       commandErrorCount,
       hasCommandErrors,
       hasUserErrors,
+      hasNetworkingErrors,
       identityErrorCount,
       noProject,
       userErrorCount,
@@ -192,6 +216,11 @@ export function TopBar() {
     if (section === "commands") {
       setActiveSection("commands");
       requestFocus(COMMANDS_VALIDATION_SUMMARY_HEADING_ID);
+      return;
+    }
+    if (section === "networking") {
+      setActiveSection("networking");
+      requestFocus(NETWORKING_VALIDATION_SUMMARY_HEADING_ID);
       return;
     }
     setActiveSection("identity");

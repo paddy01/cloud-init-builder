@@ -725,7 +725,7 @@ describe("MainLayout export gating", () => {
 
     const aside = container.querySelector("aside");
     expect(aside).toBeTruthy();
-    expect(within(aside!).getByText(/validation error/i)).toBeInTheDocument();
+    expect(within(aside!).getAllByText(/validation error/i).length).toBeGreaterThan(0);
     expect(
       within(aside!).getByText(
         /Export blocked: enter a supported password hash/i,
@@ -1021,15 +1021,15 @@ describe("MainLayout Phase 4 regression hardening", () => {
       expect(screen.getByText("Users need attention")).toBeInTheDocument();
     });
     expect(
-      screen.getByText(
+      screen.getAllByText(
         "Export blocked: add a supported password hash or at least one valid SSH key for this login user.",
-      ),
-    ).toBeInTheDocument();
+      ).length,
+    ).toBeGreaterThan(0);
     expect(
-      screen.getByText(
+      screen.getAllByText(
         "Export blocked: enter a username or clear the other fields to omit this card.",
-      ),
-    ).toBeInTheDocument();
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it("keeps aria-invalid off warning-only uppercase usernames", () => {

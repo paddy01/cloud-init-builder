@@ -42,6 +42,11 @@ function MainLayoutContent() {
   const [view, setView] = useState<EditorPreviewView>("editor");
   const [activeSection, setActiveSection] = useState<EditorSection>("identity");
 
+  const showEditor = (path?: string) => {
+    setView("editor");
+    if (path) setActiveSection(path.startsWith("networking.") ? "networking" : path.startsWith("users.") ? "users" : path.startsWith("commands.") ? "commands" : "identity");
+  };
+
   return (
     <EditorNavigationProvider
       activeSection={activeSection}
@@ -64,12 +69,12 @@ function MainLayoutContent() {
               <div
                 className={view === "preview" ? "block lg:hidden" : "hidden"}
               >
-                <PreviewPanel />
+                <PreviewPanel onShowEditor={showEditor} />
               </div>
             </div>
           </main>
           <aside className="hidden w-80 border-l border-gray-200 bg-gray-50 lg:block">
-            <PreviewPanel />
+            <PreviewPanel onShowEditor={showEditor} />
           </aside>
         </div>
       </div>

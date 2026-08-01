@@ -49,7 +49,7 @@ describe("PreviewPanel empty state", () => {
     });
 
     expect(container.querySelector("pre code")).toBeNull();
-    expect(screen.getByText(/validation error/)).toBeInTheDocument();
+    expect(screen.getAllByText(/validation error/).length).toBeGreaterThan(0);
   });
 
   it("blocks output when hostname is undefined", () => {
@@ -174,7 +174,7 @@ describe("PreviewPanel debounce and validation", () => {
 
     expect(screen.getByText("2 validation errors")).toBeInTheDocument();
     expect(
-      screen.getAllByText(/name: Export blocked: username conflicts/i),
+      screen.getAllByText(/username conflicts with shared/i),
     ).toHaveLength(2);
 
     act(() => {

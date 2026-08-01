@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { CommandStage } from "../../models/commands.ts";
 import type { ValidationIssue } from "../../validators/validateConfig.ts";
+import type { EditorSection } from "../../layouts/editorNavigation.ts";
 
 export type YamlOutputChannel = "export" | "copy";
 
@@ -35,7 +36,7 @@ export interface ValidationContextValue {
     commandId: string,
   ) => { errors: number; warnings: number };
   hasCrossInterfaceStructuralConflict: (interfaceId: string) => boolean;
-  getFirstBlockingIssueSection: () => "identity" | "users" | "commands";
+  getFirstBlockingIssueSection: () => EditorSection;
   getFirstBlockingCommandStage: () => CommandStage | null;
 }
 

@@ -31,6 +31,7 @@ import {
 } from "../networking/networkingValidationPaths.ts";
 import { isUserIssuePath } from "../users/userValidationPaths.ts";
 import { ValidationContext } from "./validationContext.ts";
+import type { EditorSection } from "../../layouts/editorNavigation.ts";
 
 function passwdPath(userId: string): string {
   return `users.entries.${userId}.passwd`;
@@ -73,9 +74,7 @@ function buildDraftIssues(
   return issues;
 }
 
-function getIssueSection(
-  path: string,
-): "identity" | "users" | "commands" | null {
+function getIssueSection(path: string): EditorSection | null {
   if (path.startsWith("identity.")) {
     return "identity";
   }
@@ -84,6 +83,9 @@ function getIssueSection(
   }
   if (isCommandIssuePath(path)) {
     return "commands";
+  }
+  if (isNetworkingIssuePath(path)) {
+    return "networking";
   }
   return null;
 }
@@ -439,7 +441,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     [isIssueVisible, mergedIssues],
   );
 
-  const getFirstBlockingIssueSection = useCallback((): "identity" | "users" | "commands" => {
+  const getFirstBlockingIssueSection = useCallback((): EditorSection => {
     const firstError = blockingErrors[0];
     if (!firstError) {
       return "identity";
