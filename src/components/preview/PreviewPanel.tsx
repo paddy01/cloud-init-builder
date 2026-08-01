@@ -1,11 +1,7 @@
 import { useMemo } from "react";
-import {
-  CLOUD_CONFIG_HEADER,
-  generateCloudInit,
-} from "../../generators/generateCloudInit.ts";
-import { isCommandsConfig } from "../../models/commands.ts";
-import { isUsersConfig } from "../../models/users.ts";
+import { CLOUD_CONFIG_HEADER, generateCloudInit } from "../../generators/generateCloudInit.ts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.ts";
+import { toGenerateInput } from "../../services/yamlService.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { useValidation } from "../validation/validationContext.ts";
 import { PreviewBanner } from "./PreviewBanner.tsx";
@@ -16,15 +12,7 @@ export function PreviewPanel() {
   const { blockingErrors } = useValidation();
   const result = useMemo(
     () =>
-      generateCloudInit({
-        identity: debouncedProject?.identity,
-        users: isUsersConfig(debouncedProject?.users)
-          ? debouncedProject.users
-          : undefined,
-        commands: isCommandsConfig(debouncedProject?.commands)
-          ? debouncedProject.commands
-          : undefined,
-      }),
+      generateCloudInit(debouncedProject ? toGenerateInput(debouncedProject) : {}),
     [debouncedProject],
   );
 
@@ -37,6 +25,10 @@ export function PreviewPanel() {
         </p>
       </div>
     );
+  }
+
+  if (blockingErrors.length > 0) {
+    return <PreviewBanner issues={blockingErrors} />;
   }
 
   if (result.yaml === CLOUD_CONFIG_HEADER) {

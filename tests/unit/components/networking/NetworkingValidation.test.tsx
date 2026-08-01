@@ -182,7 +182,7 @@ describe("NetworkingValidation", () => {
     });
   });
 
-  it("keeps networking-only MTU errors out of blockingErrors and export gating", async () => {
+  it("includes networking-only MTU errors in blockingErrors and export gating", async () => {
     seedInterface("iface-nonblocking", {
       mtuEnabled: true,
       mtu: "0",
@@ -203,11 +203,11 @@ describe("NetworkingValidation", () => {
     );
 
     await waitFor(() => {
-      expect(blockingCount).toBe(0);
+      expect(blockingCount).toBe(1);
     });
 
     const exportBtn = screen.getByRole("button", { name: /export yaml/i });
-    expect(exportBtn).not.toHaveAttribute("aria-disabled", "true");
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
   });
 
   it("does not surface issues for semantically blank interfaces", () => {

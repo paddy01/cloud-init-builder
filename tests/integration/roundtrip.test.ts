@@ -23,6 +23,7 @@ import {
   exportProject,
   importProject,
 } from "../../src/services/projectService.ts";
+import { toGenerateInput } from "../../src/services/yamlService.ts";
 import identityUsersCommandsFull from "../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../fixtures/users-safety-valid.yaml?raw";
@@ -116,7 +117,7 @@ describe("networking project round-trip", () => {
     );
   });
 
-  it("preserves rich addressing drafts and provenance through two round trips without lowering networking", async () => {
+  it("preserves rich addressing drafts and provenance through two round trips and lowers networking", async () => {
     const firstImport = await importProject(
       fileFromJson(
         validProjectNetworkingAddressing,
@@ -150,45 +151,25 @@ describe("networking project round-trip", () => {
     expect(thirdImport.project).toEqual(firstImport.project);
     expect(thirdImport.project.networking).toEqual(expectedNetworking);
 
-    const generatorInput = {
-      identity: thirdImport.project.identity,
-      users: isUsersConfig(thirdImport.project.users)
-        ? thirdImport.project.users
-        : undefined,
-      commands: isCommandsConfig(thirdImport.project.commands)
-        ? thirdImport.project.commands
-        : undefined,
-    };
-    const yamlWithNetworkingState = generateCloudInit(generatorInput).yaml;
-    const yamlWithoutNetworkingState = generateCloudInit({
-      identity: firstImport.project.identity,
-      users: isUsersConfig(firstImport.project.users)
-        ? firstImport.project.users
-        : undefined,
-      commands: isCommandsConfig(firstImport.project.commands)
-        ? firstImport.project.commands
-        : undefined,
-    }).yaml;
+    const yamlWithNetworkingState = generateCloudInit(
+      toGenerateInput(thirdImport.project),
+    ).yaml;
+    const yamlAfterRoundTrip = generateCloudInit(
+      toGenerateInput(firstImport.project),
+    ).yaml;
 
-    expect(yamlWithNetworkingState).toBe(yamlWithoutNetworkingState);
-    expect(yamlWithNetworkingState).toBe("#cloud-config\nusers:\n  - default\n");
-    expect(yamlWithNetworkingState).not.toMatch(/^network:/m);
+    expect(yamlWithNetworkingState).toBe(yamlAfterRoundTrip);
+    expect(yamlWithNetworkingState).toMatch(/^network:/m);
     expect(yamlWithNetworkingState).not.toContain("isExampleValue");
     expect(yamlWithNetworkingState).not.toContain("exampleFields");
     expect(yamlWithNetworkingState).not.toContain("network-interface-rich");
   });
 
-  it("keeps networking outside generated cloud-init YAML", async () => {
+  it("keeps a captured networking snapshot stable after builder edits", async () => {
     const { project } = await importProject(
       fileFromJson(validProjectNetworkingV2),
     );
-    const generatorInput = {
-      identity: project.identity,
-      users: isUsersConfig(project.users) ? project.users : undefined,
-      commands: isCommandsConfig(project.commands)
-        ? project.commands
-        : undefined,
-    };
+    const generatorInput = structuredClone(toGenerateInput(project));
     const yamlBefore = generateCloudInit(generatorInput).yaml;
 
     project.networking.interfaces.reverse();
@@ -196,7 +177,7 @@ describe("networking project round-trip", () => {
     const yamlAfter = generateCloudInit(generatorInput).yaml;
 
     expect(yamlAfter).toBe(yamlBefore);
-    expect(yamlAfter).not.toMatch(/^network:/m);
+    expect(yamlAfter).toMatch(/^network:/m);
     expect(yamlAfter).not.toContain("network-interface-");
   });
 

@@ -3,14 +3,18 @@ import {
   type GenerateProjectInput,
 } from "../generators/generateCloudInit.ts";
 import { isCommandsConfig } from "../models/commands.ts";
+import { isNetworkingConfig } from "../models/networking.ts";
 import type { ProjectFile } from "../models/project.ts";
 import { isUsersConfig } from "../models/users.ts";
 import { slugify } from "../utils/slugify.ts";
 import { validateConfig } from "../validators/validateConfig.ts";
 
-function toGenerateInput(project: ProjectFile): GenerateProjectInput {
+export function toGenerateInput(project: ProjectFile): GenerateProjectInput {
   return {
     identity: project.identity,
+    networking: isNetworkingConfig(project.networking)
+      ? project.networking
+      : undefined,
     users: isUsersConfig(project.users) ? project.users : undefined,
     commands: isCommandsConfig(project.commands) ? project.commands : undefined,
   };

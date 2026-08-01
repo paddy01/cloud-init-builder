@@ -221,8 +221,7 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
   const blockingErrors = useMemo(
     () =>
       mergedIssues.filter(
-        (issue) =>
-          issue.severity === "error" && !isNetworkingIssuePath(issue.path),
+        (issue) => issue.severity === "error",
       ),
     [mergedIssues],
   );

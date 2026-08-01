@@ -44,6 +44,7 @@ describe("MainLayout networking navigation", () => {
   beforeEach(() => {
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
   });
 
   it("renders Networking explicitly without mutating project state", () => {
@@ -63,7 +64,7 @@ describe("MainLayout networking navigation", () => {
     expect(useProjectStore.getState().isDirty).toBe(beforeDirty);
   });
 
-  it("does not project networking into the YAML preview", () => {
+  it("projects networking into the YAML preview", () => {
     vi.useFakeTimers();
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
@@ -79,8 +80,8 @@ describe("MainLayout networking navigation", () => {
 
     const yaml = container.querySelector("aside pre code")?.textContent ?? "";
     expect(yaml).toContain("hostname: web01");
-    expect(yaml).not.toContain("network:");
-    expect(yaml).not.toContain("ens18");
+    expect(yaml).toContain("network:");
+    expect(yaml).toContain("ens18:");
     vi.useRealTimers();
   });
 });
@@ -89,6 +90,7 @@ describe("MainLayout commands workflow", () => {
   beforeEach(() => {
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     vi.spyOn(window, "confirm");
   });
 
@@ -181,6 +183,7 @@ describe("MainLayout users workflow", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     vi.spyOn(window, "confirm");
   });
 
@@ -277,6 +280,7 @@ describe("MainLayout users regression hardening", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     vi.spyOn(window, "confirm");
   });
 
@@ -340,8 +344,8 @@ describe("MainLayout users regression hardening", () => {
 
     const previewCode = container.querySelector("aside pre code");
     expect(previewCode?.textContent).toContain("- default");
-    expect(previewCode?.textContent).not.toContain("name:");
-    expect(previewCode?.textContent).not.toContain("id:");
+    expect(previewCode?.textContent).not.toMatch(/^name:/m);
+    expect(previewCode?.textContent).not.toMatch(/^id:/m);
   });
 
   it("mounts exactly one editor across section and responsive tab switches", () => {
@@ -457,6 +461,7 @@ describe("MainLayout full Phase 3 workflow", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
     });
@@ -557,14 +562,8 @@ describe("MainLayout full Phase 3 workflow", () => {
 
     const previewCode = container.querySelector("aside pre code");
     const yaml = previewCode?.textContent ?? "";
-    expect(yaml).toContain("users:");
-    expect(yaml).toContain("- default");
-    expect(yaml).toContain("name: deploy");
-    expect(yaml).toContain("gecos: Deploy User");
-    expect(yaml).toContain("primary_group: deploy");
-    expect(yaml).toContain("homedir: /srv/deploy");
-    expect(yaml).not.toContain("name: ops");
-    expect(yaml).not.toContain("id:");
+    expect(yaml).toBe("");
+    expect(screen.getAllByText(/validation error/i).length).toBeGreaterThan(0);
   });
 });
 
@@ -625,6 +624,7 @@ describe("MainLayout export gating", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     act(() => {
       useProjectStore.getState().updateIdentity({ hostname: "web01" });
     });
@@ -733,7 +733,7 @@ describe("MainLayout export gating", () => {
     ).toBeInTheDocument();
 
     const previewCode = container.querySelector("aside pre code");
-    expect(previewCode?.textContent).not.toContain("hunter2");
+    expect(previewCode).toBeNull();
 
     const exportBtn = screen.getByRole("button", { name: /export yaml/i });
     expect(exportBtn).toHaveAttribute("aria-disabled", "true");
@@ -861,6 +861,7 @@ describe("MainLayout Phase 4 regression hardening", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     seedSafetyProject();
     vi.spyOn(window, "confirm");
     writeTextMock.mockReset();

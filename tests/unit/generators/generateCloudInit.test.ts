@@ -187,7 +187,11 @@ describe("generateCloudInit", () => {
       .map((line) => line.split(":")[0]);
     expect(keys).toEqual(
       [...CLOUD_CONFIG_ORDER].filter(
-        (key) => key !== "users" && key !== "bootcmd" && key !== "runcmd",
+        (key) =>
+          key !== "network" &&
+          key !== "users" &&
+          key !== "bootcmd" &&
+          key !== "runcmd",
       ),
     );
   });

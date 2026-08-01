@@ -2,15 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectFile } from "../../../src/models/project.ts";
 import {
   generateCloudInit,
-  type GenerateProjectInput,
 } from "../../../src/generators/generateCloudInit.ts";
 import type { CommandsConfig } from "../../../src/models/commands.ts";
-import { isCommandsConfig } from "../../../src/models/commands.ts";
 import { isUsersConfig, SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
 import { createBlankNetworkInterface } from "../../../src/models/networking.ts";
 import {
   copyCloudInitYaml,
   exportCloudInitYaml,
+  toGenerateInput,
 } from "../../../src/services/yamlService.ts";
 import * as validateConfig from "../../../src/validators/validateConfig.ts";
 import commandsFull from "../../fixtures/commands-full.yaml?raw";
@@ -43,16 +42,8 @@ function validProject(overrides: Partial<ProjectFile> = {}): ProjectFile {
   };
 }
 
-function toGenerateInput(project: ProjectFile): GenerateProjectInput {
-  return {
-    identity: project.identity,
-    users: isUsersConfig(project.users) ? project.users : undefined,
-    commands: isCommandsConfig(project.commands) ? project.commands : undefined,
-  };
-}
-
 describe("networking authoring boundary", () => {
-  it("does not project builder networking into cloud-init YAML yet", () => {
+  it("projects valid networking into cloud-init YAML", () => {
     const project = validProject({
       networking: {
         interfaces: [
@@ -64,10 +55,8 @@ describe("networking authoring boundary", () => {
       },
     });
 
-    expect(toGenerateInput(project)).not.toHaveProperty("networking");
-    expect(generateCloudInit(toGenerateInput(project)).yaml).not.toMatch(
-      /^network:/m,
-    );
+    expect(toGenerateInput(project)).toHaveProperty("networking");
+    expect(generateCloudInit(toGenerateInput(project)).yaml).toMatch(/^network:/m);
   });
 });
 
