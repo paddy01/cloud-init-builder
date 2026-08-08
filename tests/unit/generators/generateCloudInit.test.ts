@@ -6,6 +6,7 @@ import commandsFull from "../../fixtures/commands-full.yaml?raw";
 import identityUsersCommandsFull from "../../fixtures/identity-users-commands-full.yaml?raw";
 import identityUsersSafetyValid from "../../fixtures/identity-users-safety-valid.yaml?raw";
 import usersSafetyValid from "../../fixtures/users-safety-valid.yaml?raw";
+import identityNetworkingFull from "../../fixtures/identity-networking-full.yaml?raw";
 import {
   CLOUD_CONFIG_HEADER,
   CLOUD_CONFIG_ORDER,
@@ -14,6 +15,11 @@ import {
 import type { CommandsConfig } from "../../../src/models/commands.ts";
 import type { UsersConfig } from "../../../src/models/users.ts";
 import { SUDO_PASSWORDLESS } from "../../../src/models/users.ts";
+import {
+  createBlankNetworkInterface,
+  type NetworkingConfig,
+} from "../../../src/models/networking.ts";
+import { buildCloudInitNetworkV2 } from "../../../src/generators/generateNetworkingV2.ts";
 
 const BCRYPT_HASH =
   "$2y$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
@@ -76,6 +82,57 @@ const COMBINED_USERS: UsersConfig = {
     },
   ],
 };
+
+function networkRow(id: string, value: string) {
+  return { id, value, isExampleValue: false };
+}
+
+function fullNetworking(): NetworkingConfig {
+  return {
+    interfaces: [
+      {
+        ...createBlankNetworkInterface("network-interface-ens18"),
+        name: "ens18",
+        dhcp4: true,
+        ipv4Addresses: [networkRow("v4-address", "192.0.2.10/24")],
+        ipv6Addresses: [networkRow("v6-address", "2001:db8::10/64")],
+        ipv4Routes: [
+          {
+            id: "v4-default",
+            kind: "default",
+            gateway: "192.0.2.1",
+            metric: "100",
+            exampleFields: [],
+          },
+        ],
+        ipv6Routes: [
+          {
+            id: "v6-specific",
+            kind: "specific",
+            destination: "2001:db8:1::/64",
+            gateway: "2001:db8::1",
+            metric: "",
+            exampleFields: [],
+          },
+        ],
+        nameservers: [
+          networkRow("dns-v4", "192.0.2.53"),
+          networkRow("dns-v6", "2001:db8::53"),
+        ],
+        searchDomains: [networkRow("search", "lab.example")],
+        mtuEnabled: true,
+        mtu: "1500",
+      },
+      {
+        ...createBlankNetworkInterface("network-interface-mac"),
+        identityMode: "mac",
+        name: "inactive-name-draft",
+        macAddress: "52:54:00:12:34:56",
+        dhcp6: true,
+      },
+    ],
+  };
+}
 
 const SAFETY_USERS_CONFIG: UsersConfig = {
   preserveDefault: true,
@@ -187,7 +244,11 @@ describe("generateCloudInit", () => {
       .map((line) => line.split(":")[0]);
     expect(keys).toEqual(
       [...CLOUD_CONFIG_ORDER].filter(
-        (key) => key !== "users" && key !== "bootcmd" && key !== "runcmd",
+        (key) =>
+          key !== "network" &&
+          key !== "users" &&
+          key !== "bootcmd" &&
+          key !== "runcmd",
       ),
     );
   });
@@ -340,5 +401,89 @@ describe("generateCloudInit", () => {
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
     expect(result.yaml).toBe(`${CLOUD_CONFIG_HEADER}runcmd:\n  - ""\n`);
+  });
+});
+
+describe("embedded networking lowering contract", () => {
+  it("matches the full golden fixture with ordered, allowlisted fresh output", () => {
+    const networking = fullNetworking();
+    const before = structuredClone(networking);
+
+    const first = buildCloudInitNetworkV2(networking);
+    const second = buildCloudInitNetworkV2(networking);
+    const equivalent = buildCloudInitNetworkV2(structuredClone(networking));
+    const yaml = generateCloudInit({
+      identity: { hostname: "web01" },
+      networking,
+    }).yaml;
+
+    expect(yaml).toBe(identityNetworkingFull);
+    expect(first).toEqual(second);
+    expect(first).toEqual(equivalent);
+    expect(networking).toEqual(before);
+    expect(first?.ethernets).toEqual({
+      ens18: {
+        dhcp4: true,
+        dhcp6: false,
+        addresses: ["192.0.2.10/24", "2001:db8::10/64"],
+        routes: [
+          { to: "default", via: "192.0.2.1", metric: 100 },
+          { to: "2001:db8:1::/64", via: "2001:db8::1" },
+        ],
+        nameservers: {
+          addresses: ["192.0.2.53", "2001:db8::53"],
+          search: ["lab.example"],
+        },
+        mtu: 1500,
+      },
+      interface0: {
+        match: { macaddress: "52:54:00:12:34:56" },
+        dhcp4: false,
+        dhcp6: true,
+      },
+    });
+    expect(Object.keys(first?.ethernets.ens18 ?? {})).toEqual([
+      "dhcp4",
+      "dhcp6",
+      "addresses",
+      "routes",
+      "nameservers",
+      "mtu",
+    ]);
+    expect(yaml).not.toMatch(/network-interface|inactive-name|exampleFields|acknowledgedRiskWarnings|gateway[46]|renderer|bridge|vlan|disclosure/i);
+  });
+
+  it("allocates MAC-only ordinals around exact-name collisions and omits blank networking", () => {
+    const networking: NetworkingConfig = {
+      interfaces: [
+        { ...createBlankNetworkInterface("name-interface0"), name: "interface0" },
+        {
+          ...createBlankNetworkInterface("mac-one"),
+          identityMode: "mac",
+          name: "unused",
+          macAddress: "AA:BB:CC:DD:EE:01",
+        },
+        {
+          ...createBlankNetworkInterface("mac-two"),
+          identityMode: "mac",
+          macAddress: "AA:BB:CC:DD:EE:02",
+        },
+      ],
+    };
+
+    expect(Object.keys(buildCloudInitNetworkV2(networking)?.ethernets ?? {})).toEqual([
+      "interface0",
+      "interface1",
+      "interface2",
+    ]);
+    expect(buildCloudInitNetworkV2(networking)?.ethernets.interface1).toMatchObject({
+      match: { macaddress: "aa:bb:cc:dd:ee:01" },
+    });
+    expect(buildCloudInitNetworkV2({
+      interfaces: [createBlankNetworkInterface("blank")],
+    })).toBeUndefined();
+    expect(generateCloudInit({ networking: { interfaces: [] } }).yaml).not.toContain(
+      "network:",
+    );
   });
 });

@@ -1,6 +1,8 @@
 import type { CommandsConfig } from "../models/commands.ts";
 import type { IdentityConfig } from "../models/identity.ts";
 import type { UsersConfig } from "../models/users.ts";
+import type { NetworkingConfig } from "../models/networking.ts";
+import { buildCloudInitNetworkV2 } from "./generateNetworkingV2.ts";
 import { buildCloudInitCommands } from "./generateCommands.ts";
 import { buildCloudInitUsers } from "./generateUsers.ts";
 import { orderKeys } from "./orderKeys.ts";
@@ -16,6 +18,7 @@ export const CLOUD_CONFIG_ORDER = [
   "manage_etc_hosts",
   "timezone",
   "locale",
+  "network",
   "users",
   "bootcmd",
   "runcmd",
@@ -34,6 +37,7 @@ export interface GenerateResult {
 
 export interface GenerateProjectInput {
   identity?: IdentityConfig;
+  networking?: NetworkingConfig;
   users?: UsersConfig;
   commands?: CommandsConfig;
 }
@@ -46,6 +50,11 @@ export function generateCloudInit(
   // own blocking validation so this module stays deterministic and side-effect free.
   const flat = { ...(project.identity ?? {}) };
   const pruned: Record<string, unknown> = pruneEmpty(flat) ?? {};
+
+  if (project.networking !== undefined) {
+    const network = buildCloudInitNetworkV2(project.networking);
+    if (network !== undefined) pruned.network = network;
+  }
 
   if (project.users !== undefined) {
     const users = buildCloudInitUsers(project.users);

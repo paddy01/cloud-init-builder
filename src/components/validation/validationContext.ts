@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { CommandStage } from "../../models/commands.ts";
 import type { ValidationIssue } from "../../validators/validateConfig.ts";
+import type { EditorSection } from "../../layouts/editorNavigation.ts";
 
 export type YamlOutputChannel = "export" | "copy";
 
@@ -25,6 +26,7 @@ export interface ValidationContextValue {
   getFieldMessageId: (path: string, code: string) => string;
   clearBlockedExportAnnouncement: () => void;
   getVisibleUserSummaryIssues: () => ValidationIssue[];
+  getVisibleNetworkingSummaryIssues: () => ValidationIssue[];
   getVisibleCommandSummaryIssues: (activeStage: CommandStage) => ValidationIssue[];
   getCardIssueCounts: (
     userId: string,
@@ -33,7 +35,8 @@ export interface ValidationContextValue {
     stage: CommandStage,
     commandId: string,
   ) => { errors: number; warnings: number };
-  getFirstBlockingIssueSection: () => "identity" | "users" | "commands";
+  hasCrossInterfaceStructuralConflict: (interfaceId: string) => boolean;
+  getFirstBlockingIssueSection: () => EditorSection;
   getFirstBlockingCommandStage: () => CommandStage | null;
 }
 
@@ -63,9 +66,11 @@ const noopValidation: ValidationContextValue = {
     `${path.replace(/\./g, "-")}-${code}`.toLowerCase(),
   clearBlockedExportAnnouncement: () => undefined,
   getVisibleUserSummaryIssues: () => [],
+  getVisibleNetworkingSummaryIssues: () => [],
   getVisibleCommandSummaryIssues: () => [],
   getCardIssueCounts: () => ({ errors: 0, warnings: 0 }),
   getCommandCardIssueCounts: () => ({ errors: 0, warnings: 0 }),
+  hasCrossInterfaceStructuralConflict: () => false,
   getFirstBlockingIssueSection: () => "identity",
   getFirstBlockingCommandStage: () => null,
 };

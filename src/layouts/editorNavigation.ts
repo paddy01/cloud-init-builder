@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-export type EditorSection = "identity" | "users" | "commands";
+export type EditorSection = "identity" | "users" | "networking" | "commands";
 
 export interface EditorNavigationContextValue {
   activeSection: EditorSection;

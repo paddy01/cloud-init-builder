@@ -1,0 +1,46 @@
+{
+  "formatVersion": 2,
+  "metadata": {
+    "name": "Networking Addressing Roundtrip",
+    "createdAt": "2026-07-22T10:00:00.000Z",
+    "updatedAt": "2026-07-22T11:30:00.000Z",
+    "appVersion": "0.1.0"
+  },
+  "users": { "preserveDefault": true, "entries": [] },
+  "commands": { "bootcmd": [], "runcmd": [] },
+  "networking": {
+    "interfaces": [
+      {
+        "id": "network-interface-rich",
+        "identityMode": "name",
+        "name": "ens18",
+        "macAddress": "",
+        "dhcp4": false,
+        "dhcp6": true,
+        "ipv4Addresses": [
+          { "id": "address-v4-1", "value": " 192.0.2.10/24 ", "isExampleValue": true },
+          { "id": "address-v4-2", "value": "partial", "isExampleValue": false }
+        ],
+        "ipv6Addresses": [
+          { "id": "address-v6-1", "value": "2001:db8::10/64", "isExampleValue": false }
+        ],
+        "ipv4Routes": [
+          { "id": "route-v4-default", "kind": "default", "gateway": "192.0.2.1", "metric": "100", "exampleFields": ["gateway", "metric"] }
+        ],
+        "ipv6Routes": [
+          { "id": "route-v6-specific", "kind": "specific", "destination": "2001:db8:1::/64", "gateway": "", "metric": "not-yet-valid", "exampleFields": ["destination"] }
+        ],
+        "nameservers": [
+          { "id": "nameserver-v4", "value": "192.0.2.53", "isExampleValue": true },
+          { "id": "nameserver-v6", "value": "2001:db8::53", "isExampleValue": false }
+        ],
+        "searchDomains": [
+          { "id": "search-1", "value": "lab.example", "isExampleValue": true }
+        ],
+        "mtuEnabled": true,
+        "mtu": " 1500 ",
+        "exampleFields": ["name", "dhcp6", "mtu"]
+      }
+    ]
+  }
+}

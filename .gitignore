@@ -6,4 +6,4 @@ playwright-report/
 test-results/
 .agents/
 .lean-ctx/
-.planning/research/.cache/
+.planning/research/.cache

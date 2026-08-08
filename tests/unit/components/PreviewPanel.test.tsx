@@ -37,7 +37,7 @@ describe("PreviewPanel empty state", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows users YAML when identity is empty but default user is preserved", () => {
+  it("blocks output when identity is empty even if the default user is preserved", () => {
     const project = createDefaultProject("Test");
     project.identity = {};
     useProjectStore.setState({ ...initialState, project });
@@ -48,13 +48,11 @@ describe("PreviewPanel empty state", () => {
       vi.advanceTimersByTime(300);
     });
 
-    const code = container.querySelector("pre code");
-    expect(code?.textContent).toContain("users:");
-    expect(code?.textContent).toContain("- default");
-    expect(screen.queryByText("No identity yet")).not.toBeInTheDocument();
+    expect(container.querySelector("pre code")).toBeNull();
+    expect(screen.getAllByText(/validation error/).length).toBeGreaterThan(0);
   });
 
-  it("shows users YAML when identity has hostname: undefined", () => {
+  it("blocks output when hostname is undefined", () => {
     const project = createDefaultProject("Test");
     project.identity = { hostname: undefined };
     useProjectStore.setState({ ...initialState, project });
@@ -65,10 +63,10 @@ describe("PreviewPanel empty state", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(container.querySelector("pre code")?.textContent).toContain("- default");
+    expect(container.querySelector("pre code")).toBeNull();
   });
 
-  it("shows users YAML when identity has only cleared optional fields", () => {
+  it("blocks output when identity has only cleared optional fields", () => {
     const project = createDefaultProject("Test");
     project.identity = {
       fqdn: "",
@@ -83,7 +81,7 @@ describe("PreviewPanel empty state", () => {
       vi.advanceTimersByTime(300);
     });
 
-    expect(container.querySelector("pre code")?.textContent).toContain("- default");
+    expect(container.querySelector("pre code")).toBeNull();
   });
 });
 
@@ -176,14 +174,14 @@ describe("PreviewPanel debounce and validation", () => {
 
     expect(screen.getByText("2 validation errors")).toBeInTheDocument();
     expect(
-      screen.getAllByText(/name: Export blocked: username conflicts/i),
+      screen.getAllByText(/username conflicts with shared/i),
     ).toHaveLength(2);
 
     act(() => {
       vi.advanceTimersByTime(299);
     });
     const code = container.querySelector("pre code");
-    expect(code?.textContent).not.toContain("name: shared");
+    expect(code).toBeNull();
   });
 });
 

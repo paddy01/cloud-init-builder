@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { COMMANDS_VALIDATION_SUMMARY_HEADING_ID } from "../components/commands/CommandValidationSummary.tsx";
 import { useUserValidation } from "../components/users/UserValidationContext.ts";
 import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
+import { NETWORKING_VALIDATION_SUMMARY_HEADING_ID } from "../components/networking/NetworkingValidationSummary.tsx";
+import { isNetworkingIssuePath } from "../components/networking/networkingValidationPaths.ts";
 import type { YamlOutputChannel } from "../components/validation/validationContext.ts";
 import { exportProject, importProject } from "../services/projectService.ts";
 import { copyCloudInitYaml, exportCloudInitYaml } from "../services/yamlService.ts";
@@ -16,6 +18,10 @@ function isCommandIssue(path: string): boolean {
   return path.startsWith("commands.");
 }
 
+function isNetworkingIssue(path: string): boolean {
+  return isNetworkingIssuePath(path);
+}
+
 function buildBlockedYamlTooltip(
   channel: YamlOutputChannel,
   {
@@ -24,6 +30,8 @@ function buildBlockedYamlTooltip(
     userErrorCount,
     hasCommandErrors,
     commandErrorCount,
+    hasNetworkingErrors,
+    networkingErrorCount,
     identityErrorCount,
   }: {
     noProject: boolean;
@@ -31,6 +39,8 @@ function buildBlockedYamlTooltip(
     userErrorCount: number;
     hasCommandErrors: boolean;
     commandErrorCount: number;
+    hasNetworkingErrors: boolean;
+    networkingErrorCount: number;
     identityErrorCount: number;
   },
 ): string {
@@ -64,6 +74,10 @@ function buildBlockedYamlTooltip(
       return `${prefix}. 1 command validation error prevents YAML output. Review the Commands validation summary.`;
     }
     return `${prefix}. ${commandErrorCount} command validation errors prevent YAML output. Review the Commands validation summary.`;
+  }
+
+  if (hasNetworkingErrors) {
+    return `${prefix}. ${networkingErrorCount} networking validation ${networkingErrorCount === 1 ? "error" : "errors"} prevents ${channel === "export" ? "export" : "YAML output"}. Review the Networking validation summary.`;
   }
 
   if (channel === "export") {
@@ -116,10 +130,13 @@ export function TopBar() {
   const nativeExportDisabled = noProject;
   const userErrors = blockingErrors.filter((issue) => isUserIssue(issue.path));
   const commandErrors = blockingErrors.filter((issue) => isCommandIssue(issue.path));
+  const networkingErrors = blockingErrors.filter((issue) => isNetworkingIssue(issue.path));
   const userErrorCount = userErrors.length;
   const commandErrorCount = commandErrors.length;
   const hasUserErrors = userErrorCount > 0;
   const hasCommandErrors = commandErrorCount > 0;
+  const networkingErrorCount = networkingErrors.length;
+  const hasNetworkingErrors = networkingErrorCount > 0;
   const identityErrorCount = blockingErrors.length;
 
   const exportTooltipText = useMemo(
@@ -130,6 +147,8 @@ export function TopBar() {
         userErrorCount,
         hasCommandErrors,
         commandErrorCount,
+        hasNetworkingErrors,
+        networkingErrorCount,
         identityErrorCount,
       }),
     [
@@ -139,6 +158,8 @@ export function TopBar() {
       identityErrorCount,
       noProject,
       userErrorCount,
+      networkingErrorCount,
+      hasNetworkingErrors,
     ],
   );
 
@@ -150,15 +171,19 @@ export function TopBar() {
         userErrorCount,
         hasCommandErrors,
         commandErrorCount,
+        hasNetworkingErrors,
+        networkingErrorCount,
         identityErrorCount,
       }),
     [
       commandErrorCount,
       hasCommandErrors,
       hasUserErrors,
+      hasNetworkingErrors,
       identityErrorCount,
       noProject,
       userErrorCount,
+      networkingErrorCount,
     ],
   );
 
@@ -192,6 +217,11 @@ export function TopBar() {
     if (section === "commands") {
       setActiveSection("commands");
       requestFocus(COMMANDS_VALIDATION_SUMMARY_HEADING_ID);
+      return;
+    }
+    if (section === "networking") {
+      setActiveSection("networking");
+      requestFocus(NETWORKING_VALIDATION_SUMMARY_HEADING_ID);
       return;
     }
     setActiveSection("identity");
@@ -356,13 +386,13 @@ export function TopBar() {
 
   const exportButtonClassName =
     exportBlocked && !nativeExportDisabled
-      ? "rounded bg-blue-600 px-3 py-1.5 text-sm text-white opacity-50 cursor-not-allowed"
-      : "rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50";
+      ? "min-h-10 rounded bg-blue-600 px-2 py-1.5 text-sm text-white opacity-50 cursor-not-allowed sm:px-3"
+      : "min-h-10 rounded bg-blue-600 px-2 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3";
 
   const copyButtonClassName =
     copyBlocked && !noProject
-      ? "rounded border border-gray-300 px-3 py-1.5 text-sm opacity-50 cursor-not-allowed"
-      : "rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50";
+      ? "min-h-10 rounded border border-gray-300 px-2 py-1.5 text-sm opacity-50 cursor-not-allowed sm:px-3"
+      : "min-h-10 rounded border border-gray-300 px-2 py-1.5 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3";
 
   const exportYamlButton = (
     <button
@@ -392,7 +422,7 @@ export function TopBar() {
 
   return (
     <div className="border-b border-gray-200 bg-white">
-      <header className="flex h-14 items-center gap-3 px-4">
+      <header className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2 sm:h-14 sm:flex-nowrap sm:gap-3 sm:py-0">
         <h1 className="text-lg font-semibold text-gray-900">Cloud-Init Builder</h1>
         <div className="h-6 border-l border-gray-300" />
         <div className="flex min-w-0 items-center gap-2 text-sm text-gray-700">
@@ -406,7 +436,7 @@ export function TopBar() {
                 onKeyDown={handleRenameInputKeyDown}
                 onBlur={handleRenameInputBlur}
                 aria-label="Project name"
-                className="h-8 w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-[10rem] rounded border border-gray-300 bg-white px-2 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="h-8 w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 rounded border border-gray-300 bg-white px-2 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               />
               {isDirty && (
                 <span className="text-amber-500" title="Unsaved changes">
@@ -453,7 +483,7 @@ export function TopBar() {
             <>
               <span
                 title={project ? project.metadata.name : undefined}
-                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-[10rem] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 truncate whitespace-nowrap overflow-hidden text-ellipsis"
               >
                 {project?.metadata.name ?? "No Project"}
               </span>
@@ -485,41 +515,45 @@ export function TopBar() {
           )}
         </div>
         {copyFeedback && (
-          <span className="text-xs text-gray-600">{copyFeedback}</span>
+          <span className="order-3 w-full text-xs text-gray-600 sm:order-none sm:w-auto">
+            {copyFeedback}
+          </span>
         )}
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={handleNew}
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-        >
-          New
-        </button>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-        >
-          Open
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={project === null}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Save
-        </button>
-        {copyBlocked && !noProject ? (
-          <span title={copyTooltipText}>{copyYamlButton}</span>
-        ) : (
-          copyYamlButton
-        )}
-        {exportBlocked && !nativeExportDisabled ? (
-          <span title={exportTooltipText}>{exportYamlButton}</span>
-        ) : (
-          exportYamlButton
-        )}
+        <div className="hidden flex-1 sm:block" />
+        <div className="order-2 flex w-full min-w-0 flex-wrap items-center justify-between gap-1 sm:order-none sm:w-auto sm:flex-nowrap sm:justify-start sm:gap-3">
+          <button
+            type="button"
+            onClick={handleNew}
+            className="rounded border border-gray-300 px-2 py-1.5 text-sm hover:bg-gray-50 sm:px-3"
+          >
+            New
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded border border-gray-300 px-2 py-1.5 text-sm hover:bg-gray-50 sm:px-3"
+          >
+            Open
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={project === null}
+            className="rounded bg-blue-600 px-2 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
+          >
+            Save
+          </button>
+          {copyBlocked && !noProject ? (
+            <span title={copyTooltipText}>{copyYamlButton}</span>
+          ) : (
+            copyYamlButton
+          )}
+          {exportBlocked && !nativeExportDisabled ? (
+            <span title={exportTooltipText}>{exportYamlButton}</span>
+          ) : (
+            exportYamlButton
+          )}
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -529,8 +563,13 @@ export function TopBar() {
         />
       </header>
       {importWarnings.length > 0 && (
-        <div className="flex items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-          <div className="flex-1">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="flex items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+        >
+          <div className="min-w-0 flex-1">
             <p>
               {importWarnings.length} import warning
               {importWarnings.length === 1 ? "" : "s"}: some fields were invalid and
@@ -539,12 +578,15 @@ export function TopBar() {
             <ul className="mt-1 list-disc pl-5 text-xs">
               {importWarnings.slice(0, 3).map((warning, index) => (
                 <li key={`${warning.path}-${index}`}>
-                  <code className="font-mono">{warning.path || "(root)"}</code> —{" "}
+                  <code className="font-mono [overflow-wrap:anywhere]">
+                    {warning.path || "(root)"}
+                  </code>{" "}
+                  —{" "}
                   {warning.message}
                 </li>
               ))}
               {importWarnings.length > 3 && (
-                <li className="italic">…and {importWarnings.length - 3} more</li>
+                <li className="italic">...and {importWarnings.length - 3} more</li>
               )}
             </ul>
           </div>
@@ -553,7 +595,7 @@ export function TopBar() {
             onClick={clearWarnings}
             className="shrink-0 rounded border border-amber-300 px-2 py-1 text-xs hover:bg-amber-100"
           >
-            Dismiss
+            Dismiss import warnings
           </button>
         </div>
       )}

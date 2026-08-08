@@ -29,8 +29,8 @@ export function EditorPreviewTabs({
               aria-selected={isActive}
               className={
                 isActive
-                  ? "border-b-2 border-blue-600 py-2 text-sm font-semibold text-blue-700"
-                  : "border-b-2 border-transparent py-2 text-sm text-gray-500 hover:text-gray-700"
+                  ? "min-h-10 border-b-2 border-blue-600 py-2 text-sm font-semibold text-blue-700"
+                  : "min-h-10 border-b-2 border-transparent py-2 text-sm text-gray-500 hover:text-gray-700"
               }
               onClick={() => onChange(tab.id)}
             >

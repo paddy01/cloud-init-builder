@@ -196,6 +196,52 @@ describe("TopBar warning banner detail (IN-02)", () => {
 
     expect(screen.getByText(/and 2 more/i)).toBeInTheDocument();
   });
+
+  it("announces networking recovery politely and dismisses shared warnings", async () => {
+    useProjectStore.setState({
+      project: createDefaultProject("Recovered"),
+      importWarnings: [
+        {
+          path: "networking.interfaces.0.identityMode",
+          message: "Invalid identity mode; interface was omitted.",
+        },
+        {
+          path: "networking.interfaces.1.macAddress",
+          message: "Invalid inactive draft was cleared.",
+        },
+        {
+          path: "networking.interfaces.2.renderer",
+          message: "Unknown field was omitted.",
+        },
+        {
+          path: "networking.interfaces.3.name",
+          message: "Invalid active identity; interface was omitted.",
+        },
+        {
+          path: "networking.interfaces.4.routes",
+          message: "Unknown field was omitted.",
+        },
+      ],
+    });
+
+    renderTopBar();
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveAttribute("aria-atomic", "true");
+    expect(screen.getByText("networking.interfaces.0.identityMode")).toBeInTheDocument();
+    expect(screen.getByText("networking.interfaces.1.macAddress")).toBeInTheDocument();
+    expect(screen.getByText("networking.interfaces.2.renderer")).toBeInTheDocument();
+    expect(screen.queryByText("networking.interfaces.3.name")).not.toBeInTheDocument();
+    expect(screen.getByText("...and 2 more")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Dismiss import warnings" }),
+    );
+
+    expect(useProjectStore.getState().importWarnings).toEqual([]);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });
 
 describe("Export YAML button", () => {

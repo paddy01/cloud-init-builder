@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import futureProjectV99 from "../fixtures/future-project-v99.cib.json?raw";
 import invalidProjectBadMetadata from "../fixtures/invalid-project-bad-metadata.cib.json?raw";
 import validProjectV1 from "../fixtures/valid-project-v1.cib.json?raw";
+import validProjectNetworkingAddressing from "../fixtures/valid-project-networking-addressing.cib.json?raw";
+import validProjectNetworkingV2 from "../fixtures/valid-project-networking-v2.cib.json?raw";
 import validProjectWithExtras from "../fixtures/valid-project-with-extras.cib.json?raw";
 import {
   exportProject,
@@ -11,6 +13,8 @@ import {
 import { isCommandsConfig } from "../../src/models/commands.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import { getExportFilename } from "../../src/utils/slugify.ts";
+import { CURRENT_FORMAT_VERSION } from "../../src/models/project.ts";
+import { createBlankNetworkInterface, builderNetworkInterfaceSchema } from "../../src/models/networking.ts";
 
 function fixtureFile(content: string, name: string): File {
   return new File([content], name, { type: "application/json" });
@@ -68,7 +72,7 @@ describe("importProject", () => {
     });
     expect(result.project.metadata.name).toBe("Incomplete Project");
     expect(result.project.metadata.appVersion).toBe("0.1.0");
-    expect(result.project.formatVersion).toBe(1);
+    expect(result.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
   });
 
   it("omits invalid identity objects during lenient fallback import", async () => {
@@ -335,6 +339,463 @@ describe("importProject", () => {
   });
 });
 
+describe("networking import normalization", () => {
+  const metadata = {
+    name: "Networking",
+    createdAt: "2026-06-01T10:00:00.000Z",
+    updatedAt: "2026-06-01T10:00:00.000Z",
+    appVersion: "0.1.0",
+  };
+
+  function importNetworking(
+    payload: Record<string, unknown>,
+  ): ReturnType<typeof importProject> {
+    return importProject(
+      fixtureFile(
+        JSON.stringify({ metadata, ...payload }),
+        "networking-import.cib.json",
+      ),
+    );
+  }
+
+  function warningPaths(
+    result: Awaited<ReturnType<typeof importProject>>,
+  ): string[] {
+    return result.warnings.map((warning) => warning.path);
+  }
+
+  it("migrates a clean pre-v2 project to an empty networking section silently", async () => {
+    const result = await importNetworking({ formatVersion: 1 });
+
+    expect(result.project.formatVersion).toBe(2);
+    expect(result.project.networking).toEqual({ interfaces: [] });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("discards pre-v2 networking including null with a section warning", async () => {
+    const present = await importNetworking({
+      formatVersion: 1,
+      networking: { interfaces: [] },
+    });
+    const nullSection = await importNetworking({
+      formatVersion: 1,
+      networking: null,
+    });
+
+    expect(present.project.networking).toEqual({ interfaces: [] });
+    expect(nullSection.project.networking).toEqual({ interfaces: [] });
+    expect(warningPaths(present)).toContain("networking");
+    expect(warningPaths(nullSection)).toContain("networking");
+  });
+
+  it("treats absent and null format-2 networking as clean empty state", async () => {
+    const absent = await importNetworking({ formatVersion: 2 });
+    const nullSection = await importNetworking({
+      formatVersion: 2,
+      networking: null,
+    });
+
+    expect(absent.project.networking).toEqual({ interfaces: [] });
+    expect(nullSection.project.networking).toEqual({ interfaces: [] });
+    expect(absent.warnings).toEqual([]);
+    expect(nullSection.warnings).toEqual([]);
+  });
+
+  it("warns for malformed interface collections and their unknown keys", async () => {
+    const nullList = await importNetworking({
+      formatVersion: 2,
+      networking: { interfaces: null },
+    });
+    const objectList = await importNetworking({
+      formatVersion: 2,
+      networking: { interfaces: { renderer: "networkd" } },
+    });
+
+    expect(nullList.project.networking.interfaces).toEqual([]);
+    expect(warningPaths(nullList)).toContain("networking.interfaces");
+    expect(objectList.project.networking.interfaces).toEqual([]);
+    expect(warningPaths(objectList)).toEqual(
+      expect.arrayContaining([
+        "networking.interfaces",
+        "networking.interfaces.renderer",
+      ]),
+    );
+  });
+
+  it("preserves valid siblings while omitting an entry with a malformed active draft", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "first", identityMode: "name", name: "ens18", macAddress: "" },
+          { id: "bad", identityMode: "name", name: null, macAddress: "" },
+          { id: "last", identityMode: "mac", name: "", macAddress: "AA:BB:CC:DD:EE:FF" },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces.map((entry) => entry.id)).toEqual([
+      "first",
+      "last",
+    ]);
+    expect(result.project.networking.interfaces[1]?.macAddress).toBe(
+      "aa:bb:cc:dd:ee:ff",
+    );
+    expect(warningPaths(result)).toContain("networking.interfaces.1.name");
+  });
+
+  it("clears only a malformed inactive draft and warns at its indexed path", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "stable", identityMode: "name", name: "ens18", macAddress: null },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces).toEqual([
+      { ...createBlankNetworkInterface("stable"), name: "ens18" },
+    ]);
+    expect(warningPaths(result)).toContain(
+      "networking.interfaces.0.macAddress",
+    );
+  });
+
+  it("infers a missing or invalid mode only from exactly one nonblank string draft", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "name-only", name: " ens18 ", macAddress: "" },
+          { id: "mac-only", identityMode: "invalid", name: "", macAddress: "AA:BB:CC:DD:EE:FF" },
+          { id: "both", name: "ens19", macAddress: "00:11:22:33:44:55" },
+          { id: "neither", name: " ", macAddress: "" },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces).toEqual([
+      {
+        ...createBlankNetworkInterface("name-only"),
+        name: " ens18 ",
+      },
+      {
+        ...createBlankNetworkInterface("mac-only"),
+        identityMode: "mac",
+        macAddress: "aa:bb:cc:dd:ee:ff",
+      },
+    ]);
+    expect(warningPaths(result)).toEqual(
+      expect.arrayContaining([
+        "networking.interfaces.2.identityMode",
+        "networking.interfaces.3.identityMode",
+      ]),
+    );
+  });
+
+  it("warns for and removes every unknown nested networking key", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        renderer: "networkd",
+        interfaces: [
+          {
+            id: "stable",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            renderer: "NetworkManager",
+          },
+        ],
+      },
+    });
+
+    expect(warningPaths(result)).toEqual(
+      expect.arrayContaining([
+        "networking.renderer",
+        "networking.interfaces.0.renderer",
+      ]),
+    );
+    expect(result.project.networking).toEqual({
+      interfaces: [
+        { ...createBlankNetworkInterface("stable"), name: "ens18" },
+      ],
+    });
+  });
+
+  it("silently repairs unsafe, empty, missing, and duplicate IDs without reordering", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "stable", identityMode: "name", name: "one", macAddress: "" },
+          { id: "stable", identityMode: "name", name: "two", macAddress: "" },
+          { id: "bad id", identityMode: "name", name: "three", macAddress: "" },
+          { id: "", identityMode: "name", name: "four", macAddress: "" },
+          { identityMode: "name", name: "five", macAddress: "" },
+        ],
+      },
+    });
+    const entries = result.project.networking.interfaces;
+    const ids = entries.map((entry) => entry.id);
+
+    expect(entries.map((entry) => entry.name)).toEqual([
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+    ]);
+    expect(ids[0]).toBe("stable");
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every((id) => /^[A-Za-z][A-Za-z0-9_-]*$/.test(id))).toBe(true);
+    expect(warningPaths(result).some((path) => path.endsWith(".id"))).toBe(false);
+  });
+
+  it("preserves exact Unicode code units and is idempotent when reopened", async () => {
+    const composed = "caf\u00e9";
+    const decomposed = "cafe\u0301";
+    const first = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          { id: "composed", identityMode: "name", name: composed, macAddress: "" },
+          { id: "decomposed", identityMode: "name", name: decomposed, macAddress: "" },
+        ],
+      },
+    });
+    const reopened = await importNetworking(first.project);
+
+    expect(first.project.networking.interfaces[0]?.name).toBe(composed);
+    expect(first.project.networking.interfaces[1]?.name).toBe(decomposed);
+    expect(reopened.project.networking).toEqual(first.project.networking);
+    expect(reopened.warnings).toEqual([]);
+  });
+
+  it("reopens the Phase 02-01 fixture with clean defaults for every new field", async () => {
+    const result = await importProject(
+      fixtureFile(validProjectNetworkingV2, "valid-project-networking-v2.cib.json"),
+    );
+
+    expect(result.warnings).toEqual([]);
+    expect(result.project.formatVersion).toBe(2);
+    expect(result.project.networking.interfaces[0]).toEqual({
+      ...createBlankNetworkInterface("network-interface-uplink"),
+      name: "uplink-é",
+      macAddress: "52:54:00:12:34:56",
+    });
+  });
+
+  it("round-trips rich nested addressing drafts and provenance exactly", async () => {
+    const first = await importProject(
+      fixtureFile(
+        validProjectNetworkingAddressing,
+        "valid-project-networking-addressing.cib.json",
+      ),
+    );
+    const reopened = await importNetworking(first.project);
+
+    expect(first.warnings).toEqual([]);
+    expect(reopened.warnings).toEqual([]);
+    expect(reopened.project.networking).toEqual(first.project.networking);
+    expect(first.project.networking.interfaces[0]).toMatchObject({
+      dhcp4: false,
+      dhcp6: true,
+      mtuEnabled: true,
+      mtu: " 1500 ",
+      exampleFields: ["name", "dhcp6", "mtu"],
+      ipv4Addresses: [
+        { id: "address-v4-1", value: " 192.0.2.10/24 ", isExampleValue: true },
+        { id: "address-v4-2", value: "partial", isExampleValue: false },
+      ],
+      ipv6Routes: [
+        {
+          id: "route-v6-specific",
+          kind: "specific",
+          destination: "2001:db8:1::/64",
+          gateway: "",
+          metric: "not-yet-valid",
+          exampleFields: ["destination"],
+        },
+      ],
+    });
+  });
+
+  it("drops unknown nested keys at exact paths while preserving known siblings", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          {
+            id: "nested-unknowns",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            dhcp4: false,
+            dhcp6: false,
+            ipv4Addresses: [
+              { id: "address-good", value: "192.0.2.10/24", isExampleValue: false, evil: true },
+            ],
+            ipv4Routes: [
+              { id: "route-good", kind: "default", gateway: "192.0.2.1", metric: "", exampleFields: [], renderer: "evil" },
+            ],
+            exampleFields: ["name"],
+            provenancePayload: { secret: true },
+          },
+        ],
+      },
+    });
+
+    expect(warningPaths(result)).toEqual(
+      expect.arrayContaining([
+        "networking.interfaces.0.provenancePayload",
+        "networking.interfaces.0.ipv4Addresses.0.evil",
+        "networking.interfaces.0.ipv4Routes.0.renderer",
+      ]),
+    );
+    expect(result.project.networking.interfaces[0]?.ipv4Addresses[0]).toEqual({
+      id: "address-good",
+      value: "192.0.2.10/24",
+      isExampleValue: false,
+    });
+    expect(result.project.networking.interfaces[0]?.ipv4Routes[0]).not.toHaveProperty(
+      "renderer",
+    );
+  });
+
+  it("recovers valid nested siblings and repairs IDs within each collection idempotently", async () => {
+    const first = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          {
+            id: "nested-recovery",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            ipv4Addresses: [
+              { id: "shared", value: "one", isExampleValue: false },
+              { id: "shared", value: "two", isExampleValue: false },
+              { id: "bad id", value: "three", isExampleValue: false },
+              { id: "malformed", value: 4, isExampleValue: false },
+            ],
+            nameservers: [
+              { id: "shared", value: "192.0.2.53", isExampleValue: false },
+            ],
+            ipv4Routes: [
+              { id: "route-ok", kind: "specific", destination: "10.0.0.0/8", gateway: "", metric: "-1", exampleFields: [] },
+              { id: "route-bad", kind: "other", destination: "bad", gateway: "", metric: "", exampleFields: [] },
+            ],
+          },
+        ],
+      },
+    });
+    const reopened = await importNetworking(first.project);
+    const entry = first.project.networking.interfaces[0];
+    if (!entry) throw new Error("expected recovered interface");
+
+    expect(entry.ipv4Addresses.map((row) => row.value)).toEqual(["one", "two", "three"]);
+    expect(new Set(entry.ipv4Addresses.map((row) => row.id)).size).toBe(3);
+    expect(entry.nameservers[0]?.id).toBe("shared");
+    expect(entry.ipv4Routes).toHaveLength(1);
+    expect(warningPaths(first)).toEqual(
+      expect.arrayContaining([
+        "networking.interfaces.0.ipv4Addresses.3.value",
+        "networking.interfaces.0.ipv4Routes.1.kind",
+      ]),
+    );
+    expect(reopened.warnings).toEqual([]);
+    expect(reopened.project.networking).toEqual(first.project.networking);
+  });
+
+  it("does not let an omitted malformed route reserve a valid sibling ID", async () => {
+    const first = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          {
+            id: "route-recovery",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            ipv4Routes: [
+              {
+                id: "route-a",
+                kind: "specific",
+                destination: 123,
+                gateway: "192.0.2.1",
+                metric: "10",
+                exampleFields: [],
+              },
+              {
+                id: "route-a",
+                kind: "specific",
+                destination: "198.51.100.0/24",
+                gateway: "192.0.2.254",
+                metric: "20",
+                exampleFields: ["destination", "gateway", "metric"],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const reopened = await importNetworking(first.project);
+    const routes = first.project.networking.interfaces[0]?.ipv4Routes;
+
+    expect(first.warnings).toContainEqual({
+      path: "networking.interfaces.0.ipv4Routes.0.destination",
+      message: "Invalid route destination draft was omitted during import.",
+    });
+    expect(routes).toEqual([
+      {
+        id: "route-a",
+        kind: "specific",
+        destination: "198.51.100.0/24",
+        gateway: "192.0.2.254",
+        metric: "20",
+        exampleFields: ["destination", "gateway", "metric"],
+      },
+    ]);
+    expect(reopened.warnings).toEqual([]);
+    expect(reopened.project.networking).toEqual(first.project.networking);
+  });
+
+  it("preserves acknowledgedRiskWarnings through import normalization and rejects unknown schema codes", async () => {
+    const result = await importNetworking({
+      formatVersion: 2,
+      networking: {
+        interfaces: [
+          {
+            id: "iface-ack",
+            identityMode: "name",
+            name: "ens18",
+            macAddress: "",
+            acknowledgedRiskWarnings: ["NET_RISK_DHCP4_STATIC_IPV4"],
+          },
+        ],
+      },
+    });
+
+    expect(result.project.networking.interfaces[0]?.acknowledgedRiskWarnings).toEqual(
+      ["NET_RISK_DHCP4_STATIC_IPV4"],
+    );
+
+    const reopened = await importNetworking(result.project);
+    expect(reopened.project.networking.interfaces[0]?.acknowledgedRiskWarnings).toEqual(
+      ["NET_RISK_DHCP4_STATIC_IPV4"],
+    );
+
+    expect(() =>
+      builderNetworkInterfaceSchema.parse({
+        ...createBlankNetworkInterface("schema-ack"),
+        acknowledgedRiskWarnings: ["NOT_A_RISK_CODE"],
+      }),
+    ).toThrow();
+  });
+});
+
 describe("metadata name normalization", () => {
   const baseMetadata = {
     createdAt: "2026-06-01T10:00:00.000Z",
@@ -563,7 +1024,7 @@ describe("users credential normalization", () => {
     ]);
   });
 
-  it("preserves unknown top-level keys and CURRENT_FORMAT_VERSION 1", async () => {
+  it("preserves unknown top-level keys and uses CURRENT_FORMAT_VERSION", async () => {
     const result = await importJson({
       formatVersion: 1,
       metadata: {
@@ -579,7 +1040,7 @@ describe("users credential normalization", () => {
       },
     });
 
-    expect(result.project.formatVersion).toBe(1);
+    expect(result.project.formatVersion).toBe(CURRENT_FORMAT_VERSION);
     expect(result.project).toMatchObject({
       futureFeature: { enabled: true },
     });
@@ -658,13 +1119,14 @@ describe("exportProject", () => {
 
   it("creates an application/json Blob and triggers download", () => {
     const project = {
-      formatVersion: 1,
+      formatVersion: 2,
       metadata: {
         name: "My Project",
         createdAt: "2026-06-01T10:00:00.000Z",
         updatedAt: "2026-06-01T10:00:00.000Z",
         appVersion: "0.1.0",
       },
+      networking: { interfaces: [] },
     };
 
     const dispatched = exportProject(project, "My Project");
@@ -688,13 +1150,14 @@ describe("exportProject", () => {
 
   it("uses renamed project name for .cib.json download filename", () => {
     const project = {
-      formatVersion: 1,
+      formatVersion: 2,
       metadata: {
         name: "Demo Server",
         createdAt: "2026-06-01T10:00:00.000Z",
         updatedAt: "2026-06-01T10:00:00.000Z",
         appVersion: "0.1.0",
       },
+      networking: { interfaces: [] },
     };
 
     exportProject(project, "Demo Server");
@@ -704,13 +1167,14 @@ describe("exportProject", () => {
 
   it("falls back to untitled.cib.json when project name slugifies to empty", () => {
     const project = {
-      formatVersion: 1,
+      formatVersion: 2,
       metadata: {
         name: "***",
         createdAt: "2026-06-01T10:00:00.000Z",
         updatedAt: "2026-06-01T10:00:00.000Z",
         appVersion: "0.1.0",
       },
+      networking: { interfaces: [] },
     };
 
     exportProject(project, "***");
@@ -720,13 +1184,14 @@ describe("exportProject", () => {
 
   it("returns false when document.body.appendChild throws", () => {
     const project = {
-      formatVersion: 1,
+      formatVersion: 2,
       metadata: {
         name: "x",
         createdAt: "2026-06-01T10:00:00.000Z",
         updatedAt: "2026-06-01T10:00:00.000Z",
         appVersion: "0.1.0",
       },
+      networking: { interfaces: [] },
     };
 
     vi.spyOn(document.body, "appendChild").mockImplementation(() => {

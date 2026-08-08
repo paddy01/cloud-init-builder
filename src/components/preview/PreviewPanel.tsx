@@ -1,30 +1,26 @@
 import { useMemo } from "react";
-import {
-  CLOUD_CONFIG_HEADER,
-  generateCloudInit,
-} from "../../generators/generateCloudInit.ts";
-import { isCommandsConfig } from "../../models/commands.ts";
-import { isUsersConfig } from "../../models/users.ts";
+import { CLOUD_CONFIG_HEADER, generateCloudInit } from "../../generators/generateCloudInit.ts";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.ts";
+import { toGenerateInput } from "../../services/yamlService.ts";
 import { useProjectStore } from "../../state/projectStore.ts";
 import { useValidation } from "../validation/validationContext.ts";
 import { PreviewBanner } from "./PreviewBanner.tsx";
+import { isNetworkingConfig, isSemanticallyBlankNetworkInterface } from "../../models/networking.ts";
+import { NetworkingOutputDisclosure } from "../networking/NetworkingOutputDisclosure.tsx";
 
-export function PreviewPanel() {
+export interface PreviewPanelProps {
+  onShowEditor?: (path?: string) => void;
+}
+
+export function PreviewPanel({ onShowEditor }: PreviewPanelProps = {}) {
   const project = useProjectStore((s) => s.project);
   const debouncedProject = useDebouncedValue(project, 300);
-  const { blockingErrors } = useValidation();
+  const { blockingErrors, mergedIssues } = useValidation();
+  const warnings = mergedIssues.filter((issue) => issue.severity === "warning");
+  const hasNetworkingOutput = isNetworkingConfig(project?.networking) && project.networking.interfaces.some((entry) => !isSemanticallyBlankNetworkInterface(entry));
   const result = useMemo(
     () =>
-      generateCloudInit({
-        identity: debouncedProject?.identity,
-        users: isUsersConfig(debouncedProject?.users)
-          ? debouncedProject.users
-          : undefined,
-        commands: isCommandsConfig(debouncedProject?.commands)
-          ? debouncedProject.commands
-          : undefined,
-      }),
+      generateCloudInit(debouncedProject ? toGenerateInput(debouncedProject) : {}),
     [debouncedProject],
   );
 
@@ -39,10 +35,15 @@ export function PreviewPanel() {
     );
   }
 
+  if (blockingErrors.length > 0) {
+    return <>{hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}<PreviewBanner issues={blockingErrors} onShowEditor={onShowEditor} /></>;
+  }
+
   if (result.yaml === CLOUD_CONFIG_HEADER) {
     return (
       <>
-        <PreviewBanner issues={blockingErrors} />
+        {hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}
+        <PreviewBanner issues={blockingErrors} warnings={warnings} onShowEditor={onShowEditor} />
         <div className="p-4 text-center">
           <p className="text-sm font-semibold text-gray-900">No identity yet</p>
           <p className="text-sm text-gray-500">
@@ -59,8 +60,9 @@ export function PreviewPanel() {
 
   return (
     <>
-      <PreviewBanner issues={blockingErrors} />
-      <pre className="overflow-auto px-4 py-3">
+      {hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}
+      <PreviewBanner issues={blockingErrors} warnings={warnings} onShowEditor={onShowEditor} />
+      <pre className="min-w-0 max-w-full overflow-auto px-4 py-3">
         <code className="font-mono text-xs leading-5 whitespace-pre text-gray-900">
           {result.yaml}
         </code>

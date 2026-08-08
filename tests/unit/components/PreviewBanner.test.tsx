@@ -24,7 +24,7 @@ describe("PreviewBanner", () => {
     expect(screen.getByText("1 validation error")).toBeInTheDocument();
     expect(screen.queryByText("1 validation errors")).toBeNull();
     expect(
-      screen.getByText("hostname: Hostname is required to export YAML."),
+      screen.getByText(/Hostname is required to export YAML/),
     ).toBeInTheDocument();
   });
 
@@ -44,7 +44,7 @@ describe("PreviewBanner", () => {
     expect(screen.getByText("2 validation errors")).toBeInTheDocument();
   });
 
-  it("truncates to first 3 items and shows overflow line", () => {
+  it("renders the complete issue list", () => {
     const issues: ValidationIssue[] = [
       { path: "identity.hostname", code: "A", message: "m1", severity: "error" },
       { path: "identity.fqdn", code: "B", message: "m2", severity: "error" },
@@ -55,11 +55,10 @@ describe("PreviewBanner", () => {
     render(<PreviewBanner issues={issues} />);
 
     expect(screen.getByText("4 validation errors")).toBeInTheDocument();
-    expect(screen.getByText("hostname: m1")).toBeInTheDocument();
-    expect(screen.getByText("fqdn: m2")).toBeInTheDocument();
-    expect(screen.getByText("timezone: m3")).toBeInTheDocument();
-    expect(screen.getByText("…and 1 more")).toBeInTheDocument();
-    expect(screen.queryByText("locale: m4")).toBeNull();
+    expect(screen.getByText(/m1/)).toBeInTheDocument();
+    expect(screen.getByText(/m2/)).toBeInTheDocument();
+    expect(screen.getByText(/m3/)).toBeInTheDocument();
+    expect(screen.getByText(/m4/)).toBeInTheDocument();
   });
 
   it("renders no Dismiss button", () => {

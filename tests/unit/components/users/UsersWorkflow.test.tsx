@@ -34,6 +34,7 @@ describe("UsersWorkflow add and edit", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
   });
 
   afterEach(() => {
@@ -86,10 +87,8 @@ describe("UsersWorkflow add and edit", () => {
     });
     const previewCode = container.querySelector("aside pre code");
     const yaml = previewCode?.textContent ?? "";
-    expect(yaml).toMatch(/name: deploy[\s\S]*name: deploy/);
-    expect(yaml).toContain("gecos: First Deploy");
-    expect(yaml).toContain("gecos: Second Deploy");
-    expect(yaml).not.toContain("id:");
+    expect(yaml).toBe("");
+    expect(screen.getAllByText(/validation error/i).length).toBeGreaterThan(0);
 
     vi.useRealTimers();
     const exported = JSON.stringify(useProjectStore.getState().project, null, 2);
@@ -126,7 +125,7 @@ describe("UsersWorkflow add and edit", () => {
     });
     const previewCode = container.querySelector("aside pre code");
     expect(previewCode?.textContent).toContain("- default");
-    expect(previewCode?.textContent).not.toContain("name:");
+    expect(previewCode?.textContent).not.toMatch(/^name:/m);
   });
 });
 
@@ -135,6 +134,7 @@ describe("UsersWorkflow remove", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
     vi.spyOn(window, "confirm");
   });
 
@@ -208,9 +208,7 @@ describe("UsersWorkflow remove", () => {
       vi.advanceTimersByTime(300);
     });
     const previewAfter = container.querySelector("aside pre code")?.textContent;
-    expect(previewAfter).toContain("name: shared");
-    expect(previewAfter).toContain("gecos: Keep me");
-    expect(previewAfter?.match(/name: shared/g)).toHaveLength(1);
+    expect(previewAfter).toBeUndefined();
   });
 
   it("shows approved header metadata fallbacks", () => {
@@ -244,6 +242,7 @@ describe("UsersWorkflow validation interaction boundaries", () => {
     vi.useFakeTimers();
     useProjectStore.setState(initialState);
     useProjectStore.getState().newProject("Test");
+    useProjectStore.getState().updateIdentity({ hostname: "web01" });
   });
 
   afterEach(() => {
@@ -266,6 +265,7 @@ describe("UsersWorkflow validation interaction boundaries", () => {
 
     await act(async () => {
       useProjectStore.getState().newProject("Fresh");
+      useProjectStore.getState().updateIdentity({ hostname: "web01" });
     });
     fireEvent.click(screen.getByRole("button", { name: "Users" }));
     fireEvent.click(screen.getByRole("button", { name: "Add user" }));

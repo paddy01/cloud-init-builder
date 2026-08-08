@@ -23,8 +23,15 @@ import {
   isCommandIssuePath,
   sortCommandSummaryIssues,
 } from "../commands/commandValidationPaths.ts";
+import {
+  isNetworkingIssuePath,
+  isCrossInterfaceNetworkingCode,
+  isStructuralNetworkingCode,
+  sortNetworkingSummaryIssues,
+} from "../networking/networkingValidationPaths.ts";
 import { isUserIssuePath } from "../users/userValidationPaths.ts";
 import { ValidationContext } from "./validationContext.ts";
+import type { EditorSection } from "../../layouts/editorNavigation.ts";
 
 function passwdPath(userId: string): string {
   return `users.entries.${userId}.passwd`;
@@ -67,9 +74,7 @@ function buildDraftIssues(
   return issues;
 }
 
-function getIssueSection(
-  path: string,
-): "identity" | "users" | "commands" | null {
+function getIssueSection(path: string): EditorSection | null {
   if (path.startsWith("identity.")) {
     return "identity";
   }
@@ -78,6 +83,9 @@ function getIssueSection(
   }
   if (isCommandIssuePath(path)) {
     return "commands";
+  }
+  if (isNetworkingIssuePath(path)) {
+    return "networking";
   }
   return null;
 }
@@ -213,7 +221,10 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
   }, [canonicalIssues, passwordDraftByUserId]);
 
   const blockingErrors = useMemo(
-    () => mergedIssues.filter((issue) => issue.severity === "error"),
+    () =>
+      mergedIssues.filter(
+        (issue) => issue.severity === "error",
+      ),
     [mergedIssues],
   );
 
@@ -302,6 +313,15 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       if (issue.severity === "warning" && isCommandIssuePath(issue.path)) {
         return true;
       }
+      if (isNetworkingIssuePath(issue.path)) {
+        if (issue.severity === "warning") {
+          return true;
+        }
+        if (isStructuralNetworkingCode(issue.code)) {
+          return true;
+        }
+        return touchedPaths.has(issue.path);
+      }
       return touchedPaths.has(issue.path);
     },
     [revealAll, touchedPaths],
@@ -339,6 +359,13 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     return mergedIssues.filter(
       (issue) => isUserIssuePath(issue.path) && isIssueVisible(issue),
     );
+  }, [isIssueVisible, mergedIssues]);
+
+  const getVisibleNetworkingSummaryIssues = useCallback(() => {
+    const visible = mergedIssues.filter(
+      (issue) => isNetworkingIssuePath(issue.path) && isIssueVisible(issue),
+    );
+    return sortNetworkingSummaryIssues(visible);
   }, [isIssueVisible, mergedIssues]);
 
   const getVisibleCommandSummaryIssues = useCallback(
@@ -401,7 +428,20 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
     [isIssueVisible, mergedIssues],
   );
 
-  const getFirstBlockingIssueSection = useCallback((): "identity" | "users" | "commands" => {
+  const hasCrossInterfaceStructuralConflict = useCallback(
+    (interfaceId: string) => {
+      const prefix = `networking.interfaces.${interfaceId}.`;
+      return mergedIssues.some(
+        (issue) =>
+          issue.path.startsWith(prefix) &&
+          isIssueVisible(issue) &&
+          isCrossInterfaceNetworkingCode(issue.code),
+      );
+    },
+    [isIssueVisible, mergedIssues],
+  );
+
+  const getFirstBlockingIssueSection = useCallback((): EditorSection => {
     const firstError = blockingErrors[0];
     if (!firstError) {
       return "identity";
@@ -441,9 +481,11 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       getFieldMessageId,
       clearBlockedExportAnnouncement,
       getVisibleUserSummaryIssues,
+      getVisibleNetworkingSummaryIssues,
       getVisibleCommandSummaryIssues,
       getCardIssueCounts,
       getCommandCardIssueCounts,
+      hasCrossInterfaceStructuralConflict,
       getFirstBlockingIssueSection,
       getFirstBlockingCommandStage,
     }),
@@ -468,9 +510,11 @@ export function ValidationProvider({ children }: { children: ReactNode }) {
       getFieldMessageId,
       clearBlockedExportAnnouncement,
       getVisibleUserSummaryIssues,
+      getVisibleNetworkingSummaryIssues,
       getVisibleCommandSummaryIssues,
       getCardIssueCounts,
       getCommandCardIssueCounts,
+      hasCrossInterfaceStructuralConflict,
       getFirstBlockingIssueSection,
       getFirstBlockingCommandStage,
     ],
