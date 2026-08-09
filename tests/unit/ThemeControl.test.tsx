@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeControl } from "../../src/components/theme/ThemeControl.tsx";
-import { disposeThemeLifecycle, initializeThemeLifecycle } from "../../src/theme/themeLifecycle.ts";
+import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
+import { createDefaultProject } from "../../src/models/project.ts";
+import { toGenerateInput } from "../../src/services/yamlService.ts";
+import { useProjectStore } from "../../src/state/projectStore.ts";
+import { disposeThemeLifecycle, initializeThemeLifecycle, setThemePreference } from "../../src/theme/themeLifecycle.ts";
 import { resetThemeStore, useThemeStore } from "../../src/theme/themeStore.ts";
 
 interface ControlledMediaQuery {
@@ -64,6 +68,12 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
   afterEach(() => {
     cleanup();
     resetThemeControlTestEnvironment();
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
     vi.restoreAllMocks();
   });
 
@@ -169,13 +179,92 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
 });
 
 describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
-  it.todo("renders one exact polite atomic storage warning while preserving selection and focus");
-  it.todo("clears the storage warning after six seconds without repeating or extending it later in the session");
+  it("renders one exact polite atomic storage warning while preserving selection and focus", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("storage unavailable");
+      },
+      removeItem: () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    initializeThemeLifecycle();
+    render(<ThemeControl />);
+    const light = screen.getByRole("radio", { name: "Light" });
+    light.focus();
+
+    act(() => fireEvent.click(light));
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveAttribute("aria-atomic", "true");
+    expect(status).toHaveTextContent(
+      "Appearance set for this session only. Your browser could not save it, so it will reset after reload.",
+    );
+    expect(light).toBeChecked();
+    expect(light).toHaveFocus();
+  });
+
+  it("clears the storage warning after six seconds without repeating or extending it later in the session", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("storage unavailable");
+      },
+      removeItem: () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    initializeThemeLifecycle();
+    render(<ThemeControl />);
+    const light = screen.getByRole("radio", { name: "Light" });
+
+    act(() => {
+      fireEvent.click(light);
+      vi.advanceTimersByTime(5_999);
+    });
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    act(() => fireEvent.click(screen.getByRole("radio", { name: "Dark" })));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
   it.todo("has no empty, loading, partial, disabled, toast, banner, modal, or appearance-success state");
 });
 
 describe("ThemeControl portable project isolation (VISU-03)", () => {
-  it.todo("preserves project reference, content, saved state, dirty state, JSON, generator input, and YAML across theme changes");
+  it("preserves project reference, content, saved state, dirty state, JSON, generator input, and YAML across theme changes", () => {
+    const project = createDefaultProject("Appearance isolation");
+    useProjectStore.setState({
+      project,
+      lastSavedProject: structuredClone(project),
+      isDirty: true,
+      importWarnings: [],
+    });
+    const beforeState = useProjectStore.getState();
+    const beforeJson = JSON.stringify(project);
+    const beforeInput = toGenerateInput(project);
+    const beforeYaml = generateCloudInit(beforeInput).yaml;
+
+    act(() => {
+      setThemePreference("light");
+      setThemePreference("dark");
+      setThemePreference("system");
+    });
+
+    const afterState = useProjectStore.getState();
+    expect(afterState.project).toBe(beforeState.project);
+    expect(afterState.lastSavedProject).toEqual(beforeState.lastSavedProject);
+    expect(afterState.isDirty).toBe(beforeState.isDirty);
+    expect(JSON.stringify(afterState.project)).toBe(beforeJson);
+    expect(toGenerateInput(afterState.project!)).toEqual(beforeInput);
+    expect(generateCloudInit(toGenerateInput(afterState.project!)).yaml).toBe(beforeYaml);
+    expect(beforeJson).not.toContain("appearance");
+    expect(JSON.stringify(beforeInput)).not.toContain("theme");
+  });
   it.todo("keeps New, Open, Save, Copy YAML, and Export YAML behavior equivalent with or without a preceding theme change");
   it.todo("keeps appearance preferences and resolved themes out of builder JSON and generator input");
 });
