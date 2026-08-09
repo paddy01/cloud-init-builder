@@ -287,6 +287,9 @@ describe("NetworkingWorkflow", () => {
 
   it("cancels populated removal and restores focus to the originating control", () => {
     seedInterface("interface-a", { name: "ens18" });
+    useProjectStore.getState().markSaved();
+    const projectBefore = useProjectStore.getState().project;
+    const updatedAtBefore = projectBefore?.metadata.updatedAt;
     render(<NetworkingSection />);
 
     const remove = screen.getByRole("button", { name: "Remove ens18" });
@@ -299,6 +302,11 @@ describe("NetworkingWorkflow", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(remove).toHaveFocus();
     expect(networking().interfaces).toHaveLength(1);
+    expect(useProjectStore.getState().project).toBe(projectBefore);
+    expect(useProjectStore.getState().project?.metadata.updatedAt).toBe(
+      updatedAtBefore,
+    );
+    expect(useProjectStore.getState().isDirty).toBe(false);
   });
 
   it("confirms populated removal and focuses the next card's active field", () => {
@@ -358,6 +366,26 @@ describe("NetworkingWorkflow", () => {
     const keep = within(dialog).getByRole("button", { name: "Keep interface" });
     const confirm = within(dialog).getByRole("button", { name: "Remove interface" });
 
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveClass("bg-[var(--ui-overlay)]");
+    expect(dialog.firstElementChild).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "text-ui-text",
+    );
+    expect(keep).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus:ring-ui-focus",
+      "focus:ring-offset-ui-raised",
+    );
+    expect(confirm).toHaveClass(
+      "border-ui-error-border",
+      "text-ui-error-text",
+      "focus:ring-ui-focus",
+      "focus:ring-offset-ui-raised",
+    );
+    expect(confirm).not.toHaveClass("focus:ring-red-500");
     expect(keep).toHaveFocus();
     await user.keyboard("{Shift>}{Tab}{/Shift}");
     expect(confirm).toHaveFocus();
