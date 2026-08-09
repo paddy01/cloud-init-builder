@@ -50,7 +50,7 @@ describe("IdentityForm", () => {
     expect(useProjectStore.getState().project?.identity?.hostname).toBe("web01");
   });
 
-  it('typing "-bad" shows HOSTNAME_INVALID error and border-red-300 class', async () => {
+  it('typing "-bad" shows HOSTNAME_INVALID error and semantic error-border class', async () => {
     render(<IdentityForm />);
     const hostnameInput = screen.getByPlaceholderText("e.g. web01");
 
@@ -61,7 +61,7 @@ describe("IdentityForm", () => {
         "Hostname must be 1–63 chars, alphanumeric or hyphen, not starting/ending with a hyphen.",
       ),
     ).toBeInTheDocument();
-    expect(hostnameInput.className).toContain("border-red-300");
+    expect(hostnameInput.className).toContain("border-ui-error-border");
   });
 
   it("empty hostname shows HOSTNAME_REQUIRED error", () => {

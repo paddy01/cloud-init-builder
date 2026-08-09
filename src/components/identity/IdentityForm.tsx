@@ -5,9 +5,9 @@ import { FieldError } from "./FieldError.tsx";
 import { IdentityAdvanced } from "./IdentityAdvanced.tsx";
 
 const inputDefaultClass =
-  "border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised";
 const inputErrorClass =
-  "border border-red-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-text focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised";
 
 export function IdentityForm() {
   const identity = useProjectStore((s) => s.project?.identity);
@@ -20,9 +20,9 @@ export function IdentityForm() {
   );
 
   return (
-    <section className="space-y-4 p-6">
-      <h2 className="text-sm font-semibold text-gray-700">Identity</h2>
-      <p className="text-xs text-gray-500">
+    <section className="space-y-4 bg-ui-canvas p-6">
+      <h2 className="text-sm font-semibold text-ui-text">Identity</h2>
+      <p className="text-xs text-ui-muted">
         Configure machine identity. These values become the first section of your
         cloud-init YAML.
       </p>
@@ -30,10 +30,10 @@ export function IdentityForm() {
       <div className="space-y-1">
         <label
           htmlFor="identity-hostname"
-          className="text-sm font-semibold text-gray-700"
+          className="text-sm font-semibold text-ui-text"
         >
           Hostname
-          <span aria-label="required" className="text-red-600">
+          <span aria-label="required" className="text-ui-error-text">
             *
           </span>
         </label>
@@ -47,7 +47,7 @@ export function IdentityForm() {
             errorByField["identity.hostname"] ? inputErrorClass : inputDefaultClass
           }
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ui-muted">
           Lowercase letters, digits, and hyphens. Max 63 characters. No leading
           or trailing hyphen.
         </p>
@@ -57,7 +57,7 @@ export function IdentityForm() {
       <div className="space-y-1">
         <label
           htmlFor="identity-fqdn"
-          className="text-sm font-semibold text-gray-700"
+          className="text-sm font-semibold text-ui-text"
         >
           Fully-qualified domain name (FQDN)
         </label>
@@ -71,7 +71,7 @@ export function IdentityForm() {
             errorByField["identity.fqdn"] ? inputErrorClass : inputDefaultClass
           }
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ui-muted">
           Optional. If set, must be a valid dotted name up to 253 characters.
         </p>
         <FieldError message={errorByField["identity.fqdn"]} />

@@ -90,7 +90,7 @@ describe("IdentityAdvanced", () => {
     ).toBeUndefined();
   });
 
-  it("invalid timezone shows TIMEZONE_INVALID error and border-red-300", async () => {
+  it("invalid timezone shows TIMEZONE_INVALID error and semantic error border", async () => {
     render(<IdentityAdvanced />);
     const timezoneInput = screen.getByPlaceholderText("e.g. Europe/Stockholm");
 
@@ -101,7 +101,7 @@ describe("IdentityAdvanced", () => {
         "Timezone must be a valid IANA name (e.g. Europe/Stockholm).",
       ),
     ).toBeInTheDocument();
-    expect(timezoneInput.className).toContain("border-red-300");
+    expect(timezoneInput.className).toContain("border-ui-error-border");
   });
 
   it("invalid locale shows LOCALE_INVALID error", async () => {
