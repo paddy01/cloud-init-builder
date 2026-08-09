@@ -38,14 +38,14 @@ export function ConfirmRemoveInterfaceDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--ui-overlay)] p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={headingId}
       onKeyDown={handleKeyDown}
     >
-      <div className="w-full max-w-md rounded border border-gray-200 bg-white p-6 shadow-xl">
-        <h3 id={headingId} className="text-base font-semibold text-gray-900">
+      <div className="w-full max-w-md rounded border border-ui-border bg-ui-raised p-6 text-ui-text shadow-xl">
+        <h3 id={headingId} className="text-xl font-semibold">
           Remove interface &quot;{title}&quot;? This removes its addressing, routes,
           DNS, and link settings from the project.
         </h3>
@@ -53,7 +53,7 @@ export function ConfirmRemoveInterfaceDialog({
           <button
             ref={keepButtonRef}
             type="button"
-            className="min-h-10 rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="min-h-10 rounded border border-ui-border bg-ui-raised px-4 py-2 text-sm text-ui-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised"
             onClick={onCancel}
           >
             Keep interface
@@ -61,7 +61,7 @@ export function ConfirmRemoveInterfaceDialog({
           <button
             ref={removeButtonRef}
             type="button"
-            className="min-h-10 rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="min-h-10 rounded border border-ui-error-border bg-ui-raised px-4 py-2 text-sm text-ui-error-text hover:bg-ui-error focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised"
             onClick={onConfirm}
           >
             Remove interface
