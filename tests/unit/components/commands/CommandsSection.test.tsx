@@ -407,4 +407,34 @@ describe("CommandsSection", () => {
       expect(screen.getByLabelText("Command")).toHaveFocus();
     });
   });
+
+  it("uses semantic status surfaces and focus roles for command issue routes", async () => {
+    render(
+      <UserValidationProvider>
+        <CommandsRevealHarness />
+      </UserValidationProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add run command" }));
+    fireEvent.blur(screen.getByLabelText("Command"));
+
+    const heading = await screen.findByRole("heading", {
+      name: "Commands need attention",
+    });
+    const summary = heading.closest("section");
+    expect(summary).toHaveClass(
+      "bg-ui-error",
+      "border-ui-error-border",
+      "text-ui-error-text",
+    );
+
+    const route = screen.getByRole("button", {
+      name: /Run command 1: Export blocked: enter a command/i,
+    });
+    expect(route).toHaveClass(
+      "text-ui-error-text",
+      "focus-visible:ring-ui-focus",
+      "focus-visible:ring-offset-ui-focus-offset-error",
+    );
+  });
 });
