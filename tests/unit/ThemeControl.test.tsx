@@ -9,7 +9,12 @@ import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import { toGenerateInput } from "../../src/services/yamlService.ts";
 import { useProjectStore } from "../../src/state/projectStore.ts";
-import { disposeThemeLifecycle, initializeThemeLifecycle, setThemePreference } from "../../src/theme/themeLifecycle.ts";
+import {
+  disposeThemeLifecycle,
+  initializeThemeLifecycle,
+  setThemePreference,
+  THEME_STORAGE_KEY,
+} from "../../src/theme/themeLifecycle.ts";
 import { resetThemeStore, useThemeStore } from "../../src/theme/themeStore.ts";
 
 interface ControlledMediaQuery {
@@ -52,6 +57,11 @@ function resetThemeControlTestEnvironment() {
   resetThemeStore();
   vi.clearAllTimers();
   vi.unstubAllGlobals();
+  try {
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+  } catch {
+    // Storage-failure tests intentionally replace localStorage with a throwing shim.
+  }
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-theme-transitions");
   document.documentElement.style.removeProperty("color-scheme");

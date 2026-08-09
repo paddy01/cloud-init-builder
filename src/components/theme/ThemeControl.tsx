@@ -44,17 +44,15 @@ export function ThemeControl() {
         <div
           data-testid="theme-control-track"
           data-theme-transition="colors"
-          className="flex min-w-0 gap-1 rounded border p-1"
-          style={{
-            backgroundColor: "var(--theme-surface)",
-            borderColor: "var(--theme-border)",
-          }}
+          className="flex min-w-0 gap-1 rounded border border-ui-border bg-ui-inset p-1"
         >
           {options.map((option) => {
             const checked = preference === option;
             const accessibleName = option === "system" ? `System (currently ${systemResult})` : option[0]!.toUpperCase() + option.slice(1);
             const visibleLabel = option === "system" ? `System (${systemResult})` : accessibleName;
-            const selectedClass = checked ? "ring-1 font-semibold" : "hover:opacity-80";
+            const segmentClass = checked
+              ? "border-ui-selected-border bg-ui-selected text-ui-selected-text font-semibold shadow-[inset_0_0_0_1px_currentColor] focus-within:ring-offset-ui-focus-offset-selected"
+              : "border-transparent bg-ui-raised text-ui-text hover:bg-ui-inset focus-within:ring-offset-ui-focus-offset-raised";
 
             return (
               <label
@@ -62,13 +60,7 @@ export function ThemeControl() {
                 data-theme-segment
                 data-theme-transition="colors"
                 data-theme-transition-focus
-                className={`group relative flex min-h-10 min-w-10 flex-1 items-center justify-center rounded px-2 text-sm focus-within:ring-2 focus-within:ring-offset-2 ${selectedClass}`}
-                style={{
-                  backgroundColor: checked ? "var(--theme-canvas)" : "var(--theme-surface)",
-                  borderColor: checked ? "var(--theme-accent)" : "transparent",
-                  color: checked ? "var(--theme-accent)" : "var(--theme-text)",
-                  boxShadow: checked ? "0 0 0 1px var(--theme-accent)" : undefined,
-                }}
+                className={`group relative flex min-h-10 min-w-10 flex-1 items-center justify-center rounded border px-2 text-sm focus-within:ring-2 focus-within:ring-ui-focus focus-within:ring-offset-2 ${segmentClass}`}
               >
                 <input
                   type="radio"
@@ -83,8 +75,7 @@ export function ThemeControl() {
                 <span className="hidden sm:inline">{visibleLabel}</span>
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden w-max max-w-56 -translate-x-1/2 rounded px-2 py-1 text-xs text-white group-focus-within:block group-hover:block sm:hidden"
-                  style={{ backgroundColor: "var(--theme-text)", color: "var(--theme-canvas)" }}
+                  className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 hidden w-max max-w-56 -translate-x-1/2 rounded border border-ui-border bg-ui-text px-2 py-1 text-xs text-ui-canvas group-focus-within:block group-hover:block sm:hidden"
                 >
                   {option === "system" ? `${accessibleName} — follows your device setting.` : accessibleName}
                 </span>
@@ -98,8 +89,7 @@ export function ThemeControl() {
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className="mt-1 max-w-80 break-words text-xs"
-          style={{ color: "var(--theme-muted-text)" }}
+          className="mt-1 max-w-80 break-words rounded border border-ui-warning-border bg-ui-warning px-2 py-1 text-xs text-ui-warning-text"
         >
           Appearance set for this session only. Your browser could not save it, so it will reset after reload.
         </p>
