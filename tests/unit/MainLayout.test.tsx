@@ -84,6 +84,31 @@ describe("MainLayout networking navigation", () => {
     expect(yaml).toContain("ens18:");
     vi.useRealTimers();
   });
+
+  it("routes a blocked preview issue to Identity without changing project or canonical YAML", () => {
+    const project = useProjectStore.getState().project;
+    if (!project) throw new Error("expected project");
+    useProjectStore.setState({
+      project: { ...project, identity: { hostname: "-invalid" } },
+    });
+    const projectBeforeRoute = structuredClone(useProjectStore.getState().project);
+    if (!projectBeforeRoute) throw new Error("expected blocked project");
+    const yamlBeforeRoute = generateCloudInit(
+      yamlService.toGenerateInput(projectBeforeRoute),
+    ).yaml;
+
+    render(<MainLayout />);
+    fireEvent.click(screen.getByRole("button", { name: "Networking" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /fix 1 error/i })[0]!);
+
+    expect(screen.getByRole("heading", { name: "Identity" })).toBeInTheDocument();
+    expect(useProjectStore.getState().project).toEqual(projectBeforeRoute);
+    const projectAfterRoute = useProjectStore.getState().project;
+    if (!projectAfterRoute) throw new Error("expected project after route");
+    expect(
+      generateCloudInit(yamlService.toGenerateInput(projectAfterRoute)).yaml,
+    ).toBe(yamlBeforeRoute);
+  });
 });
 
 describe("MainLayout commands workflow", () => {

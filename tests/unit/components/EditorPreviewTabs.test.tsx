@@ -20,7 +20,7 @@ describe("EditorPreviewTabs", () => {
       "bg-ui-selected",
       "text-ui-selected-text",
       "focus-visible:ring-ui-focus",
-      "focus-visible:ring-offset-ui-inset",
+      "focus-visible:ring-offset-[var(--ui-focus-offset-inset)]",
     );
   });
 

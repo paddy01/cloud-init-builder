@@ -29,8 +29,8 @@ export function EditorPreviewTabs({
               aria-selected={isActive}
               className={
                 isActive
-                  ? "min-h-10 border-b-2 border-ui-selected-border bg-ui-selected py-2 text-sm font-semibold text-ui-selected-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-inset focus-visible:outline-none"
-                  : "min-h-10 border-b-2 border-transparent py-2 text-sm text-ui-muted-text hover:bg-ui-raised hover:text-ui-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-inset focus-visible:outline-none"
+                  ? "min-h-10 border-b-2 border-ui-selected-border bg-ui-selected py-2 text-sm font-semibold text-ui-selected-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-inset)] focus-visible:outline-none"
+                  : "min-h-10 border-b-2 border-transparent py-2 text-sm text-ui-muted-text hover:bg-ui-raised hover:text-ui-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-inset)] focus-visible:outline-none"
               }
               onClick={() => onChange(tab.id)}
             >

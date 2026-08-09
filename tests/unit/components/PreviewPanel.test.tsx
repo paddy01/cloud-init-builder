@@ -52,6 +52,7 @@ describe("PreviewPanel empty state", () => {
     });
 
     expect(container.querySelector("pre code")).toBeNull();
+    expect(screen.getByRole("region", { name: "YAML preview" })).toBeInTheDocument();
     expect(screen.getAllByText(/validation error/).length).toBeGreaterThan(0);
   });
 

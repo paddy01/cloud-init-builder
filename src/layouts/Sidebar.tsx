@@ -29,8 +29,8 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                 }
                 className={
                   activeSection === section.id
-                    ? "block w-full whitespace-nowrap border-l-2 border-ui-selected-border bg-ui-selected px-4 py-2 text-left text-sm font-semibold text-ui-selected-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-inset focus-visible:outline-none"
-                    : "block w-full whitespace-nowrap rounded border border-transparent px-4 py-2 text-left text-sm text-ui-text hover:bg-ui-raised focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-inset focus-visible:outline-none"
+                    ? "block w-full whitespace-nowrap border-l-2 border-ui-selected-border bg-ui-selected px-4 py-2 text-left text-sm font-semibold text-ui-selected-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-inset)] focus-visible:outline-none"
+                    : "block w-full whitespace-nowrap rounded border border-transparent px-4 py-2 text-left text-sm text-ui-text hover:bg-ui-raised focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-inset)] focus-visible:outline-none"
                 }
               >
                 {section.label}
