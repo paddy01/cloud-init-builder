@@ -170,6 +170,26 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
     }
   });
 
+  it("pairs checked appearance radios with semantic selected styling and the shared focus ring", () => {
+    render(<ThemeControl />);
+
+    const system = screen.getByRole("radio", { name: "System (currently Light)" });
+    const systemSegment = system.closest("[data-theme-segment]");
+    expect(system).toBeChecked();
+    expect(systemSegment).toHaveClass(
+      "bg-ui-selected",
+      "border-ui-selected-border",
+      "text-ui-selected-text",
+      "focus-within:ring-ui-focus",
+      "focus-within:ring-offset-ui-focus-offset-selected",
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    const lightSegment = screen.getByRole("radio", { name: "Light" }).closest("[data-theme-segment]");
+    expect(lightSegment).toHaveClass("bg-ui-selected", "border-ui-selected-border", "text-ui-selected-text");
+    expect(systemSegment).toHaveClass("bg-ui-raised", "hover:bg-ui-inset");
+  });
+
   it("updates System live resolution silently without moving focus and ignores events for fixed overrides", () => {
     const media = installControlledMatchMedia(false);
     initializeThemeLifecycle();
@@ -228,6 +248,29 @@ describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
     );
     expect(light).toBeChecked();
     expect(light).toHaveFocus();
+  });
+
+  it("renders persistence feedback with semantic warning surface, border, and text cues", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("storage unavailable");
+      },
+      removeItem: () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    initializeThemeLifecycle();
+    render(<ThemeControl />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+
+    expect(screen.getByRole("status")).toHaveClass(
+      "bg-ui-warning",
+      "border-ui-warning-border",
+      "text-ui-warning-text",
+    );
   });
 
   it("clears the storage warning after six seconds without repeating or extending it later in the session", () => {
