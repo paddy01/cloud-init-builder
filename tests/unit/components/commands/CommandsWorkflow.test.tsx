@@ -291,12 +291,13 @@ describe("CommandsWorkflow warning visibility", () => {
     render(<MainLayout />);
     openCommandsSection();
 
-    const emptyState = screen.getByText("No run commands yet").closest("div");
+    const emptyHeading = screen.getByText("No run commands yet");
+    const emptyState = emptyHeading.closest("div");
     expect(emptyState).toHaveClass(
       "border-ui-border",
       "bg-ui-raised",
-      "text-ui-text",
     );
+    expect(emptyHeading).toHaveClass("text-ui-text");
 
     addRunCommand();
     addRunCommand();

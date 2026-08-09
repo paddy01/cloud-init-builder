@@ -103,9 +103,9 @@ export function CommandCardList({
       </div>
 
       {commands.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-left">
-          <p className="text-sm font-semibold text-gray-900">{copy.heading}</p>
-          <p className="text-sm text-gray-500">{copy.body}</p>
+        <div className="rounded-lg border border-dashed border-ui-border bg-ui-raised p-6 text-left">
+          <p className="text-sm font-semibold text-ui-text">{copy.heading}</p>
+          <p className="text-sm text-ui-muted-text">{copy.body}</p>
         </div>
       ) : (
         commands.map((command, index) => (
@@ -135,7 +135,7 @@ export function CommandCardList({
       <button
         ref={addButtonRef}
         type="button"
-        className="mt-6 min-h-10 rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+        className="mt-6 min-h-10 rounded border border-ui-action bg-ui-action px-4 py-2 text-sm text-ui-action-contrast hover:bg-ui-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-canvas"
         onClick={handleAdd}
       >
         {copy.addLabel}
