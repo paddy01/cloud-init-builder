@@ -265,7 +265,8 @@ describe("MainLayout users workflow", () => {
     expect(commandsButton).not.toHaveAttribute("aria-current");
 
     const exportRow = within(nav).getByText("Export").closest("span");
-    expect(exportRow?.className).toContain("text-gray-400");
+    expect(exportRow?.className).toContain("text-ui-disabled-text");
+    expect(exportRow?.className).toContain("border-ui-disabled-border");
     expect(exportRow?.className).toContain("cursor-not-allowed");
 
     fireEvent.click(usersButton);

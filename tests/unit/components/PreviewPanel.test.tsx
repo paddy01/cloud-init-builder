@@ -5,6 +5,8 @@ import { PreviewPanel } from "../../../src/components/preview/PreviewPanel.tsx";
 import { UserValidationProvider } from "../../../src/components/users/UserValidationProvider.tsx";
 import { createDefaultProject } from "../../../src/models/project.ts";
 import { useProjectStore } from "../../../src/state/projectStore.ts";
+import { generateCloudInit } from "../../../src/generators/generateCloudInit.ts";
+import { toGenerateInput } from "../../../src/services/yamlService.ts";
 
 function renderPreviewPanel(ui: ReactElement = <PreviewPanel />) {
   return render(<UserValidationProvider>{ui}</UserValidationProvider>);
@@ -31,6 +33,7 @@ describe("PreviewPanel empty state", () => {
   it("shows no-project state when project is null", () => {
     renderPreviewPanel();
 
+    expect(screen.getByRole("region", { name: "YAML preview" })).toBeInTheDocument();
     expect(screen.getByText("No project loaded")).toBeInTheDocument();
     expect(
       screen.getByText("Create or open a project to preview cloud-init YAML."),
@@ -126,6 +129,52 @@ describe("PreviewPanel debounce and validation", () => {
     const code = container.querySelector("pre code");
     expect(code?.textContent).toContain("hostname: web01");
     expect(code?.textContent?.startsWith("#cloud-config")).toBe(true);
+  });
+
+  it("retains the prior preview until 300 ms, then renders exact canonical YAML bytes", () => {
+    const project = createDefaultProject("Test");
+    project.identity = { hostname: "web01" };
+    useProjectStore.setState({ ...initialState, project });
+    const { container } = renderPreviewPanel();
+    const initialYaml = generateCloudInit(toGenerateInput(project)).yaml;
+
+    expect(container.querySelector("pre code")?.textContent).toBe(initialYaml);
+
+    act(() => {
+      useProjectStore.getState().updateIdentity({ hostname: "api01" });
+    });
+
+    expect(container.querySelector("pre code")?.textContent).toBe(initialYaml);
+
+    const updatedProject = useProjectStore.getState().project;
+    if (!updatedProject) throw new Error("expected updated project");
+    const updatedYaml = generateCloudInit(toGenerateInput(updatedProject)).yaml;
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(container.querySelector("pre code")?.textContent).toBe(updatedYaml);
+  });
+
+  it("uses a named region with a terminal frame, horizontal scroller, and non-wrapping code", () => {
+    const project = createDefaultProject("Test");
+    project.identity = { hostname: "web01" };
+    useProjectStore.setState({ ...initialState, project });
+    const { container } = renderPreviewPanel();
+
+    const region = screen.getByRole("region", { name: "YAML preview" });
+    const frame = region.querySelector("div.border-ui-terminal-border");
+    const scroller = frame?.firstElementChild;
+    const pre = scroller?.querySelector("pre");
+
+    expect(frame).toHaveClass("bg-ui-terminal");
+    expect(frame?.className).not.toMatch(/overflow-[xy]-(auto|scroll)/);
+    expect(scroller).toHaveClass("overflow-x-auto", "overflow-y-hidden");
+    expect(pre).toHaveClass("min-w-max", "whitespace-pre", "text-xs", "leading-5");
+    expect(pre?.className).not.toMatch(/overflow-[xy]-(auto|scroll)/);
+    expect(pre?.querySelector("code")).not.toBeNull();
+    expect(container.querySelectorAll('[aria-label="YAML preview"]')).toHaveLength(1);
   });
 
   it("shows validation banner immediately without waiting for debounce", () => {

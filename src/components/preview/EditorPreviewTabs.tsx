@@ -17,7 +17,7 @@ export function EditorPreviewTabs({
       <div
         role="tablist"
         aria-label="Switch between editor and preview"
-        className="grid grid-cols-2 border-b border-gray-200"
+        className="grid grid-cols-2 border-b border-ui-border bg-ui-inset"
       >
         {TABS.map((tab) => {
           const isActive = view === tab.id;
@@ -29,8 +29,8 @@ export function EditorPreviewTabs({
               aria-selected={isActive}
               className={
                 isActive
-                  ? "min-h-10 border-b-2 border-blue-600 py-2 text-sm font-semibold text-blue-700"
-                  : "min-h-10 border-b-2 border-transparent py-2 text-sm text-gray-500 hover:text-gray-700"
+                  ? "min-h-10 border-b-2 border-ui-selected-border bg-ui-selected py-2 text-sm font-semibold text-ui-selected-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-inset focus-visible:outline-none"
+                  : "min-h-10 border-b-2 border-transparent py-2 text-sm text-ui-muted-text hover:bg-ui-raised hover:text-ui-text focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-inset focus-visible:outline-none"
               }
               onClick={() => onChange(tab.id)}
             >

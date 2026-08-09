@@ -11,11 +11,17 @@ describe("EditorPreviewTabs", () => {
     expect(screen.getByRole("tab", { name: /preview/i })).toBeInTheDocument();
   });
 
-  it("applies active class to Editor tab when view is editor", () => {
+  it("applies redundant semantic selection and focus classes to the active Editor tab", () => {
     render(<EditorPreviewTabs view="editor" onChange={vi.fn()} />);
 
     const editorTab = screen.getByRole("tab", { name: /editor/i });
-    expect(editorTab).toHaveClass("border-blue-600", "text-blue-700");
+    expect(editorTab).toHaveClass(
+      "border-ui-selected-border",
+      "bg-ui-selected",
+      "text-ui-selected-text",
+      "focus-visible:ring-ui-focus",
+      "focus-visible:ring-offset-ui-inset",
+    );
   });
 
   it('calls onChange("preview") when Preview tab is clicked', async () => {
