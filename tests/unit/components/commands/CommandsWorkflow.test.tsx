@@ -185,6 +185,48 @@ describe("CommandsWorkflow argv editing and form switching", () => {
     expect(argv).toHaveFocus();
   });
 
+  it("uses semantic mono input, status, action, and repeatable-row roles", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+
+    const shellInput = screen.getByLabelText("Command");
+    expect(shellInput).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(screen.getByText(/Enter the command as cloud-init/i)).toHaveClass(
+      "text-ui-muted-text",
+    );
+
+    selectArgvForm(getCommandCard(0));
+    const executable = screen.getByLabelText("Executable");
+    expect(executable).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(screen.getByRole("button", { name: "Add argument" })).toHaveClass(
+      "border-ui-border",
+      "text-ui-text",
+      "focus-visible:ring-ui-focus",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add argument" }));
+    const argument = screen.getByPlaceholderText("e.g. enable");
+    expect(argument).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(screen.getByRole("button", { name: "Remove argument" })).toHaveClass(
+      "border-ui-error-border",
+      "text-ui-error-text",
+      "focus-visible:ring-ui-focus",
+    );
+  });
+
   it("requires confirmation for ambiguous shell-to-argv conversion and preserves shell on cancel", () => {
     render(<MainLayout />);
     openCommandsSection();
