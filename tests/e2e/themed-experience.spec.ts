@@ -26,7 +26,7 @@ for (const [theme, expectedFocus] of [["light", "#2563EB"], ["dark", "#60A5FA"]]
     }, compatibilityPairs);
 
     expect(properties["--ui-canvas"]).not.toBe("");
-    expect(properties["--ui-focus"]).toBe(expectedFocus);
+    expect(properties["--ui-focus"].toLowerCase()).toBe(expectedFocus.toLowerCase());
     for (const [legacy, canonical] of Object.entries(compatibilityPairs)) {
       expect(properties[legacy]).toBe(properties[canonical]);
     }

@@ -1,8 +1,7 @@
+// @ts-expect-error Vitest executes this source-inspection test in Node.
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const stylesPath = resolve(process.cwd(), "src/assets/styles.css");
 const requiredProperties = [
   "--ui-canvas",
   "--ui-raised",
@@ -48,9 +47,11 @@ function parseThemeTokens(css: string, theme: "light" | "dark"): ThemeTokens {
   const rule = new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\}`, "g");
   const matches = [...withoutComments.matchAll(rule)];
   expect(matches).toHaveLength(1);
+  const body = matches[0]?.[1];
+  if (body === undefined) throw new Error(`Missing ${selector} rule`);
 
   const declarations = new Map<string, string[]>();
-  for (const declaration of matches[0][1].split(";")) {
+  for (const declaration of body.split(";")) {
     const [property, ...value] = declaration.split(":");
     if (!property || value.length === 0) continue;
     const name = property.trim();
@@ -72,22 +73,30 @@ function resolveToken(tokens: ThemeTokens, token: keyof ThemeTokens): string {
 }
 
 function luminance(hex: string): number {
-  const channels = hex.slice(1).match(/.{2}/g)?.map((part) => Number.parseInt(part, 16) / 255);
-  if (!channels || channels.length !== 3) throw new Error(`Expected a hex color, received ${hex}`);
+  const parts = hex.slice(1).match(/.{2}/g);
+  if (!parts || parts.length !== 3) throw new Error(`Expected a hex color, received ${hex}`);
+  const channels = parts.map((part) => Number.parseInt(part, 16) / 255);
   const linear = channels.map((channel) => channel <= 0.04045
     ? channel / 12.92
     : ((channel + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  const [red, green, blue] = linear;
+  if (red === undefined || green === undefined || blue === undefined) {
+    throw new Error(`Expected three color channels, received ${hex}`);
+  }
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 }
 
 function contrast(foreground: string, background: string): number {
-  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  const first = luminance(foreground);
+  const second = luminance(background);
+  const lighter = Math.max(first, second);
+  const darker = Math.min(first, second);
   return (lighter + 0.05) / (darker + 0.05);
 }
 
 describe("semantic theme tokens", () => {
   it("declares contrast-safe canonical roles for each resolved theme", async () => {
-    const css = await readFile(stylesPath, "utf8");
+    const css = await readFile("src/assets/styles.css", "utf8");
     const light = parseThemeTokens(css, "light");
     const dark = parseThemeTokens(css, "dark");
 
