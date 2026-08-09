@@ -22,10 +22,10 @@ export function CommandsSection() {
   };
 
   return (
-    <section className="space-y-8 p-6">
+    <section className="space-y-8 bg-ui-canvas p-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Commands</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-lg font-semibold text-ui-text">Commands</h2>
+        <p className="text-sm text-ui-muted-text">
           Add ordered commands for early boot or first-boot setup without writing
           cloud-init YAML.
         </p>
