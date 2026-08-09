@@ -166,6 +166,7 @@ for (const width of [1279, 1280] as const) {
     await expect(repositoryLink).toContainText("GitHub");
     await repositoryLink.focus();
     await expect(repositoryLink).toBeFocused();
+    await waitForStableLayout(page, [repositoryLink]);
 
     const geometry = await page.evaluate(() => {
       const toRect = (element: Element) => {
