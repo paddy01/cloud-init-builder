@@ -153,6 +153,45 @@ describe("NetworkingValidation", () => {
     expect(screen.queryByText(/export-blocking/i)).toBeNull();
   });
 
+  it("keeps structural blockers and risk warnings on their distinct semantic surfaces", async () => {
+    seedInterface("semantic-error", { name: "ens18" });
+    seedInterface("semantic-error-peer", { name: "ens18" });
+    useProjectStore.getState().setNetworkDhcp("semantic-error", "ipv4", true);
+    const addressId = useProjectStore
+      .getState()
+      .addNetworkAddress("semantic-error", "ipv4", "semantic-risk-address");
+    useProjectStore
+      .getState()
+      .updateNetworkAddress(
+        "semantic-error",
+        "ipv4",
+        addressId!,
+        "192.0.2.10/24",
+      );
+
+    renderNetworkingSection();
+
+    const errorSummary = await screen.findByRole("heading", {
+      name: "Networking needs attention",
+    });
+    expect(errorSummary.closest("section")).toHaveClass(
+      "border-ui-error-border",
+      "bg-ui-error",
+      "text-ui-error-text",
+    );
+    const warningSummary = screen.getByRole("heading", {
+      name: "Networking safety warnings",
+    });
+    expect(warningSummary.closest("section")).toHaveClass(
+      "border-ui-warning-border",
+      "bg-ui-warning",
+      "text-ui-warning-text",
+    );
+    expect(screen.getByText("2 validation errors")).toBeInTheDocument();
+    expect(screen.getByText("1 warning")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /dismiss warning/i })).toBeNull();
+  });
+
   it("focuses the MTU input when a summary issue is activated", async () => {
     seedInterface("iface-focus", {
       mtuEnabled: true,
@@ -172,6 +211,10 @@ describe("NetworkingValidation", () => {
         `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_MTU_INVALID}`,
       ),
     });
+    expect(summaryButton).toHaveClass(
+      "focus:ring-ui-focus",
+      "focus:ring-offset-ui-error",
+    );
     fireEvent.click(summaryButton);
 
     await waitFor(() => {
@@ -521,6 +564,9 @@ describe("NetworkingValidation", () => {
       .getState()
       .updateNetworkAddress("risk-focus", "ipv4", addressId!, "192.0.2.10/24");
 
+    useProjectStore.getState().markSaved();
+    const projectBefore = useProjectStore.getState().project;
+    const updatedAtBefore = projectBefore?.metadata.updatedAt;
     renderNetworkingSection();
 
     const summaryButton = await screen.findByRole("button", {
@@ -528,6 +574,10 @@ describe("NetworkingValidation", () => {
         `ens18: ${NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4}`,
       ),
     });
+    expect(summaryButton).toHaveClass(
+      "focus:ring-ui-focus",
+      "focus:ring-offset-ui-warning",
+    );
     fireEvent.click(summaryButton);
 
     await waitFor(() => {
@@ -536,6 +586,11 @@ describe("NetworkingValidation", () => {
         "network-risk-focus-risk-warnings",
       );
     });
+    expect(useProjectStore.getState().project).toBe(projectBefore);
+    expect(useProjectStore.getState().project?.metadata.updatedAt).toBe(
+      updatedAtBefore,
+    );
+    expect(useProjectStore.getState().isDirty).toBe(false);
   });
 
   it("dismisses a risk warning from the card and summary without confirmation", async () => {
