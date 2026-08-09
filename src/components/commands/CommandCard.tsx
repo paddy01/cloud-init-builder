@@ -14,7 +14,10 @@ import {
   ArgvCommandInput,
   type ArgvCommandInputHandle,
 } from "./ArgvCommandInput.tsx";
-import { CommandFormSelector } from "./CommandFormSelector.tsx";
+import {
+  CommandFormSelector,
+  type CommandFormActivationOrigin,
+} from "./CommandFormSelector.tsx";
 import { ShellCommandInput } from "./ShellCommandInput.tsx";
 
 const REMOVE_CONFIRM =
@@ -169,10 +172,11 @@ export function CommandCard({
     onRemove(command.id);
   };
 
-  const handleFormSwitch = (form: BuilderCommand["form"]) => {
-    if (form === "argv") {
-      setFocusArgvExecutable(true);
-    }
+  const handleFormSwitch = (
+    form: BuilderCommand["form"],
+    origin: CommandFormActivationOrigin,
+  ) => {
+    setFocusArgvExecutable(form === "argv" && origin === "activation");
   };
 
   return (
