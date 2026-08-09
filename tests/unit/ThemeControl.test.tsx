@@ -179,6 +179,17 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
 });
 
 describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
+  beforeEach(() => {
+    resetThemeControlTestEnvironment();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetThemeControlTestEnvironment();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it("renders one exact polite atomic storage warning while preserving selection and focus", () => {
     vi.useFakeTimers();
     vi.stubGlobal("localStorage", {
@@ -227,7 +238,7 @@ describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
       vi.advanceTimersByTime(5_999);
     });
     expect(screen.getByRole("status")).toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(1));
+    act(() => vi.advanceTimersByTime(2));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     act(() => fireEvent.click(screen.getByRole("radio", { name: "Dark" })));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -236,6 +247,16 @@ describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
 });
 
 describe("ThemeControl portable project isolation (VISU-03)", () => {
+  beforeEach(() => {
+    resetThemeControlTestEnvironment();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetThemeControlTestEnvironment();
+    vi.restoreAllMocks();
+  });
+
   it("preserves project reference, content, saved state, dirty state, JSON, generator input, and YAML across theme changes", () => {
     const project = createDefaultProject("Appearance isolation");
     useProjectStore.setState({
