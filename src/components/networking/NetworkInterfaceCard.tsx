@@ -152,24 +152,24 @@ export function NetworkInterfaceCard({
   };
 
   const iconButton =
-    "flex size-10 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50";
+    "flex size-10 shrink-0 items-center justify-center rounded border border-ui-border bg-ui-raised text-ui-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised disabled:cursor-not-allowed disabled:border-ui-disabled-border disabled:bg-ui-disabled disabled:text-ui-disabled-text";
 
   return (
     <article
       ref={cardRef}
       aria-labelledby={`network-interface-title-${entry.id}`}
-      className="min-w-0 rounded border border-gray-200 bg-white p-4 sm:p-6"
+      className="min-w-0 rounded border border-ui-border bg-ui-raised p-4 sm:p-6"
     >
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h3
             id={`network-interface-title-${entry.id}`}
-            className="min-w-0 break-words text-sm font-semibold text-gray-900"
+            className="min-w-0 break-words text-sm font-semibold text-ui-text"
           >
             {title}
           </h3>
           {showCrossInterfaceAlert ? (
-            <p role="alert" className="mt-1 text-xs text-red-600">
+            <p role="alert" className="mt-1 text-xs text-ui-error-text">
               Conflicts with another interface — see the networking summary above.
             </p>
           ) : null}
@@ -202,7 +202,7 @@ export function NetworkInterfaceCard({
           <button
             ref={removeRef}
             type="button"
-            className={`${iconButton} border-red-200 text-red-600 hover:bg-red-50`}
+            className={`${iconButton} border-ui-error-border text-ui-error-text hover:bg-ui-error`}
             aria-label={`Remove ${title}`}
             title={`Remove ${title}`}
             onClick={requestRemoval}
@@ -216,7 +216,7 @@ export function NetworkInterfaceCard({
         <div
           id={`network-${entry.id}-risk-warnings`}
           tabIndex={-1}
-          className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900"
+          className="mb-6 rounded-lg border border-ui-warning-border bg-ui-warning px-4 py-3 text-ui-warning-text"
         >
           <ul className="space-y-3">
             {riskWarnings.map((issue) => (
@@ -227,7 +227,7 @@ export function NetworkInterfaceCard({
                 <p className="text-sm">{issue.message}</p>
                 <button
                   type="button"
-                  className="shrink-0 rounded border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="shrink-0 rounded border border-ui-warning-border bg-ui-raised px-3 py-1.5 text-sm text-ui-warning-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-warning"
                   aria-label={`Dismiss ${issue.message} for ${title}`}
                   onClick={() =>
                     acknowledgeNetworkRiskWarning(entry.id, issue.code as RiskCode)

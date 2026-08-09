@@ -479,7 +479,7 @@ describe("NetworkingValidation", () => {
     });
   });
 
-  it("renders the amber risk-warning container for a risky DHCP and static combo", async () => {
+  it("renders the card-owned semantic risk-warning container for a risky DHCP and static combo", async () => {
     seedInterface("risk-ui", { name: "ens18" });
     useProjectStore.getState().setNetworkDhcp("risk-ui", "ipv4", true);
     const addressId = useProjectStore
@@ -498,14 +498,17 @@ describe("NetworkingValidation", () => {
     });
     expect(container).toHaveAttribute("id", "network-risk-ui-risk-warnings");
     expect(container).toHaveAttribute("tabindex", "-1");
+    expect(container).toHaveClass("border-ui-warning-border", "bg-ui-warning");
     expect(
       screen.getByText(NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
+    const dismissButton = screen.getByRole("button", {
         name: `Dismiss ${NETWORKING_VALIDATION_MESSAGES.NET_RISK_DHCP4_STATIC_IPV4} for ens18`,
-      }),
-    ).toBeInTheDocument();
+      });
+    expect(dismissButton).toHaveClass(
+      "border-ui-warning-border",
+      "focus:ring-offset-ui-warning",
+    );
   });
 
   it("focuses the risk-warning container from the networking summary", async () => {
