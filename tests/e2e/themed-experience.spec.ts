@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import {
+  THEMED_EXPERIENCE_CASE_MANIFEST,
+  type ThemedExperienceCase,
+} from "./themedExperienceManifest.ts";
 
 const REPOSITORY_URL = "https://github.com/paddy01/cloud-init-builder";
 const REPOSITORY_LINK_NAME = "Open Cloud-Init Builder repository on GitHub";
@@ -55,6 +59,99 @@ function rectanglesIntersect(
 ) {
   return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
 }
+
+function previewRegion(page: import("@playwright/test").Page, width: number) {
+  return width < 1024
+    ? page.locator("main").getByRole("region", { name: "YAML preview" })
+    : page.locator("aside").getByRole("region", { name: "YAML preview" });
+}
+
+async function startThemedProject(
+  page: import("@playwright/test").Page,
+  entry: ThemedExperienceCase,
+) {
+  await page.setViewportSize(entry.viewport);
+  await page.goto("/");
+  await page.evaluate((theme) => {
+    document.documentElement.dataset.theme = theme;
+  }, entry.theme);
+  await page.getByRole("button", { name: "New" }).click();
+}
+
+async function fillValidHostname(page: import("@playwright/test").Page) {
+  await page.getByRole("textbox", { name: "Hostname" }).fill("themed-builder");
+  await expect(page.getByRole("textbox", { name: "Hostname" })).toHaveValue("themed-builder");
+  await page.waitForTimeout(300);
+}
+
+for (const entry of THEMED_EXPERIENCE_CASE_MANIFEST.filter(
+  (caseEntry) => caseEntry.group === "surface",
+)) {
+  test(`${entry.id} ${entry.tag}`, async ({ page }) => {
+    test.setTimeout(entry.timeout);
+    await startThemedProject(page, entry);
+
+    await expect(page.getByRole("textbox", { name: "Hostname" })).toBeVisible();
+    if (entry.viewport.width === 390) {
+      await page.getByRole("tab", { name: "Preview" }).click();
+      await expect(previewRegion(page, entry.viewport.width)).toContainText("YAML preview is unavailable");
+      await page.getByRole("tab", { name: "Editor" }).click();
+    } else {
+      await expect(page.locator("aside").getByRole("region", { name: "YAML preview" })).toContainText(
+        "YAML preview is unavailable",
+      );
+    }
+    await fillValidHostname(page);
+
+    if (entry.viewport.width === 390) {
+      await page.getByRole("tab", { name: "Preview" }).click();
+      await expect(previewRegion(page, entry.viewport.width)).toBeVisible();
+      await expect(previewRegion(page, entry.viewport.width).locator("pre code")).toContainText("hostname: themed-builder");
+      await page.getByRole("tab", { name: "Editor" }).click();
+    } else {
+      await expect(previewRegion(page, entry.viewport.width)).toBeVisible();
+      await expect(previewRegion(page, entry.viewport.width).locator("pre code")).toContainText("hostname: themed-builder");
+    }
+
+    for (const section of ["Identity", "Users", "Networking", "Commands"] as const) {
+      await page.getByRole("button", { name: section }).click();
+      await expect(page.getByRole("heading", { name: section })).toBeVisible();
+    }
+
+    await expect(page.getByRole("tab", { name: /Run commands/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByRole("button", { name: "Add run command" })).toBeVisible();
+    await page.getByRole("button", { name: "Identity" }).click();
+    await expect(page.getByRole("button", { name: "Identity" })).toHaveAttribute("aria-current", "page");
+  });
+}
+
+const layoutCase = THEMED_EXPERIENCE_CASE_MANIFEST.find(
+  (entry) => entry.id === "layout-lg-inflow-1024",
+);
+if (!layoutCase) throw new Error("Missing layout-lg-inflow-1024 manifest case");
+
+test(`${layoutCase.id} ${layoutCase.tag}`, async ({ page }) => {
+  test.setTimeout(layoutCase.timeout);
+  await startThemedProject(page, layoutCase);
+  await fillValidHostname(page);
+
+  const repositoryLink = page.getByRole("link", { name: REPOSITORY_LINK_NAME });
+  const asidePreview = previewRegion(page, layoutCase.viewport.width);
+  await expect(repositoryLink).toHaveCount(1);
+  await expect(repositoryLink).toHaveCSS("position", "static");
+  await expect(asidePreview).toBeVisible();
+
+  const documentMetrics = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(documentMetrics.scrollWidth).toBeLessThanOrEqual(documentMetrics.clientWidth + 1);
+  await expect(page.getByRole("button", { name: "Copy YAML" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export YAML" })).toBeVisible();
+});
 
 for (const width of [1279, 1280] as const) {
   test(`@repository-tracer protects TopBar geometry at ${width}px`, async ({ page }) => {
