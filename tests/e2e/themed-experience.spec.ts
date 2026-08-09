@@ -341,6 +341,173 @@ test(`${navigationCase.id} ${navigationCase.tag}`, async ({ page, context }) => 
   expect(context.pages()).toHaveLength(1);
 });
 
+async function downloadedBytes(download: import("@playwright/test").Download) {
+  const path = await download.path();
+  if (!path) throw new Error("expected Playwright to materialize the download");
+  return readFile(path);
+}
+
+async function exerciseCoreWorkflow(
+  page: import("@playwright/test").Page,
+  context: import("@playwright/test").BrowserContext,
+  entry: ThemedExperienceCase,
+) {
+  const utilities = page.getByTestId("top-bar-utilities");
+  const projectName = `Themed ${entry.theme} workflow`;
+  const sentinelName = `Dirty ${entry.theme} workflow`;
+
+  await test.step("project setup and authoring", async () => {
+    await startThemedProject(page, entry);
+    await page.getByRole("button", { name: "Rename project" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill(projectName);
+    await page.getByRole("button", { name: "Save project name" }).click();
+    await fillValidHostname(page);
+    await page.getByRole("button", { name: "Networking" }).click();
+    await page.getByRole("button", { name: "Add blank interface" }).click();
+    const interfaceCard = page.getByRole("article").first();
+    await interfaceCard.getByRole("textbox", { name: "Device name" }).fill("ens18");
+    await expect(page.getByText(projectName, { exact: true })).toBeVisible();
+    await expect(interfaceCard.getByRole("textbox", { name: "Device name" })).toHaveValue("ens18");
+    await expect(page.locator('[title="Unsaved changes"]')).toBeVisible();
+  });
+
+  await test.step("validation recovery", async () => {
+    await page.getByRole("button", { name: "Commands" }).click();
+    await page.getByRole("tab", { name: /Boot commands/i }).click();
+    await page.getByRole("button", { name: "Add boot command" }).click();
+    const bootPanel = page.getByRole("tabpanel", { name: /Boot commands/i });
+    const command = bootPanel.getByRole("textbox", { name: "Command" });
+    await command.fill("mkdir -p /run/themed-workflow");
+    await command.fill("");
+    await command.blur();
+    await expect(page.getByRole("heading", { name: "Commands need attention" })).toBeVisible();
+    await page.getByRole("tab", { name: /Run commands/i }).click();
+    await utilities.getByRole("button", { name: "Export YAML" }).click({ force: true });
+    await expect(page.getByRole("heading", { name: "Commands need attention" })).toBeFocused();
+    const issueRoute = page.getByRole("button", {
+      name: "Boot command 1: Export blocked: enter a command or remove this command card.",
+    });
+    await issueRoute.click();
+    await expect(page.getByRole("tab", { name: /Boot commands/i })).toHaveAttribute("aria-selected", "true");
+    await expect(bootPanel.getByRole("textbox", { name: "Command" })).toBeFocused();
+    await command.fill("mkdir -p /run/themed-workflow");
+    await command.blur();
+    await expect(issueRoute).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Commands need attention" })).toHaveCount(0);
+    await expect(utilities.getByRole("button", { name: "Export YAML" })).not.toHaveAttribute("aria-disabled", "true");
+    await page.waitForTimeout(300);
+  });
+
+  await test.step("dialog dismissal", async () => {
+    await page.getByRole("button", { name: "Networking" }).click();
+    const removeTrigger = page.getByRole("button", { name: "Remove ens18" });
+    await removeTrigger.focus();
+    await removeTrigger.press("Enter");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Keep interface" }).click();
+    await expect(removeTrigger).toBeFocused();
+    await removeTrigger.press("Enter");
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(removeTrigger).toBeFocused();
+    await expect(page.getByRole("textbox", { name: "Device name" })).toHaveValue("ens18");
+  });
+
+  let previewYaml = "";
+  await test.step("YAML output", async () => {
+    if (entry.viewport.width < 1024) {
+      await page.getByRole("tab", { name: "Preview" }).click();
+    }
+    const preview = previewRegion(page, entry.viewport.width);
+    const code = preview.locator("pre code");
+    await expect(code).toBeVisible();
+    previewYaml = await code.textContent() ?? "";
+    expect(previewYaml).toContain("hostname: themed-builder");
+    expect(previewYaml).toContain("mkdir -p /run/themed-workflow");
+
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: "http://127.0.0.1:4173",
+    });
+    try {
+      await utilities.getByRole("button", { name: "Copy YAML" }).click();
+      await expect(page.getByText("Copied YAML to clipboard.")).toBeVisible();
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(previewYaml);
+    } finally {
+      await context.clearPermissions();
+    }
+
+    const yamlDownload = page.waitForEvent("download");
+    await utilities.getByRole("button", { name: "Export YAML" }).click();
+    expect(await downloadedBytes(await yamlDownload)).toEqual(Buffer.from(previewYaml, "utf8"));
+  });
+
+  await test.step("project save and import", async () => {
+    const projectDownload = page.waitForEvent("download");
+    await utilities.getByRole("button", { name: "Save" }).click();
+    const downloadedProject = await projectDownload;
+    const savedProject = JSON.parse((await downloadedBytes(downloadedProject)).toString("utf8")) as {
+      metadata: { name: string };
+      identity: { hostname: string };
+      networking: { interfaces: Array<{ name: string }> };
+      commands: { bootcmd: Array<{ command: string }> };
+    };
+    expect(savedProject.metadata.name).toBe(projectName);
+    expect(savedProject.identity.hostname).toBe("themed-builder");
+    expect(savedProject.networking.interfaces.map((network) => network.name)).toContain("ens18");
+    expect(savedProject.commands.bootcmd.map((command) => command.command)).toContain("mkdir -p /run/themed-workflow");
+
+    const projectPath = await downloadedProject.path();
+    if (!projectPath) throw new Error("expected Playwright to materialize the project download");
+    await page.getByRole("button", { name: "Rename project" }).click();
+    await page.getByRole("textbox", { name: "Project name" }).fill(sentinelName);
+    await page.getByRole("button", { name: "Save project name" }).click();
+    await expect(page.getByText(sentinelName, { exact: true })).toBeVisible();
+    await expect(page.locator('[title="Unsaved changes"]')).toBeVisible();
+
+    let seen = 0;
+    let accepted = 0;
+    const laterDialogs: string[] = [];
+    const laterDialogHandler = (laterDialog: import("@playwright/test").Dialog) => {
+      laterDialogs.push(laterDialog.message());
+      void laterDialog.dismiss();
+    };
+    const firstDialog = new Promise<void>((resolve, reject) => {
+      page.once("dialog", async (dialog) => {
+        try {
+          seen += 1;
+          expect(dialog.type()).toBe("confirm");
+          expect(dialog.message()).toBe("You have unsaved changes. Open another project anyway?");
+          page.on("dialog", laterDialogHandler);
+          accepted += 1;
+          await dialog.accept();
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    try {
+      await utilities.getByRole("button", { name: "Open" }).click();
+      await page.locator('input[type="file"]').setInputFiles(projectPath);
+      await firstDialog;
+    } finally {
+      page.off("dialog", laterDialogHandler);
+    }
+    expect(seen).toBe(1);
+    expect(accepted).toBe(1);
+    expect(laterDialogs).toEqual([]);
+    await expect(page.getByText(projectName, { exact: true })).toBeVisible();
+    await expect(page.getByText(sentinelName, { exact: true })).toHaveCount(0);
+    await expect(page.locator('[title="Unsaved changes"]')).toHaveCount(0);
+    if (entry.viewport.width < 1024) {
+      await page.getByRole("tab", { name: "Editor" }).click();
+    }
+    await page.getByRole("button", { name: "Commands" }).click();
+    await expect(page.getByRole("tab", { name: /Boot commands/i })).toHaveCount(1);
+  });
+}
+
 for (const entry of THEMED_EXPERIENCE_CASE_MANIFEST.filter(
   (caseEntry) => caseEntry.group === "workflow",
 )) {
