@@ -287,6 +287,79 @@ describe("CommandsWorkflow warning visibility", () => {
     vi.restoreAllMocks();
   });
 
+  it("keeps zero, one, and many command cards structurally distinct with semantic actions", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+
+    const emptyState = screen.getByText("No run commands yet").closest("div");
+    expect(emptyState).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "text-ui-text",
+    );
+
+    addRunCommand();
+    addRunCommand();
+    addRunCommand();
+
+    expect(commands().runcmd).toHaveLength(3);
+    expect(new Set(commands().runcmd.map((command) => command.id)).size).toBe(3);
+
+    const firstCard = getCommandCard(0);
+    const secondCard = getCommandCard(1);
+    expect(firstCard).toHaveClass("border-ui-border", "bg-ui-raised");
+
+    const moveUp = within(firstCard).getByRole("button", { name: "Move up" });
+    expect(moveUp).toBeDisabled();
+    expect(moveUp).toHaveClass(
+      "cursor-not-allowed",
+      "border-ui-disabled-border",
+      "bg-ui-disabled",
+      "text-ui-disabled-text",
+    );
+    expect(moveUp.className).not.toMatch(/opacity-/);
+
+    const moveDown = within(secondCard).getByRole("button", {
+      name: "Move down",
+    });
+    expect(moveDown).toHaveClass("focus-visible:ring-ui-focus");
+    expect(
+      within(secondCard).getByRole("button", { name: "Remove command" }),
+    ).toHaveClass("focus-visible:ring-ui-focus", "text-ui-error-text");
+  });
+
+  it("reveals semantic error and warning badges through live command interaction", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+
+    addRunCommand();
+    const blankCard = getCommandCard(0);
+    const blankCommand = within(blankCard).getByLabelText("Command");
+
+    expect(within(blankCard).queryByText("1 error")).toBeNull();
+    fireEvent.blur(blankCommand);
+
+    const errorBadge = within(blankCard).getByText("1 error");
+    expect(errorBadge).toHaveClass(
+      "border-ui-error-border",
+      "bg-ui-error",
+      "text-ui-error-text",
+    );
+
+    addRunCommand();
+    const warningCard = getCommandCard(1);
+    fireEvent.change(within(warningCard).getByLabelText("Command"), {
+      target: { value: "rm -rf /tmp/demo" },
+    });
+
+    const warningBadge = within(warningCard).getByText("1 warning");
+    expect(warningBadge).toHaveClass(
+      "border-ui-warning-border",
+      "bg-ui-warning",
+      "text-ui-warning-text",
+    );
+  });
+
   it("shows recursive-deletion warnings inline in Run commands without blur", () => {
     render(<MainLayout />);
     openCommandsSection();
