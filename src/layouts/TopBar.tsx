@@ -4,6 +4,7 @@ import { useUserValidation } from "../components/users/UserValidationContext.ts"
 import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
 import { NETWORKING_VALIDATION_SUMMARY_HEADING_ID } from "../components/networking/NetworkingValidationSummary.tsx";
 import { ThemeControl } from "../components/theme/ThemeControl.tsx";
+import { RepositoryLink } from "../components/navigation/RepositoryLink.tsx";
 import { isNetworkingIssuePath } from "../components/networking/networkingValidationPaths.ts";
 import type { YamlOutputChannel } from "../components/validation/validationContext.ts";
 import { exportProject, importProject } from "../services/projectService.ts";
@@ -422,8 +423,8 @@ export function TopBar() {
   );
 
   return (
-    <div className="border-b border-gray-200 bg-white">
-      <header className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2 sm:h-14 sm:flex-nowrap sm:gap-3 sm:py-0">
+    <div data-testid="top-bar-shell" className="relative border-b border-gray-200 bg-white">
+      <header data-testid="top-bar-header" className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2 sm:gap-3 xl:pr-36">
         <h1 className="text-lg font-semibold text-gray-900">Cloud-Init Builder</h1>
         <div className="h-6 border-l border-gray-300" />
         <div className="flex min-w-0 items-center gap-2 text-sm text-gray-700">
@@ -484,7 +485,7 @@ export function TopBar() {
             <>
               <span
                 title={project ? project.metadata.name : undefined}
-                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 truncate whitespace-nowrap overflow-hidden text-ellipsis xl:w-48 xl:max-w-48"
               >
                 {project?.metadata.name ?? "No Project"}
               </span>
@@ -524,7 +525,7 @@ export function TopBar() {
           </span>
         )}
         <div className="hidden flex-1 sm:block" />
-        <div className="order-2 flex w-full min-w-0 flex-wrap items-center justify-between gap-1 sm:order-none sm:w-auto sm:flex-nowrap sm:justify-start sm:gap-3">
+        <div data-testid="top-bar-utilities" className="order-2 flex w-full shrink-0 min-w-0 flex-wrap items-center justify-between gap-1 sm:order-none sm:justify-start sm:gap-3 xl:w-auto xl:flex-nowrap">
           <button
             type="button"
             onClick={handleNew}
@@ -557,6 +558,7 @@ export function TopBar() {
           ) : (
             exportYamlButton
           )}
+          <RepositoryLink />
         </div>
         <input
           ref={fileInputRef}

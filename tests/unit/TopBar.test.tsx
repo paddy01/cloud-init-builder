@@ -17,6 +17,12 @@ import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
 
+const productionSources = import.meta.glob("../../src/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+}) as Record<string, string>;
+
 function renderTopBar(
   activeSection: EditorSection = "identity",
   setActiveSection = vi.fn(),
@@ -55,7 +61,15 @@ describe("TopBar repository navigation", () => {
     for (const name of ["New", "Open", "Save", "Copy YAML", "Export YAML"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
-    expect(screen.getByRole("radiogroup", { name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
+  });
+
+  it("keeps the fixed repository destination literal in its sole production owner", () => {
+    const owners = Object.entries(productionSources)
+      .filter(([, source]) => source.includes(REPOSITORY_URL))
+      .map(([path]) => path.replace(/^\.\.\/\.\.\//, ""));
+
+    expect(owners).toEqual(["src/components/navigation/RepositoryLink.tsx"]);
   });
 });
 
