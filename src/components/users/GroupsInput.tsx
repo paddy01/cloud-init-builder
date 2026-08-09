@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 const chipClassName =
-  "inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700";
+  "inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-inset px-2 py-1 text-xs text-ui-text";
 
 function mergeGroups(existing: string[], incoming: string[]): string[] {
   const result = [...existing];
@@ -40,13 +40,13 @@ export function GroupsInput({ id, groups, onChange }: GroupsInputProps) {
 
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-sm font-semibold text-gray-700">
+      <label htmlFor={id} className="text-sm font-semibold text-ui-text">
         Additional groups
       </label>
       <div
         className={
-          "flex flex-wrap items-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 " +
-          "focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500"
+          "flex flex-wrap items-center gap-2 rounded border border-ui-border bg-ui-raised px-3 py-2 text-ui-text " +
+          "focus-within:ring-2 focus-within:ring-ui-focus focus-within:ring-offset-2 focus-within:ring-offset-ui-focus-offset-raised focus-within:border-ui-focus"
         }
       >
         {groups.map((group) => (
@@ -54,7 +54,7 @@ export function GroupsInput({ id, groups, onChange }: GroupsInputProps) {
             {group}
             <button
               type="button"
-              className="text-gray-500 hover:text-gray-700"
+              className="rounded text-ui-muted-text hover:text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-inset"
               aria-label={`Remove group ${group}`}
               onClick={() => removeGroup(group)}
             >
@@ -67,7 +67,7 @@ export function GroupsInput({ id, groups, onChange }: GroupsInputProps) {
           type="text"
           value={draft}
           placeholder="Type a group and press Enter"
-          className="min-w-[12rem] flex-1 border-0 bg-transparent p-0 text-sm focus:outline-none focus:ring-0"
+          className="min-w-[12rem] flex-1 border-0 bg-transparent p-0 text-sm text-ui-text focus:outline-none focus:ring-0"
           onChange={(event) => {
             const value = event.target.value;
             if (value.includes(",")) {
@@ -93,7 +93,7 @@ export function GroupsInput({ id, groups, onChange }: GroupsInputProps) {
           onBlur={() => commitDraft(draft)}
         />
       </div>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-ui-muted-text">
         Add one group per tag. Pasting comma-separated values creates multiple
         tags.
       </p>

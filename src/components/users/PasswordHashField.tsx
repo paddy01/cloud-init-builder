@@ -5,11 +5,11 @@ import { FieldMessage } from "./FieldMessage.tsx";
 import { useUserValidation } from "./UserValidationContext.ts";
 
 const inputDefaultClassName =
-  "border border-gray-300 rounded px-3 py-2 text-xs font-mono bg-white w-full " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "w-full rounded border border-ui-border bg-ui-raised px-3 py-2 text-xs font-mono text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised focus:border-ui-focus";
 const inputErrorClassName =
-  "border border-red-300 rounded px-3 py-2 text-xs font-mono bg-white w-full " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "w-full rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-xs font-mono text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised focus:border-ui-focus";
 
 interface PasswordHashFieldProps {
   userId: string;
@@ -81,14 +81,14 @@ export function PasswordHashField({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-ui-text">
         {isLocked && !hasCommittedHash
           ? "Password login locked"
           : "Password login enabled"}
       </p>
       <p
         id={`user-password-help-${userId}`}
-        className="text-xs text-gray-500"
+        className="text-xs text-ui-muted-text"
       >
         {isLocked && !hasCommittedHash
           ? "New users start locked. Add a supported password hash to enable password login."
@@ -98,7 +98,7 @@ export function PasswordHashField({
       <div className="space-y-1">
         <label
           htmlFor={`user-password-${userId}`}
-          className="text-sm font-semibold text-gray-700"
+          className="text-sm font-semibold text-ui-text"
         >
           Hashed password
         </label>
@@ -120,7 +120,7 @@ export function PasswordHashField({
           />
           <button
             type="button"
-            className="min-h-10 shrink-0 rounded border border-gray-300 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+            className="min-h-10 shrink-0 rounded border border-ui-border bg-ui-raised px-3 py-2 text-xs text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
             onClick={() => setRevealed((current) => !current)}
           >
             {revealed ? "Hide hash" : "Show hash"}
@@ -128,7 +128,7 @@ export function PasswordHashField({
         </div>
         <p
           id={`user-password-formats-${userId}`}
-          className="text-xs text-gray-500"
+          className="text-xs text-ui-muted-text"
         >
           Supported prefixes: $6$, $5$, and $2y$.
         </p>
