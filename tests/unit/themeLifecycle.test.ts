@@ -1,4 +1,14 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  applyResolvedTheme,
+  disposeThemeLifecycle,
+  initializeThemeLifecycle,
+  resolveTheme,
+  THEME_MEDIA_QUERY,
+  THEME_STORAGE_KEY,
+} from "../../src/theme/themeLifecycle.ts";
+import { useThemeStore } from "../../src/theme/themeStore.ts";
 
 type StorageFailure = "get" | "set" | "remove";
 
@@ -92,9 +102,17 @@ export function installControlledMatchMedia(media: ControlledMediaQueryList): vo
 }
 
 export function extractThemeBootstrapBody(): string {
-  const scripts = document.querySelectorAll("script#theme-bootstrap");
+  const indexHtml = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const documentForSource = document.implementation.createHTMLDocument("theme source");
+  documentForSource.documentElement.innerHTML = indexHtml;
+  const scripts = documentForSource.querySelectorAll("script#theme-bootstrap");
   expect(scripts).toHaveLength(1);
-  return scripts[0]?.textContent ?? "";
+  const bootstrap = scripts[0];
+  const module = documentForSource.querySelector('script[type="module"]');
+  expect(bootstrap).not.toBeNull();
+  expect(module).not.toBeNull();
+  expect(bootstrap?.compareDocumentPosition(module!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  return bootstrap?.textContent ?? "";
 }
 
 export function resetThemeTestEnvironment(): void {
@@ -115,6 +133,7 @@ describe("theme lifecycle", () => {
   });
 
   afterEach(() => {
+    disposeThemeLifecycle();
     resetThemeTestEnvironment();
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -136,11 +155,95 @@ describe("theme lifecycle", () => {
     expect(consoleLogSpy).not.toHaveBeenCalled();
   });
 
-  it.todo("resolves missing System preference through OS Light and Dark");
-  it.todo("allows only stored light and dark overrides and rejects invalid storage values");
-  it.todo("keeps bootstrap and runtime root data-theme and color-scheme parity");
-  it.todo("orders the exact theme bootstrap body before the application module");
-  it.todo("applies only resolved root themes without a first-paint transition marker");
+  it.each([
+    [undefined, false, "system", "light"],
+    [undefined, true, "system", "dark"],
+    ["light", true, "light", "light"],
+    ["dark", false, "dark", "dark"],
+    ["not-a-theme", true, "system", "dark"],
+  ] as const)(
+    "resolves %s storage with OS dark=%s as %s/%s",
+    (storedPreference, osDark, preference, resolvedTheme) => {
+      expect(resolveTheme(storedPreference, osDark)).toEqual({ preference, resolvedTheme });
+    },
+  );
+
+  it("keeps the exact bootstrap body and runtime root application in parity", () => {
+    const body = extractThemeBootstrapBody();
+
+    for (const [storedPreference, osDark] of [
+      [undefined, false],
+      [undefined, true],
+      ["light", true],
+      ["dark", false],
+      ["invalid", true],
+    ] as const) {
+      resetThemeTestEnvironment();
+      const storage = createControlledStorage(
+        storedPreference === undefined ? {} : { [THEME_STORAGE_KEY]: storedPreference },
+      );
+      storage.install();
+      installControlledMatchMedia(createControlledMediaQueryList(THEME_MEDIA_QUERY, osDark));
+      new Function(body)();
+      const bootstrapPair = [
+        document.documentElement.dataset.theme,
+        document.documentElement.style.colorScheme,
+      ];
+
+      resetThemeTestEnvironment();
+      storage.install();
+      installControlledMatchMedia(createControlledMediaQueryList(THEME_MEDIA_QUERY, osDark));
+      initializeThemeLifecycle();
+      expect([
+        document.documentElement.dataset.theme,
+        document.documentElement.style.colorScheme,
+      ]).toEqual(bootstrapPair);
+    }
+  });
+
+  it("applies only resolved root themes and initializes before React without transitions", () => {
+    applyResolvedTheme(document.documentElement, "dark");
+
+    expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(document.documentElement).not.toHaveAttribute("data-theme-transitions");
+
+    const mainSource = readFileSync(new URL("../../src/main.tsx", import.meta.url), "utf8");
+    expect(mainSource.indexOf("initializeThemeLifecycle()")).toBeLessThan(
+      mainSource.indexOf("createRoot(rootElement)"),
+    );
+  });
+
+  it.each(["get", "media"] as const)(
+    "silently applies a fallback root for guarded %s failure",
+    (failure) => {
+      const storage = createControlledStorage();
+      storage.install();
+      if (failure === "get") storage.failures.add("get");
+      installControlledMatchMedia(
+        failure === "media"
+          ? ({
+              media: THEME_MEDIA_QUERY,
+              matches: false,
+              addEventListener() {
+                throw new Error("media failure");
+              },
+              removeEventListener() {},
+              emit() {},
+              listenerCount() {
+                return 0;
+              },
+            } satisfies ControlledMediaQueryList)
+          : createControlledMediaQueryList(THEME_MEDIA_QUERY, true),
+      );
+
+      initializeThemeLifecycle();
+
+      expect(document.documentElement.dataset.theme).toMatch(/^(light|dark)$/);
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+    },
+  );
+
   it.todo("owns one System media listener, removes overrides, and disposes cleanly");
   it.todo("applies current System events and ignores stale events after explicit selection");
   it.todo("persists explicit overrides, removes System, and retains session appearance on failure");
