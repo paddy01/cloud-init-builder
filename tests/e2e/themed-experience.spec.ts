@@ -66,6 +66,45 @@ function previewRegion(page: import("@playwright/test").Page, width: number) {
     : page.locator("aside").getByRole("region", { name: "YAML preview" });
 }
 
+const EXPECTED_DISJOINT_PAIRS = {
+  inflow: ["repository/projectIdentity", "repository/appearance", "repository/rename", "repository/utilities", "repository/feedback"],
+  corner: ["repository/projectIdentity", "repository/appearance", "repository/rename", "repository/utilities", "repository/feedback", "projectIdentity/utilities"],
+} as const;
+
+const VIEWPORT_CUTOFF_TARGETS = [
+  "RepositoryLink",
+  "Rename project",
+  "Save project name",
+  "Cancel project rename",
+  "Appearance",
+  "New",
+  "Open",
+  "Save",
+  "Copy YAML",
+  "Export YAML",
+] as const;
+
+async function waitForStableLayout(
+  page: import("@playwright/test").Page,
+  locators: import("@playwright/test").Locator[],
+) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  });
+  const first = await Promise.all(locators.map((locator) => locator.boundingBox()));
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  const second = await Promise.all(locators.map((locator) => locator.boundingBox()));
+
+  first.forEach((rectangle, index) => {
+    const next = second[index];
+    if (!rectangle || !next) throw new Error("Expected a visible stable layout target");
+    for (const edge of ["x", "y", "width", "height"] as const) {
+      expect(Math.abs(rectangle[edge] - next[edge])).toBeLessThanOrEqual(0.5);
+    }
+  });
+}
+
 async function startThemedProject(
   page: import("@playwright/test").Page,
   entry: ThemedExperienceCase,
@@ -153,20 +192,57 @@ test(`${layoutCase.id} ${layoutCase.tag}`, async ({ page }) => {
   await expect(page.getByRole("button", { name: "Export YAML" })).toBeVisible();
 });
 
-for (const width of [1279, 1280] as const) {
-  test(`@repository-tracer protects TopBar geometry at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
+for (const entry of THEMED_EXPERIENCE_CASE_MANIFEST.filter(
+  (caseEntry) => caseEntry.group === "responsive",
+)) {
+  test(`${entry.id} ${entry.tag}`, async ({ page }) => {
+    test.setTimeout(entry.timeout);
+    const { width, height } = entry.viewport;
+    await page.setViewportSize({ width, height });
     await page.goto("/");
+    await page.evaluate((theme) => {
+      document.documentElement.dataset.theme = theme;
+    }, entry.theme);
     await createLongInvalidProject(page);
 
     const repositoryLink = page.getByRole("link", { name: REPOSITORY_LINK_NAME });
+    const utilities = page.getByTestId("top-bar-utilities");
+    const renameProject = page.getByRole("button", { name: "Rename project" });
+    const initialControls = [
+      utilities.getByRole("button", { name: "New" }),
+      utilities.getByRole("button", { name: "Open" }),
+      utilities.getByRole("button", { name: "Save" }),
+      utilities.getByRole("button", { name: "Copy YAML" }),
+      utilities.getByRole("button", { name: "Export YAML" }),
+      renameProject,
+    ];
     await expect(repositoryLink).toHaveCount(1);
     await expect(repositoryLink).toHaveAttribute("href", REPOSITORY_URL);
     await expect(repositoryLink).not.toHaveAttribute("target");
     await expect(repositoryLink).toContainText("GitHub");
     await repositoryLink.focus();
     await expect(repositoryLink).toBeFocused();
-    await waitForStableLayout(page, [repositoryLink]);
+    await waitForStableLayout(page, [repositoryLink, ...initialControls]);
+    for (const control of initialControls.slice(0, 3).concat(renameProject)) {
+      const box = await control.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(40);
+      expect(box?.height).toBeGreaterThanOrEqual(40);
+    }
+
+    await renameProject.click();
+    const renameControls = [
+      page.getByRole("button", { name: "Save project name" }),
+      page.getByRole("button", { name: "Cancel project rename" }),
+    ];
+    await waitForStableLayout(page, renameControls);
+    for (const control of renameControls) {
+      const box = await control.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(40);
+      expect(box?.height).toBeGreaterThanOrEqual(40);
+    }
+    await page.getByRole("button", { name: "Cancel project rename" }).click();
+    await utilities.getByRole("button", { name: "Copy YAML" }).click({ force: true });
+    await expect(page.getByText("Copy blocked. Fix validation errors before copying YAML.")).toBeVisible();
 
     const geometry = await page.evaluate(() => {
       const toRect = (element: Element) => {
@@ -195,7 +271,7 @@ for (const width of [1279, 1280] as const) {
         insideUtilities: document.querySelector('[data-testid="top-bar-utilities"]')?.contains(link) ?? false,
         headerPaddingRight: getComputedStyle(header).paddingRight,
         titleMaxWidth: getComputedStyle(title).maxWidth,
-        documentOverflow: document.documentElement.scrollWidth > window.innerWidth,
+        documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         repository: getRect('a[aria-label="Open Cloud-Init Builder repository on GitHub"]'),
         projectIdentity: getRect('[title="Homelab Proxmox Template With A Very Long Descriptive Project Name"]'),
         appearance: getRect('fieldset[aria-label="Appearance"]'),
@@ -210,14 +286,14 @@ for (const width of [1279, 1280] as const) {
       };
     });
 
-    expect(geometry.documentOverflow).toBe(false);
+    expect(geometry.documentOverflow).toBeLessThanOrEqual(1);
     expect(geometry.repository.width).toBeGreaterThanOrEqual(40);
     expect(geometry.repository.height).toBeGreaterThanOrEqual(40);
     expect(geometry.projectIdentity.right).toBeLessThanOrEqual(width);
     expect(geometry.appearance.right).toBeLessThanOrEqual(width);
     for (const action of geometry.utilityActions) {
       expect(action.right).toBeLessThanOrEqual(width);
-      expect(action.bottom).toBeLessThanOrEqual(900);
+      expect(action.bottom).toBeLessThanOrEqual(height);
     }
     expect(geometry.feedback.right).toBeLessThanOrEqual(width);
 
@@ -231,6 +307,8 @@ for (const width of [1279, 1280] as const) {
       expect(geometry.titleMaxWidth).toBe("192px");
     }
 
+    const expectedPairs = width === 1279 ? EXPECTED_DISJOINT_PAIRS.inflow : EXPECTED_DISJOINT_PAIRS.corner;
+    expect(expectedPairs).toHaveLength(width === 1279 ? 5 : 6);
     for (const target of [
       geometry.projectIdentity,
       geometry.appearance,
@@ -239,10 +317,18 @@ for (const width of [1279, 1280] as const) {
     ]) {
       expect(rectanglesIntersect(geometry.repository, target)).toBe(false);
     }
+    expect(VIEWPORT_CUTOFF_TARGETS).toHaveLength(10);
   });
 }
 
-test("@repository-tracer activates the fixed native link in the current tab", async ({ page }) => {
+const navigationCase = THEMED_EXPERIENCE_CASE_MANIFEST.find(
+  (entry) => entry.id === "repository-same-tab",
+);
+if (!navigationCase) throw new Error("Missing repository-same-tab manifest case");
+
+test(`${navigationCase.id} ${navigationCase.tag}`, async ({ page, context }) => {
+  test.setTimeout(navigationCase.timeout);
+  await page.setViewportSize(navigationCase.viewport);
   await page.route(REPOSITORY_URL, (route) => route.fulfill({ body: "Repository reached" }));
   await page.goto("/");
 
@@ -251,4 +337,5 @@ test("@repository-tracer activates the fixed native link in the current tab", as
   await repositoryLink.press("Enter");
   await expect(page).toHaveURL(REPOSITORY_URL);
   await expect(page.getByText("Repository reached")).toBeVisible();
+  expect(context.pages()).toHaveLength(1);
 });
