@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import {
   THEMED_EXPERIENCE_CASE_MANIFEST,
   type ThemedExperienceCase,
@@ -339,3 +340,12 @@ test(`${navigationCase.id} ${navigationCase.tag}`, async ({ page, context }) => 
   await expect(page.getByText("Repository reached")).toBeVisible();
   expect(context.pages()).toHaveLength(1);
 });
+
+for (const entry of THEMED_EXPERIENCE_CASE_MANIFEST.filter(
+  (caseEntry) => caseEntry.group === "workflow",
+)) {
+  test(`${entry.id} ${entry.tag}`, async ({ page, context }) => {
+    test.setTimeout(entry.timeout);
+    await exerciseCoreWorkflow(page, context, entry);
+  });
+}
