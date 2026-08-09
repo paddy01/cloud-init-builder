@@ -5,6 +5,10 @@ import { UserValidationProvider } from "../../src/components/users/UserValidatio
 import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationProvider.tsx";
 import type { EditorSection } from "../../src/layouts/editorNavigation.ts";
 import { TopBar } from "../../src/layouts/TopBar.tsx";
+import {
+  REPOSITORY_LINK_NAME,
+  REPOSITORY_URL,
+} from "../../src/components/navigation/RepositoryLink.tsx";
 import { useProjectStore } from "../../src/state/projectStore.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import * as projectService from "../../src/services/projectService.ts";
@@ -28,6 +32,32 @@ function renderTopBar(
     </UserValidationProvider>,
   );
 }
+
+describe("TopBar repository navigation", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+  });
+
+  it("exposes one fixed same-tab repository link without changing the utility actions", () => {
+    renderTopBar();
+
+    const repositoryLinks = screen.getAllByRole("link", { name: REPOSITORY_LINK_NAME });
+    expect(repositoryLinks).toHaveLength(1);
+    expect(repositoryLinks[0]).toHaveAttribute("href", REPOSITORY_URL);
+    expect(repositoryLinks[0]).not.toHaveAttribute("target");
+    expect(repositoryLinks[0]).toHaveTextContent("GitHub");
+
+    for (const name of ["New", "Open", "Save", "Copy YAML", "Export YAML"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("radiogroup", { name: "Appearance" })).toBeInTheDocument();
+  });
+});
 
 describe("TopBar Open dirty guard (WR-01)", () => {
   beforeEach(() => {
