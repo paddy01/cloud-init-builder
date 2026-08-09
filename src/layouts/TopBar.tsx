@@ -3,7 +3,6 @@ import { COMMANDS_VALIDATION_SUMMARY_HEADING_ID } from "../components/commands/C
 import { useUserValidation } from "../components/users/UserValidationContext.ts";
 import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
 import { NETWORKING_VALIDATION_SUMMARY_HEADING_ID } from "../components/networking/NetworkingValidationSummary.tsx";
-import { ThemeControl } from "../components/theme/ThemeControl.tsx";
 import { isNetworkingIssuePath } from "../components/networking/networkingValidationPaths.ts";
 import type { YamlOutputChannel } from "../components/validation/validationContext.ts";
 import { exportProject, importProject } from "../services/projectService.ts";
@@ -514,9 +513,6 @@ export function TopBar() {
               )}
             </>
           )}
-        </div>
-        <div className="order-1 sm:order-none">
-          <ThemeControl />
         </div>
         {copyFeedback && (
           <span className="order-3 w-full text-xs text-gray-600 sm:order-none sm:w-auto">
