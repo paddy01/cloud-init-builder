@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeControl } from "../../src/components/theme/ThemeControl.tsx";
 import { disposeThemeLifecycle, initializeThemeLifecycle } from "../../src/theme/themeLifecycle.ts";
@@ -62,6 +62,7 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
   });
 
   afterEach(() => {
+    cleanup();
     resetThemeControlTestEnvironment();
     vi.restoreAllMocks();
   });
@@ -153,11 +154,15 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
     const system = screen.getByRole("radio", { name: "System (currently Light)" });
     system.focus();
 
-    media.emit(true);
+    act(() => {
+      media.emit(true);
+    });
     expect(system).toHaveFocus();
     expect(screen.getByRole("radio", { name: "System (currently Dark)" })).toBeChecked();
     fireEvent.click(screen.getByRole("radio", { name: "Light" }));
-    media.emit(false);
+    act(() => {
+      media.emit(false);
+    });
     expect(screen.getByRole("radio", { name: "Light" })).toBeChecked();
     expect(useThemeStore.getState().resolvedTheme).toBe("light");
   });
