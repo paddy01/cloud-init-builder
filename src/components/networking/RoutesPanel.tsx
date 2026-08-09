@@ -35,11 +35,11 @@ function describedByIds(
 }
 
 const inputClass =
-  "min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-10 min-w-0 w-full rounded border border-ui-border bg-ui-raised px-4 py-2 font-mono text-sm text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised";
 const addButtonClass =
-  "min-h-10 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-10 rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset";
 const removeButtonClass =
-  "min-h-10 shrink-0 rounded border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto";
+  "min-h-10 shrink-0 rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-error-text hover:bg-ui-error focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised sm:w-auto";
 
 function interfaceTitle(entry: BuilderNetworkInterface): string {
   const activeDraft =
@@ -103,25 +103,25 @@ function RouteRow({
   const gatewayIssues = getVisibleIssuesForPath(gatewayPath);
   const metricIssues = getVisibleIssuesForPath(metricPath);
   const marker = (id: string) => (
-    <span id={id} className="text-xs font-normal text-amber-700">
+    <span id={id} className="text-xs font-normal text-ui-warning-text">
       Example value—replace for your network
     </span>
   );
 
   return (
     <div
-      className="min-w-0 space-y-3 rounded border border-gray-200 bg-white p-4"
+      className="min-w-0 space-y-3 rounded border border-ui-border bg-ui-raised p-4"
       role="group"
       aria-label={rowName}
     >
-      <p className="text-sm font-semibold text-gray-900">{visibleTitle}</p>
+      <p className="text-sm font-semibold text-ui-text">{visibleTitle}</p>
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <div className="min-w-0 space-y-3">
           {route.kind === "specific" ? (
             <div className="min-w-0 space-y-1">
               <label
                 htmlFor={destinationId}
-                className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+                className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-ui-text"
               >
                 <span>Destination</span>
                 {route.exampleFields.includes("destination") ? (
@@ -169,7 +169,7 @@ function RouteRow({
           <div className="min-w-0 space-y-1">
             <label
               htmlFor={gatewayId}
-              className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+              className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-ui-text"
             >
               <span>
                 {route.kind === "default" ? "Gateway" : "Gateway (optional)"}
@@ -221,7 +221,7 @@ function RouteRow({
       <div className="space-y-2">
         <button
           type="button"
-          className="min-h-10 rounded px-2 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="min-h-10 rounded px-2 py-1 text-sm font-semibold text-ui-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised"
           aria-label={`Advanced for ${familyLabel} ${intent} route ${position} for ${title}`}
           aria-expanded={isExpanded}
           aria-controls={advancedPanelId}
@@ -233,7 +233,7 @@ function RouteRow({
           <div id={advancedPanelId} className="min-w-0 space-y-1">
             <label
               htmlFor={metricId}
-              className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+              className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-ui-text"
             >
               <span>Metric (optional)</span>
               {route.exampleFields.includes("metric") ? (
@@ -367,12 +367,12 @@ function RouteFamilyGroup({ entry, family }: RouteFamilyGroupProps) {
       role="group"
       aria-labelledby={headingId}
     >
-      <h5 id={headingId} className="text-sm font-semibold text-gray-900">
+      <h5 id={headingId} className="text-sm font-semibold text-ui-text">
         {familyLabel} routes
       </h5>
 
       {routes.length === 0 ? (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ui-muted-text">
           No {familyLabel} routes added.
         </p>
       ) : (
@@ -448,13 +448,13 @@ export function RoutesPanel({ entry }: RoutesPanelProps) {
     >
       <h4
         id={`network-${entry.id}-routes`}
-        className="text-lg font-semibold text-gray-900"
+        className="text-lg font-semibold text-ui-text"
       >
         Routes
       </h4>
-      <div className="space-y-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div className="space-y-5 rounded-lg border border-ui-border bg-ui-inset p-4">
         <RouteFamilyGroup entry={entry} family="ipv4" />
-        <div aria-hidden="true" className="border-t border-gray-200" />
+        <div aria-hidden="true" className="border-t border-ui-border" />
         <RouteFamilyGroup entry={entry} family="ipv6" />
       </div>
     </section>

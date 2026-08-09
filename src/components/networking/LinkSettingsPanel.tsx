@@ -41,16 +41,16 @@ export function LinkSettingsPanel({ entry }: LinkSettingsPanelProps) {
 
   return (
     <section
-      className="min-w-0 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+      className="min-w-0 space-y-4 rounded-lg border border-ui-border bg-ui-inset p-4"
       aria-labelledby={headingId}
     >
-      <h4 id={headingId} className="text-lg font-semibold text-gray-900">
+      <h4 id={headingId} className="text-lg font-semibold text-ui-text">
         Link settings
       </h4>
-      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-gray-700">
+      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-ui-text">
         <input
           type="checkbox"
-          className="size-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          className="size-4 rounded border-ui-border text-ui-action focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset"
           checked={entry.mtuEnabled}
           onChange={(event) => {
             focusMtuAfterRender.current = event.target.checked;
@@ -64,11 +64,11 @@ export function LinkSettingsPanel({ entry }: LinkSettingsPanelProps) {
         <div className="min-w-0 space-y-1">
           <label
             htmlFor={`network-${entry.id}-mtu`}
-            className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+            className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-ui-text"
           >
             <span>MTU</span>
             {isExample ? (
-              <span id={markerId} className="text-xs font-normal text-amber-700">
+              <span id={markerId} className="text-xs font-normal text-ui-warning-text">
                 Example value—replace for your network
               </span>
             ) : null}
@@ -78,7 +78,7 @@ export function LinkSettingsPanel({ entry }: LinkSettingsPanelProps) {
             id={`network-${entry.id}-mtu`}
             type="text"
             inputMode="numeric"
-            className="min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="min-h-10 min-w-0 w-full rounded border border-ui-border bg-ui-raised px-4 py-2 font-mono text-sm text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset"
             aria-label="MTU"
             aria-describedby={mtuDescribedBy || undefined}
             placeholder="1500"
