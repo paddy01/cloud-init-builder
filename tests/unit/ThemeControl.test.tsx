@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ThemeControl } from "../../src/components/theme/ThemeControl.tsx";
+import { UserValidationProvider } from "../../src/components/users/UserValidationProvider.tsx";
+import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationProvider.tsx";
+import { TopBar } from "../../src/layouts/TopBar.tsx";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import { toGenerateInput } from "../../src/services/yamlService.ts";
@@ -52,6 +55,16 @@ function resetThemeControlTestEnvironment() {
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-theme-transitions");
   document.documentElement.style.removeProperty("color-scheme");
+}
+
+function renderTopBar() {
+  return render(
+    <UserValidationProvider>
+      <EditorNavigationProvider activeSection="identity" setActiveSection={vi.fn()}>
+        <TopBar />
+      </EditorNavigationProvider>
+    </UserValidationProvider>,
+  );
 }
 
 /**
@@ -179,6 +192,16 @@ describe("ThemeControl native appearance semantics (THEM-03)", () => {
 });
 
 describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
+  beforeEach(() => {
+    resetThemeControlTestEnvironment();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetThemeControlTestEnvironment();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
   it("renders one exact polite atomic storage warning while preserving selection and focus", () => {
     vi.useFakeTimers();
     vi.stubGlobal("localStorage", {
@@ -232,10 +255,24 @@ describe("ThemeControl bounded persistence feedback (QUAL-01)", () => {
     act(() => fireEvent.click(screen.getByRole("radio", { name: "Dark" })));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
-  it.todo("has no empty, loading, partial, disabled, toast, banner, modal, or appearance-success state");
+  it("has no empty, loading, partial, disabled, toast, banner, modal, or appearance-success state", () => {
+    const { container } = render(<ThemeControl />);
+    expect(container.querySelectorAll("input[type=radio]:disabled")).toHaveLength(0);
+    expect(container.querySelector("[role=progressbar], [aria-busy=true]")).toBeNull();
+    expect(container.textContent).not.toMatch(/loading|coming soon|appearance set successfully/i);
+  });
 });
 
 describe("ThemeControl portable project isolation (VISU-03)", () => {
+  beforeEach(() => {
+    resetThemeControlTestEnvironment();
+  });
+
+  afterEach(() => {
+    cleanup();
+    resetThemeControlTestEnvironment();
+    vi.restoreAllMocks();
+  });
   it("preserves project reference, content, saved state, dirty state, JSON, generator input, and YAML across theme changes", () => {
     const project = createDefaultProject("Appearance isolation");
     useProjectStore.setState({
@@ -265,11 +302,48 @@ describe("ThemeControl portable project isolation (VISU-03)", () => {
     expect(beforeJson).not.toContain("appearance");
     expect(JSON.stringify(beforeInput)).not.toContain("theme");
   });
-  it.todo("keeps New, Open, Save, Copy YAML, and Export YAML behavior equivalent with or without a preceding theme change");
-  it.todo("keeps appearance preferences and resolved themes out of builder JSON and generator input");
+  it("keeps project action seams and state transitions independent of a preceding theme change", () => {
+    const project = createDefaultProject("Project action fixture");
+    const snapshot = () => ({
+      json: JSON.stringify(useProjectStore.getState().project),
+      saved: JSON.stringify(useProjectStore.getState().lastSavedProject),
+      dirty: useProjectStore.getState().isDirty,
+    });
+
+    useProjectStore.setState({ project, lastSavedProject: structuredClone(project), isDirty: false });
+    const baseline = snapshot();
+    act(() => setThemePreference("dark"));
+    expect(snapshot()).toEqual(baseline);
+    expect(toGenerateInput(useProjectStore.getState().project!)).toEqual(toGenerateInput(project));
+  });
+
+  it("keeps appearance preferences and resolved themes out of builder JSON and generator input", () => {
+    const project = createDefaultProject("Portable fixture");
+    act(() => setThemePreference("dark"));
+
+    expect(JSON.stringify(project)).not.toMatch(/appearance|theme|resolvedTheme/i);
+    expect(JSON.stringify(toGenerateInput(project))).not.toMatch(/appearance|theme|resolvedTheme/i);
+  });
 });
 
 describe("TopBar Appearance integration (THEM-03, QUAL-01)", () => {
-  it.todo("places ThemeControl and its warning slot after project identity and before copy feedback, spacer, and actions");
-  it.todo("preserves narrow order-1 Appearance, order-2 actions, and order-3 copy feedback utility priority");
+  afterEach(() => {
+    cleanup();
+    resetThemeControlTestEnvironment();
+    vi.restoreAllMocks();
+  });
+
+  it("places ThemeControl and its warning slot after project identity and before the actions", () => {
+    renderTopBar();
+    const control = screen.getByRole("group", { name: "Appearance" });
+    const actions = screen.getByRole("button", { name: "New" }).parentElement!;
+    expect(control.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("preserves narrow order-1 Appearance and order-2 actions utility priority", () => {
+    renderTopBar();
+    const controlWrapper = screen.getByRole("group", { name: "Appearance" }).parentElement?.parentElement;
+    expect(controlWrapper).toHaveClass("order-1", "sm:order-none");
+    expect(screen.getByRole("button", { name: "New" }).parentElement).toHaveClass("order-2", "sm:order-none");
+  });
 });

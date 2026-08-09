@@ -34,6 +34,7 @@ function ThemeIcon({ option }: { option: ThemeOption }) {
 export function ThemeControl() {
   const preference = useThemeStore((state) => state.preference);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const storageWarningVisible = useThemeStore((state) => state.storageWarningVisible);
   const systemResult = resolvedTheme === "dark" ? "Dark" : "Light";
 
   return (
@@ -92,6 +93,17 @@ export function ThemeControl() {
           })}
         </div>
       </fieldset>
+      {storageWarningVisible ? (
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="mt-1 max-w-80 break-words text-xs"
+          style={{ color: "var(--theme-muted-text)" }}
+        >
+          Appearance set for this session only. Your browser could not save it, so it will reset after reload.
+        </p>
+      ) : null}
     </div>
   );
 }

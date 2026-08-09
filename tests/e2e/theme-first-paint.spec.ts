@@ -69,10 +69,12 @@ test("uses bounded post-startup color motion and disables it for reduced motion"
     document.body.append(focusProbe);
     focusProbe.focus();
   });
-  await expect(page.locator("[data-theme-transition='colors']")).toHaveCSS("transition-duration", /0\.15s/);
-  await expect(page.locator("[data-theme-transition='colors']")).toHaveCSS("transition-timing-function", /ease-out/);
-  await expect(page.locator("[data-theme-transition-focus]")).toHaveCSS("transition-property", /box-shadow/);
+  const colorProbe = page.getByRole("button", { name: "color probe" });
+  const focusProbe = page.getByRole("button", { name: "focus probe" });
+  await expect(colorProbe).toHaveCSS("transition-duration", /0\.15s/);
+  await expect(colorProbe).toHaveCSS("transition-timing-function", /ease-out/);
+  await expect(focusProbe).toHaveCSS("transition-property", /box-shadow/);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(page.locator("[data-theme-transition='colors']")).toHaveCSS("transition-duration", "0s");
+  await expect(colorProbe).toHaveCSS("transition-duration", "0s");
 });
