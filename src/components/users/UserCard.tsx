@@ -17,14 +17,14 @@ import {
 import { useUserValidation } from "./UserValidationContext.ts";
 
 const inputDefaultClassName =
-  "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "min-w-0 rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised";
 const inputErrorClassName =
-  "border border-red-300 rounded px-3 py-2 text-sm bg-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "min-w-0 rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised";
 const inputWarningClassName =
-  "border border-amber-300 rounded px-3 py-2 text-sm bg-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "min-w-0 rounded border border-ui-warning-border bg-ui-raised px-3 py-2 text-sm text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised";
 
 interface UserCardProps {
   user: BuilderUser;
@@ -91,14 +91,14 @@ export function UserCard({
       ? {
           label: cardErrors === 1 ? "1 error" : `${cardErrors} errors`,
           className:
-            "inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs text-red-700",
+            "inline-flex items-center rounded-full border border-ui-error-border bg-ui-error px-2 py-1 text-xs font-semibold text-ui-error-text",
         }
       : cardWarnings > 0
         ? {
             label:
               cardWarnings === 1 ? "1 warning" : `${cardWarnings} warnings`,
             className:
-              "inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800",
+              "inline-flex items-center rounded-full border border-ui-warning-border bg-ui-warning px-2 py-1 text-xs text-ui-warning-text",
           }
         : null;
 
@@ -163,15 +163,15 @@ export function UserCard({
     <article
       ref={cardRef}
       aria-labelledby={`user-card-title-${user.id}`}
-      className="rounded-lg border border-gray-200 bg-white p-6"
+      className="rounded-lg border border-ui-border bg-ui-raised p-6"
     >
       <div className="mb-4 flex items-start justify-between gap-4">
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p
                 id={`user-card-title-${user.id}`}
-                className="text-sm font-semibold text-gray-900"
+                className="break-words text-sm font-semibold text-ui-text"
               >
                 {title}
               </p>
@@ -181,9 +181,11 @@ export function UserCard({
                 </span>
               ) : null}
             </div>
-            <div className="mt-1 flex flex-wrap gap-2 text-xs text-gray-500">
+            <div className="mt-1 flex min-w-0 flex-wrap gap-2 text-xs text-ui-muted-text">
               {secondary.map((line) => (
-                <span key={`${user.id}-${line}`}>{line}</span>
+                <span key={`${user.id}-${line}`} className="break-words">
+                  {line}
+                </span>
               ))}
             </div>
           </div>
@@ -197,8 +199,8 @@ export function UserCard({
                     key={`${user.id}-${badge}`}
                     className={
                       isAttention
-                        ? "inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800"
-                        : "inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                        ? "inline-flex items-center rounded-full border border-ui-warning-border bg-ui-warning px-2 py-1 text-xs text-ui-warning-text"
+                        : "inline-flex items-center rounded-full border border-ui-selected-border bg-ui-selected px-2 py-1 text-xs font-semibold text-ui-selected-text"
                     }
                   >
                     {badge}
@@ -210,7 +212,7 @@ export function UserCard({
         </div>
         <button
           type="button"
-          className="text-sm text-red-600 hover:text-red-700"
+          className="rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-error-text hover:bg-ui-error focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
           onClick={handleRemove}
         >
           Remove user
@@ -221,7 +223,7 @@ export function UserCard({
         <div className="space-y-1">
           <label
             htmlFor={`user-username-${user.id}`}
-            className="text-sm font-semibold text-gray-700"
+            className="text-sm font-semibold text-ui-text"
           >
             Username
           </label>
@@ -241,7 +243,7 @@ export function UserCard({
           />
           <p
             id={`user-username-help-${user.id}`}
-            className="text-xs text-gray-500"
+            className="text-xs text-ui-muted-text"
           >
             Letters, numbers, underscores, and hyphens. Must start with a letter
             or underscore.
@@ -267,7 +269,7 @@ export function UserCard({
         <div className="space-y-1">
           <label
             htmlFor={`user-gecos-${user.id}`}
-            className="text-sm font-semibold text-gray-700"
+            className="text-sm font-semibold text-ui-text"
           >
             Full name
           </label>
@@ -281,7 +283,7 @@ export function UserCard({
             }
             className={inputDefaultClassName}
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ui-muted-text">
             Optional. Written to cloud-init as the user&apos;s GECOS value.
           </p>
         </div>
@@ -313,12 +315,12 @@ export function UserCard({
           onChange={(sudo) => updateUser(user.id, { sudo })}
         />
 
-        <div className="space-y-4 border-t border-gray-200 pt-4">
+        <div className="space-y-4 border-t border-ui-border pt-4">
           <div>
-            <h4 className="text-sm font-semibold text-gray-900">
+            <h4 className="text-sm font-semibold text-ui-text">
               Authentication
             </h4>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-ui-muted-text">
               Regular login users need a supported password hash or at least one
               valid SSH key.
             </p>

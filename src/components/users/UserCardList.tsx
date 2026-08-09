@@ -45,7 +45,7 @@ export function UserCardList({ entries }: UserCardListProps) {
 
       <button
         type="button"
-        className="mt-6 rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+        className="mt-6 min-h-10 rounded border border-ui-action bg-ui-action px-4 py-2 text-sm text-ui-action-contrast hover:bg-ui-action-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-canvas"
         onClick={handleAddUser}
       >
         Add user

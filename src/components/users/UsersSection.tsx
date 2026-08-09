@@ -31,10 +31,10 @@ export function UsersSection() {
   };
 
   return (
-    <section className="space-y-8 p-6">
+    <section className="space-y-8 bg-ui-canvas p-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Users</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-lg font-semibold text-ui-text">Users</h2>
+        <p className="text-sm text-ui-muted-text">
           Preserve the distro default account or add custom users for common
           server-template access.
         </p>
@@ -42,19 +42,19 @@ export function UsersSection() {
 
       <div className="space-y-4">
         <div>
-          <label className="flex items-start gap-3">
+          <label className="flex items-start gap-3 text-ui-text">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 accent-ui-action focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-canvas"
               checked={users.preserveDefault}
               onChange={(event) => handleToggleChange(event.target.checked)}
               aria-label="Preserve default user"
             />
             <span>
-              <span className="block text-sm font-semibold text-gray-700">
+              <span className="block text-sm font-semibold text-ui-text">
                 Preserve default user
               </span>
-              <span className="block text-xs text-gray-500">
+              <span className="block text-xs text-ui-muted-text">
                 Keeps cloud-init&apos;s default distro user as `- default` in
                 generated YAML.
               </span>
@@ -63,18 +63,18 @@ export function UsersSection() {
         </div>
 
         {users.preserveDefault ? (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+          <div className="rounded-lg border border-ui-border bg-ui-inset px-4 py-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-ui-text">
                   Default cloud-init user
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-ui-muted-text">
                   This entry preserves the distro-provided default account and is
                   emitted as `- default`.
                 </p>
               </div>
-              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">
+              <span className="inline-flex items-center rounded-full border border-ui-selected-border bg-ui-selected px-2 py-1 text-xs font-semibold text-ui-selected-text">
                 Default
               </span>
             </div>
@@ -82,7 +82,7 @@ export function UsersSection() {
         ) : null}
 
         {showNoUserWarning ? (
-          <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+          <div className="rounded border border-ui-warning-border bg-ui-warning px-4 py-3 text-ui-warning-text">
             <p className="text-sm font-semibold">No login users configured</p>
             <p className="text-xs">
               You turned off the default user and haven&apos;t added a custom
@@ -94,11 +94,11 @@ export function UsersSection() {
       </div>
 
       {users.entries.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-left">
-          <p className="text-sm font-semibold text-gray-900">
+        <div className="rounded-lg border border-dashed border-ui-border bg-ui-raised p-6 text-left">
+          <p className="text-sm font-semibold text-ui-text">
             No custom users yet
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-ui-muted-text">
             Keep the default user above or add a custom user to provision named
             accounts in cloud-init.
           </p>
