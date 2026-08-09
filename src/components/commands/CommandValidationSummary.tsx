@@ -100,8 +100,11 @@ export function CommandValidationSummary({
       : "Commands need attention";
 
   const containerClassName = hasErrors
-    ? "mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-900"
-    : "mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900";
+    ? "mb-6 rounded-lg border border-ui-error-border bg-ui-error px-4 py-3 text-ui-error-text"
+    : "mb-6 rounded-lg border border-ui-warning-border bg-ui-warning px-4 py-3 text-ui-warning-text";
+  const issueRouteClassName = hasErrors
+    ? "min-h-10 w-full break-words rounded border border-ui-error-border px-3 py-2 text-left text-sm text-ui-error-text underline-offset-2 hover:bg-ui-raised hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-error"
+    : "min-h-10 w-full break-words rounded border border-ui-warning-border px-3 py-2 text-left text-sm text-ui-warning-text underline-offset-2 hover:bg-ui-raised hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-warning";
 
   const errorCountLabel =
     errors.length === 1
@@ -161,7 +164,7 @@ export function CommandValidationSummary({
           <li key={`${issue.path}-${issue.code}-${index}`}>
             <button
               type="button"
-              className="min-h-10 w-full text-left text-sm text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={issueRouteClassName}
               onClick={() => handleIssueActivate(issue)}
             >
               {labelForIssue(issue)}: {issue.message}
