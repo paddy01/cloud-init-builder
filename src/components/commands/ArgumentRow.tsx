@@ -5,14 +5,14 @@ import { FieldMessage } from "../users/FieldMessage.tsx";
 import { useUserValidation } from "../users/UserValidationContext.ts";
 
 const inputClassName =
-  "min-w-0 flex-1 rounded border border-gray-300 bg-white px-3 py-2 font-mono text-xs " +
-  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-w-0 flex-1 rounded border border-ui-border bg-ui-raised px-3 py-2 font-mono text-xs text-ui-text placeholder:text-ui-muted-text " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const inputErrorClassName =
-  "min-w-0 flex-1 rounded border border-red-300 bg-white px-3 py-2 font-mono text-xs " +
-  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-w-0 flex-1 rounded border border-ui-error-border bg-ui-raised px-3 py-2 font-mono text-xs text-ui-text placeholder:text-ui-muted-text " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const inputWarningClassName =
-  "min-w-0 flex-1 rounded border border-amber-300 bg-white px-3 py-2 font-mono text-xs " +
-  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-w-0 flex-1 rounded border border-ui-warning-border bg-ui-raised px-3 py-2 font-mono text-xs text-ui-text placeholder:text-ui-muted-text " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 
 interface ArgumentRowProps {
   stage: CommandStage;
@@ -84,7 +84,7 @@ export function ArgumentRow({
         />
         <button
           type="button"
-          className="min-h-10 shrink-0 text-sm text-red-600 hover:text-red-700 max-[480px]:self-start"
+          className="min-h-10 shrink-0 rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-error-text hover:bg-ui-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised max-[480px]:self-start"
           onClick={() => onRemove(row.id)}
         >
           Remove argument

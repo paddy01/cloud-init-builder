@@ -5,14 +5,14 @@ import { FieldMessage } from "../users/FieldMessage.tsx";
 import { useUserValidation } from "../users/UserValidationContext.ts";
 
 const textareaClassName =
-  "min-h-24 w-full resize-y rounded border border-gray-300 bg-white px-3 py-2 " +
-  "font-mono text-sm leading-5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-24 w-full resize-y rounded border border-ui-border bg-ui-raised px-3 py-2 " +
+  "font-mono text-sm leading-5 text-ui-text placeholder:text-ui-muted-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const textareaErrorClassName =
-  "min-h-24 w-full resize-y rounded border border-red-300 bg-white px-3 py-2 " +
-  "font-mono text-sm leading-5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-24 w-full resize-y rounded border border-ui-error-border bg-ui-raised px-3 py-2 " +
+  "font-mono text-sm leading-5 text-ui-text placeholder:text-ui-muted-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const textareaWarningClassName =
-  "min-h-24 w-full resize-y rounded border border-amber-300 bg-white px-3 py-2 " +
-  "font-mono text-sm leading-5 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-24 w-full resize-y rounded border border-ui-warning-border bg-ui-raised px-3 py-2 " +
+  "font-mono text-sm leading-5 text-ui-text placeholder:text-ui-muted-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 
 interface ShellCommandInputProps {
   stage: CommandStage;
@@ -52,7 +52,7 @@ export const ShellCommandInput = forwardRef<
 
   return (
     <div className="space-y-1">
-      <label htmlFor={inputId} className="text-sm font-semibold text-gray-700">
+      <label htmlFor={inputId} className="text-sm font-semibold text-ui-text">
         Command
       </label>
       <textarea
@@ -69,7 +69,7 @@ export const ShellCommandInput = forwardRef<
         onBlur={() => markTouched(path)}
         className={className}
       />
-      <p id={helpId} className="text-xs text-gray-500">
+      <p id={helpId} className="text-xs text-ui-muted-text">
         Enter the command as cloud-init should pass it to the shell. Do not add
         YAML list markers or quotes for YAML.
       </p>

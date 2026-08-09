@@ -13,14 +13,14 @@ import { useUserValidation } from "../users/UserValidationContext.ts";
 import { ArgumentRow } from "./ArgumentRow.tsx";
 
 const inputClassName =
-  "w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 font-mono text-xs " +
-  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full min-w-0 rounded border border-ui-border bg-ui-raised px-3 py-2 font-mono text-xs text-ui-text placeholder:text-ui-muted-text " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const inputErrorClassName =
-  "w-full min-w-0 rounded border border-red-300 bg-white px-3 py-2 font-mono text-xs " +
-  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full min-w-0 rounded border border-ui-error-border bg-ui-raised px-3 py-2 font-mono text-xs text-ui-text placeholder:text-ui-muted-text " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const inputWarningClassName =
-  "w-full min-w-0 rounded border border-amber-300 bg-white px-3 py-2 font-mono text-xs " +
-  "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full min-w-0 rounded border border-ui-warning-border bg-ui-raised px-3 py-2 font-mono text-xs text-ui-text placeholder:text-ui-muted-text " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 
 export interface ArgvCommandInputHandle {
   focusExecutable: () => void;
@@ -138,7 +138,7 @@ export const ArgvCommandInput = forwardRef<
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <label htmlFor={executableId} className="text-sm font-semibold text-gray-700">
+        <label htmlFor={executableId} className="text-sm font-semibold text-ui-text">
           Executable
         </label>
         <input
@@ -155,7 +155,7 @@ export const ArgvCommandInput = forwardRef<
           onBlur={() => markTouched(executablePath)}
           className={executableClassName}
         />
-        <p id={executableHelpId} className="text-xs text-gray-500">
+        <p id={executableHelpId} className="text-xs text-ui-muted-text">
           Use the executable name or path. Add each argument separately below.
         </p>
         {executableErrors.map((issue) => (
@@ -178,8 +178,8 @@ export const ArgvCommandInput = forwardRef<
 
       <div className="space-y-2">
         <div>
-          <p className="text-sm font-semibold text-gray-700">Arguments</p>
-          <p id={argumentsHelpId} className="text-xs text-gray-500">
+          <p className="text-sm font-semibold text-ui-text">Arguments</p>
+          <p id={argumentsHelpId} className="text-xs text-ui-muted-text">
             Arguments are passed in the order shown. Enter values only; do not add
             YAML brackets or commas.
           </p>
@@ -203,7 +203,7 @@ export const ArgvCommandInput = forwardRef<
 
         <button
           type="button"
-          className="min-h-10 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          className="min-h-10 rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
           onClick={handleAddArgument}
         >
           Add argument
