@@ -26,7 +26,7 @@ export function UserAuthStatus({ userId }: UserAuthStatusProps) {
       id={`user-auth-${userId}`}
       tabIndex={-1}
       data-field-message-id={getFieldMessageId(authPath, error.code)}
-      className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="rounded border border-ui-error-border bg-ui-error px-3 py-2 text-xs text-ui-error-text focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-error"
     >
       <span id={getFieldMessageId(authPath, error.code)} role="alert">
         {error.message}

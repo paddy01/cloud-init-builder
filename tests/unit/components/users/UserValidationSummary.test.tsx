@@ -129,11 +129,11 @@ describe("UserValidationSummary", () => {
     ).toBeInTheDocument();
 
     const section = screen.getByRole("region", { name: "Users need attention" });
-    expect(section.className).toContain("border-red-200");
-    expect(section.className).toContain("bg-red-50");
+    expect(section.className).toContain("border-ui-error-border");
+    expect(section.className).toContain("bg-ui-error");
   });
 
-  it("renders warnings-only heading and amber classes", async () => {
+  it("renders warnings-only heading and semantic warning classes", async () => {
     const blank = createBlankUser("upper-user");
     const user = {
       ...blank,
@@ -155,8 +155,8 @@ describe("UserValidationSummary", () => {
     });
     expect(screen.getByText("1 warning")).toBeInTheDocument();
     const section = screen.getByRole("region", { name: "User safety warnings" });
-    expect(section.className).toContain("border-amber-200");
-    expect(section.className).toContain("bg-amber-50");
+    expect(section.className).toContain("border-ui-warning-border");
+    expect(section.className).toContain("bg-ui-warning");
   });
 
   it("renders mixed severity with error-first heading and both counts", async () => {

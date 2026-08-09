@@ -6,8 +6,8 @@ import {
 import type { BuilderUser } from "../../models/users.ts";
 
 const inputClassName =
-  "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised focus:border-ui-focus";
 
 interface SudoRuleSelectorProps {
   id: string;
@@ -20,7 +20,7 @@ export function SudoRuleSelector({ id, sudo, onChange }: SudoRuleSelectorProps) 
 
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="text-sm font-semibold text-gray-700">
+      <label htmlFor={id} className="text-sm font-semibold text-ui-text">
         Sudo rule
       </label>
       <select
@@ -52,12 +52,12 @@ export function SudoRuleSelector({ id, sudo, onChange }: SudoRuleSelectorProps) 
           </option>
         ) : null}
       </select>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-ui-muted-text">
         Use a guided preset for the common cloud-init sudo patterns in this
         phase.
       </p>
       {choice === "custom" ? (
-        <p className="text-xs text-amber-800">
+        <p className="rounded border border-ui-warning-border bg-ui-warning px-2 py-1 text-xs text-ui-warning-text">
           Imported custom sudo value preserved. Choose a preset to replace it.
         </p>
       ) : null}
