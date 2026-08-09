@@ -6,10 +6,11 @@ import {
   disposeThemeLifecycle,
   initializeThemeLifecycle,
   resolveTheme,
+  setThemePreference,
   THEME_MEDIA_QUERY,
   THEME_STORAGE_KEY,
 } from "../../src/theme/themeLifecycle.ts";
-import { useThemeStore } from "../../src/theme/themeStore.ts";
+import { resetThemeStore, useThemeStore } from "../../src/theme/themeStore.ts";
 
 type StorageFailure = "get" | "set" | "remove";
 
@@ -135,15 +136,7 @@ describe("theme lifecycle", () => {
 
   afterEach(() => {
     disposeThemeLifecycle();
-    useThemeStore.setState(
-      {
-        preference: "system",
-        resolvedTheme: "light",
-        storageWarningVisible: false,
-        storageWarningShown: false,
-      },
-      true,
-    );
+    resetThemeStore();
     resetThemeTestEnvironment();
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -253,11 +246,123 @@ describe("theme lifecycle", () => {
     },
   );
 
-  it.todo("owns one System media listener, removes overrides, and disposes cleanly");
-  it.todo("applies current System events and ignores stale events after explicit selection");
-  it.todo("persists explicit overrides, removes System, and retains session appearance on failure");
-  it.todo("silently survives storage and media failures without warn, error, or log output");
-  it.todo("shows one six-second persistence warning without extending repeated failures");
-  it.todo("keeps root state, listener ownership, and transition enablement idempotent");
-  it.todo("uses the bounded 150ms ease-out color transition and disables it for reduced motion");
+  it("owns one System media listener, removes overrides, and disposes cleanly", () => {
+    const storage = createControlledStorage();
+    const media = createControlledMediaQueryList(THEME_MEDIA_QUERY, false);
+    storage.install();
+    installControlledMatchMedia(media);
+
+    initializeThemeLifecycle();
+    initializeThemeLifecycle();
+    expect(media.listenerCount()).toBe(1);
+
+    setThemePreference("dark");
+    expect(media.listenerCount()).toBe(0);
+    setThemePreference("system");
+    expect(media.listenerCount()).toBe(1);
+
+    disposeThemeLifecycle();
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it("applies current System events and ignores stale events after explicit selection", () => {
+    const storage = createControlledStorage();
+    const media = createControlledMediaQueryList(THEME_MEDIA_QUERY, false);
+    storage.install();
+    installControlledMatchMedia(media);
+    initializeThemeLifecycle();
+
+    media.emit(true);
+    expect(useThemeStore.getState()).toMatchObject({ preference: "system", resolvedTheme: "dark" });
+    expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+
+    setThemePreference("light");
+    media.emit(true);
+    expect(useThemeStore.getState()).toMatchObject({ preference: "light", resolvedTheme: "light" });
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+  });
+
+  it("persists explicit overrides, removes System, and retains session appearance on failure", () => {
+    const storage = createControlledStorage();
+    const media = createControlledMediaQueryList(THEME_MEDIA_QUERY, true);
+    storage.install();
+    installControlledMatchMedia(media);
+    initializeThemeLifecycle();
+
+    setThemePreference("light");
+    expect(storage.values.get(THEME_STORAGE_KEY)).toBe("light");
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+
+    setThemePreference("system");
+    expect(storage.values.has(THEME_STORAGE_KEY)).toBe(false);
+    expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+
+    storage.failures.add("set");
+    setThemePreference("dark");
+    expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+    expect(useThemeStore.getState().storageWarningVisible).toBe(true);
+    expect(consoleLogSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["get", "set", "remove"] as const)(
+    "silently survives %s storage failures without warn, error, or log output",
+    (failure) => {
+      const storage = createControlledStorage();
+      const media = createControlledMediaQueryList(THEME_MEDIA_QUERY, true);
+      storage.install();
+      installControlledMatchMedia(media);
+      storage.failures.add(failure);
+
+      initializeThemeLifecycle();
+      if (failure === "set") setThemePreference("dark");
+      if (failure === "remove") setThemePreference("system");
+
+      expect(document.documentElement.dataset.theme).toMatch(/^(light|dark)$/);
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows one six-second persistence warning without extending repeated failures", () => {
+    const storage = createControlledStorage();
+    const media = createControlledMediaQueryList(THEME_MEDIA_QUERY, false);
+    storage.install();
+    installControlledMatchMedia(media);
+    initializeThemeLifecycle();
+    storage.failures.add("set");
+
+    setThemePreference("dark");
+    expect(useThemeStore.getState()).toMatchObject({ storageWarningVisible: true, storageWarningShown: true });
+    vi.advanceTimersByTime(5_000);
+    setThemePreference("light");
+    vi.advanceTimersByTime(1_001);
+
+    expect(useThemeStore.getState()).toMatchObject({ storageWarningVisible: false, storageWarningShown: true });
+    expect(consoleLogSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps root state, listener ownership, and transition enablement idempotent", () => {
+    const storage = createControlledStorage();
+    const media = createControlledMediaQueryList(THEME_MEDIA_QUERY, false);
+    storage.install();
+    installControlledMatchMedia(media);
+
+    initializeThemeLifecycle();
+    initializeThemeLifecycle();
+    setThemePreference("system");
+    setThemePreference("system");
+    vi.runOnlyPendingTimers();
+
+    expect(media.listenerCount()).toBe(1);
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+    expect(document.documentElement).toHaveAttribute("data-theme-transitions", "enabled");
+  });
+
+  it("uses the bounded 150ms ease-out color transition and disables it for reduced motion", async () => {
+    const styles = await import("../../src/assets/styles.css?raw");
+    expect(styles.default).toContain('html[data-theme-transitions="enabled"]');
+    expect(styles.default).toContain("background-color, color, border-color, fill, stroke, outline-color");
+    expect(styles.default).toContain("150ms ease-out");
+    expect(styles.default).toContain("[data-theme-transition-focus]:is(:focus-visible, :focus-within)");
+    expect(styles.default).toContain("@media (prefers-reduced-motion: reduce)");
+  });
 });
