@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import indexHtml from "../../index.html?raw";
+import mainSource from "../../src/main.tsx?raw";
 import {
   applyResolvedTheme,
   disposeThemeLifecycle,
@@ -102,7 +103,6 @@ export function installControlledMatchMedia(media: ControlledMediaQueryList): vo
 }
 
 export function extractThemeBootstrapBody(): string {
-  const indexHtml = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
   const documentForSource = document.implementation.createHTMLDocument("theme source");
   documentForSource.documentElement.innerHTML = indexHtml;
   const scripts = documentForSource.querySelectorAll("script#theme-bootstrap");
@@ -111,7 +111,8 @@ export function extractThemeBootstrapBody(): string {
   const module = documentForSource.querySelector('script[type="module"]');
   expect(bootstrap).not.toBeNull();
   expect(module).not.toBeNull();
-  expect(bootstrap?.compareDocumentPosition(module!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  if (!bootstrap || !module) throw new Error("theme bootstrap or module script missing");
+  expect(bootstrap.compareDocumentPosition(module) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   return bootstrap?.textContent ?? "";
 }
 
@@ -134,6 +135,15 @@ describe("theme lifecycle", () => {
 
   afterEach(() => {
     disposeThemeLifecycle();
+    useThemeStore.setState(
+      {
+        preference: "system",
+        resolvedTheme: "light",
+        storageWarningVisible: false,
+        storageWarningShown: false,
+      },
+      true,
+    );
     resetThemeTestEnvironment();
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -208,7 +218,6 @@ describe("theme lifecycle", () => {
     expect(document.documentElement.style.colorScheme).toBe("dark");
     expect(document.documentElement).not.toHaveAttribute("data-theme-transitions");
 
-    const mainSource = readFileSync(new URL("../../src/main.tsx", import.meta.url), "utf8");
     expect(mainSource.indexOf("initializeThemeLifecycle()")).toBeLessThan(
       mainSource.indexOf("createRoot(rootElement)"),
     );
