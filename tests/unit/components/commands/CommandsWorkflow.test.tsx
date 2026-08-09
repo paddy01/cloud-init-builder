@@ -129,6 +129,62 @@ describe("CommandsWorkflow argv editing and form switching", () => {
     expect(focusSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("uses two semantic custom radios with the checked radio as the only tab stop", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+
+    const group = screen.getByRole("radiogroup", { name: "Command form" });
+    const shell = within(group).getByRole("radio", { name: "Shell command" });
+    const argv = within(group).getByRole("radio", {
+      name: "Executable and arguments",
+    });
+
+    expect(within(group).getAllByRole("radio")).toHaveLength(2);
+    expect(shell).toHaveAttribute("aria-checked", "true");
+    expect(shell).toHaveAttribute("tabindex", "0");
+    expect(argv).toHaveAttribute("aria-checked", "false");
+    expect(argv).toHaveAttribute("tabindex", "-1");
+    expect(shell).toHaveClass(
+      "bg-ui-selected",
+      "border-ui-selected-border",
+      "text-ui-selected-text",
+    );
+    expect(argv).toHaveClass("text-ui-muted-text");
+  });
+
+  it("uses Arrow/Home/End navigation to select and focus exactly the checked radio", () => {
+    const focusSpy = vi.spyOn(HTMLInputElement.prototype, "focus");
+
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+
+    const group = screen.getByRole("radiogroup", { name: "Command form" });
+    const shell = within(group).getByRole("radio", { name: "Shell command" });
+    const argv = within(group).getByRole("radio", {
+      name: "Executable and arguments",
+    });
+    focusSpy.mockClear();
+
+    fireEvent.keyDown(shell, { key: "ArrowRight" });
+
+    expect(argv).toHaveAttribute("aria-checked", "true");
+    expect(argv).toHaveAttribute("tabindex", "0");
+    expect(shell).toHaveAttribute("tabindex", "-1");
+    expect(argv).toHaveFocus();
+    expect(screen.getByLabelText("Executable")).not.toHaveFocus();
+    expect(focusSpy).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(argv, { key: "Home" });
+    expect(shell).toHaveAttribute("aria-checked", "true");
+    expect(shell).toHaveFocus();
+
+    fireEvent.keyDown(shell, { key: "End" });
+    expect(argv).toHaveAttribute("aria-checked", "true");
+    expect(argv).toHaveFocus();
+  });
+
   it("requires confirmation for ambiguous shell-to-argv conversion and preserves shell on cancel", () => {
     render(<MainLayout />);
     openCommandsSection();
