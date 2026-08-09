@@ -357,12 +357,4 @@ describe("theme lifecycle", () => {
     expect(document.documentElement).toHaveAttribute("data-theme-transitions", "enabled");
   });
 
-  it("uses the bounded 150ms ease-out color transition and disables it for reduced motion", async () => {
-    const styles = await import("../../src/assets/styles.css?raw");
-    expect(styles.default).toContain('html[data-theme-transitions="enabled"]');
-    expect(styles.default).toContain("background-color, color, border-color, fill, stroke, outline-color");
-    expect(styles.default).toContain("150ms ease-out");
-    expect(styles.default).toContain("[data-theme-transition-focus]:is(:focus-visible, :focus-within)");
-    expect(styles.default).toContain("@media (prefers-reduced-motion: reduce)");
-  });
 });

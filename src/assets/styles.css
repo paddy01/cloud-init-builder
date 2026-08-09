@@ -1,1 +1,54 @@
 @import "tailwindcss";
+
+html[data-theme="light"] {
+  --theme-canvas: #ffffff;
+  --theme-surface: #f9fafb;
+  --theme-text: #111827;
+  --theme-muted-text: #4b5563;
+  --theme-border: #d1d5db;
+  --theme-accent: #2563eb;
+  background-color: var(--theme-canvas);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] {
+  --theme-canvas: #111827;
+  --theme-surface: #1f2937;
+  --theme-text: #f9fafb;
+  --theme-muted-text: #d1d5db;
+  --theme-border: #374151;
+  --theme-accent: #2563eb;
+  background-color: var(--theme-canvas);
+  color: var(--theme-text);
+}
+
+html[data-theme] body,
+html[data-theme] #root {
+  background-color: var(--theme-canvas);
+  color: var(--theme-text);
+}
+
+html[data-theme-transitions="enabled"],
+html[data-theme-transitions="enabled"] body,
+html[data-theme-transitions="enabled"] #root,
+html[data-theme-transitions="enabled"] [data-theme-transition="colors"] {
+  transition: background-color 150ms ease-out, color 150ms ease-out,
+    border-color 150ms ease-out, fill 150ms ease-out, stroke 150ms ease-out,
+    outline-color 150ms ease-out;
+}
+
+html[data-theme-transitions="enabled"] [data-theme-transition-focus]:is(:focus-visible, :focus-within) {
+  transition: background-color 150ms ease-out, color 150ms ease-out,
+    border-color 150ms ease-out, fill 150ms ease-out, stroke 150ms ease-out,
+    outline-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-transitions="enabled"],
+  html[data-theme-transitions="enabled"] body,
+  html[data-theme-transitions="enabled"] #root,
+  html[data-theme-transitions="enabled"] [data-theme-transition="colors"],
+  html[data-theme-transitions="enabled"] [data-theme-transition-focus]:is(:focus-visible, :focus-within) {
+    transition-duration: 0ms;
+  }
+}
