@@ -581,7 +581,9 @@ describe("TopBar semantic interaction states (VISU-01, VISU-02)", () => {
       expect(screen.getByRole("button", { name }).className).not.toMatch(/opacity-/);
     }
 
-    useProjectStore.getState().newProject("Blocked fixture");
+    act(() => {
+      useProjectStore.getState().newProject("Blocked fixture");
+    });
     rerender(
       <UserValidationProvider>
         <EditorNavigationProvider activeSection="identity" setActiveSection={vi.fn()}>
