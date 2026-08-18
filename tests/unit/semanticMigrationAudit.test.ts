@@ -1,6 +1,7 @@
 // @vitest-environment node
 // @ts-expect-error Vitest executes this source-inspection test in Node.
 import { readFile, readdir } from "node:fs/promises";
+import type { OutputAsset } from "rollup";
 import ts from "typescript";
 import { build } from "vite";
 import { describe, expect, it, vi } from "vitest";
@@ -317,9 +318,12 @@ export async function buildProductionCss(): Promise<string> {
     build: { write: false },
   });
   const bundles = Array.isArray(output) ? output : [output];
-  const cssAssets = bundles.flatMap((bundle) => bundle.output.filter((asset) => (
-    asset.type === "asset" && asset.fileName.endsWith(".css") && typeof asset.source === "string"
-  )));
+  const cssAssets = bundles.flatMap((bundle) => {
+    if (!("output" in bundle)) throw new Error("Vite build unexpectedly returned a watcher");
+    return bundle.output.filter((asset): asset is OutputAsset & { source: string } => (
+      asset.type === "asset" && asset.fileName.endsWith(".css") && typeof asset.source === "string"
+    ));
+  });
   expect(cssAssets.length, "Vite production build must emit an in-memory CSS asset").toBeGreaterThan(0);
   return cssAssets.map((asset) => asset.source).join("\n");
 }

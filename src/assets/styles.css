@@ -23,6 +23,13 @@
   --color-ui-warning-border: var(--ui-warning-border);
   --color-ui-warning-text: var(--ui-warning-text);
   --color-ui-focus: var(--ui-focus);
+  --color-ui-focus-offset-canvas: var(--ui-focus-offset-canvas);
+  --color-ui-focus-offset-raised: var(--ui-focus-offset-raised);
+  --color-ui-focus-offset-inset: var(--ui-focus-offset-inset);
+  --color-ui-focus-offset-selected: var(--ui-focus-offset-selected);
+  --color-ui-focus-offset-error: var(--ui-focus-offset-error);
+  --color-ui-focus-offset-warning: var(--ui-focus-offset-warning);
+  --color-ui-focus-offset-terminal: var(--ui-focus-offset-terminal);
   --color-ui-terminal: var(--ui-terminal-background);
   --color-ui-terminal-border: var(--ui-terminal-border);
   --color-ui-terminal-text: var(--ui-terminal-text);
