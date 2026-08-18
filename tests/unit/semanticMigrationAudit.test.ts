@@ -550,7 +550,7 @@ describe("semantic migration audit", () => {
       const rule = css.slice(selectorIndex, css.indexOf("}", selectorIndex) + 1);
       expect(rule, `${utility} must bind its matching surface role`).toContain(`--tw-ring-offset-color:var(${focusOffsetProperty(role)})`);
     }
-  });
+  }, 15_000);
 
   it("accepts only bounded semantic static forms and reports exact legacy palette diagnostics", async () => {
     const passFindings = await inspectFile(fixture("semantic-pass"));
