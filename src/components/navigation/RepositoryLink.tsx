@@ -6,7 +6,7 @@ export function RepositoryLink() {
     <a
       href={REPOSITORY_URL}
       aria-label={REPOSITORY_LINK_NAME}
-      className="static inline-flex min-h-10 shrink-0 items-center gap-2 rounded border border-[var(--ui-border)] bg-[var(--ui-raised)] px-2 py-1.5 text-sm font-medium text-[var(--ui-action-strong)] hover:bg-[var(--ui-inset)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ui-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-raised)] xl:absolute xl:right-4 xl:top-2 xl:max-w-28 xl:rounded-none xl:rounded-bl-lg xl:px-3"
+      className="static inline-flex min-h-10 shrink-0 items-center gap-2 rounded border border-ui-border bg-ui-raised px-2 py-1.5 text-sm font-medium text-ui-action hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised xl:absolute xl:right-4 xl:top-2 xl:max-w-28 xl:rounded-none xl:rounded-bl-lg xl:px-3"
     >
       <svg
         aria-hidden="true"
