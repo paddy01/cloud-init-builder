@@ -1,7 +1,9 @@
+// @vitest-environment node
 // @ts-expect-error Vitest executes this source-inspection test in Node.
 import { readFile, readdir } from "node:fs/promises";
 import ts from "typescript";
-import { describe, expect, it } from "vitest";
+import { build } from "vite";
+import { describe, expect, it, vi } from "vitest";
 import { THEMED_EXPERIENCE_CASE_MANIFEST } from "../e2e/themedExperienceManifest.ts";
 
 export const SEMANTIC_MIGRATION_FILES = [
@@ -79,6 +81,16 @@ const fixture = (name: string) => `${FIXTURE_DIRECTORY}/${name}.tsx`;
 
 const LEGACY_PALETTE = /^(?:bg|text|border|ring|outline|fill|stroke)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-|$)/;
 const ARBITRARY_PALETTE = /^(?:bg|text|border|ring|outline|fill|stroke)-\[(.+)\]$/;
+export const FOCUS_OFFSET_UTILITY_PATTERN = /^(?:(?:focus|focus-visible|focus-within):)?ring-offset-ui-focus-offset-(canvas|raised|inset|selected|error|warning|terminal)$/;
+const FOCUS_OFFSET_ROLES = [
+  "canvas",
+  "raised",
+  "inset",
+  "selected",
+  "error",
+  "warning",
+  "terminal",
+] as const;
 const STYLE_COLOR_PROPERTIES = new Set([
   "color",
   "backgroundColor",
@@ -225,6 +237,93 @@ function scanStyleExpression(expression: ts.Expression, context: ScanContext) {
   }
 }
 
+function collectClassNameFragments(source: ts.SourceFile, file: string): string[] {
+  const context: ScanContext = {
+    file,
+    source,
+    constants: collectSameFileConstants(source),
+    findings: [],
+  };
+  const fragments: string[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isJsxAttribute(node)
+      && node.name.getText(source) === "className"
+      && node.initializer
+    ) {
+      if (ts.isStringLiteral(node.initializer)) {
+        fragments.push(...staticFragments(node.initializer, context));
+      } else if (ts.isJsxExpression(node.initializer) && node.initializer.expression) {
+        fragments.push(...staticFragments(node.initializer.expression, context));
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+  return fragments;
+}
+
+export async function collectReferencedFocusOffsetUtilities(files = SEMANTIC_MIGRATION_FILES): Promise<Set<string>> {
+  const utilities = new Set<string>();
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    for (const fragment of collectClassNameFragments(source, file)) {
+      for (const token of fragment.split(/\s+/).filter(Boolean)) {
+        if (FOCUS_OFFSET_UTILITY_PATTERN.test(token)) utilities.add(token);
+      }
+    }
+  }
+  return utilities;
+}
+
+function parseDeclarations(css: string, selector: string): Map<string, string[]> {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matches = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\}`, "g"))];
+  expect(matches, `Expected exactly one ${selector} block`).toHaveLength(1);
+  const body = matches[0]?.[1];
+  if (body === undefined) throw new Error(`Missing ${selector} block`);
+
+  const declarations = new Map<string, string[]>();
+  for (const declaration of body.split(";")) {
+    const [property, ...value] = declaration.split(":");
+    if (!property || value.length === 0) continue;
+    const name = property.trim();
+    declarations.set(name, [...(declarations.get(name) ?? []), value.join(":").trim()]);
+  }
+  return declarations;
+}
+
+function escapeCssClassToken(token: string): string {
+  return token.replace(/[^a-zA-Z0-9_-]/g, (character) => `\\${character}`);
+}
+
+function focusOffsetProperty(role: string): string {
+  return ["--ui-focus", "offset", role].join("-");
+}
+
+export async function buildProductionCss(): Promise<string> {
+  vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+    const warning = args.map(String).join(" ");
+    if (!warning.includes(".ring-offset-\\[var\\(--ui-focus-offset-\\*\\)")) {
+      throw new Error(`Unexpected console.warn during Vite CSS build: ${warning}`);
+    }
+  });
+  const output = await build({
+    configFile: "vite.config.ts",
+    logLevel: "silent",
+    build: { write: false },
+  });
+  const bundles = Array.isArray(output) ? output : [output];
+  const cssAssets = bundles.flatMap((bundle) => bundle.output.filter((asset) => (
+    asset.type === "asset" && asset.fileName.endsWith(".css") && typeof asset.source === "string"
+  )));
+  expect(cssAssets.length, "Vite production build must emit an in-memory CSS asset").toBeGreaterThan(0);
+  return cssAssets.map((asset) => asset.source).join("\n");
+}
+
 function collectSameFileConstants(source: ts.SourceFile): Map<string, ts.Expression> {
   const constants = new Map<string, ts.Expression>();
   const duplicateNames = new Set<string>();
@@ -330,7 +429,7 @@ const EXPECTED_MANIFEST_IDS = [
 ] as const;
 
 describe("semantic migration audit", () => {
-  it("uses an explicit Plan 02-09 production inventory with no broad glob", async () => {
+  it("uses an explicit complete phase-owned production inventory with no broad glob", async () => {
     expect(SEMANTIC_MIGRATION_FILES).toEqual(expect.arrayContaining([
       "src/components/theme/ThemeControl.tsx",
       "src/layouts/TopBar.tsx",
@@ -339,6 +438,40 @@ describe("semantic migration audit", () => {
     expect(new Set(SEMANTIC_MIGRATION_FILES).size).toBe(SEMANTIC_MIGRATION_FILES.length);
     expect(SEMANTIC_MIGRATION_FILES.every((file) => file.startsWith("src/") && file.endsWith(".tsx"))).toBe(true);
     await expect(Promise.all(SEMANTIC_MIGRATION_FILES.map((file) => readFile(file, "utf8")))).resolves.toHaveLength(SEMANTIC_MIGRATION_FILES.length);
+  });
+
+  it("maps every raw focus-offset role to its same-suffix Tailwind alias in both themes", async () => {
+    const css = await readFile("src/assets/styles.css", "utf8");
+    const theme = parseDeclarations(css, "@theme inline");
+
+    for (const selector of ['html[data-theme="light"]', 'html[data-theme="dark"]']) {
+      const declarations = parseDeclarations(css, selector);
+      for (const role of FOCUS_OFFSET_ROLES) {
+        const property = focusOffsetProperty(role);
+        expect(declarations.get(property), `${selector} must declare ${property} exactly once`).toHaveLength(1);
+      }
+    }
+
+    for (const role of FOCUS_OFFSET_ROLES) {
+      const alias = `--color-ui-focus-offset-${role}`;
+      expect(theme.get(alias), `${alias} must be declared exactly once`).toEqual([`var(${focusOffsetProperty(role)})`]);
+    }
+  });
+
+  it("derives production focus-offset utilities and verifies their emitted Vite CSS bindings", async () => {
+    const utilities = await collectReferencedFocusOffsetUtilities();
+    expect(utilities.size, "Production source must reference at least one semantic focus-offset utility").toBeGreaterThan(0);
+
+    const css = await buildProductionCss();
+    for (const utility of utilities) {
+      const role = utility.match(FOCUS_OFFSET_UTILITY_PATTERN)?.[1];
+      if (!role) throw new Error(`Unable to derive focus-offset role from ${utility}`);
+      const selector = `.${escapeCssClassToken(utility)}`;
+      const selectorIndex = css.indexOf(selector);
+      expect(selectorIndex, `Missing emitted selector for ${utility}`).toBeGreaterThanOrEqual(0);
+      const rule = css.slice(selectorIndex, css.indexOf("}", selectorIndex) + 1);
+      expect(rule, `${utility} must bind its matching surface role`).toContain(`--tw-ring-offset-color:var(${focusOffsetProperty(role)})`);
+    }
   });
 
   it("accepts only bounded semantic static forms and reports exact legacy palette diagnostics", async () => {
