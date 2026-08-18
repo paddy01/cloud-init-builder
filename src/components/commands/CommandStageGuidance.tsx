@@ -7,7 +7,7 @@ interface CommandStageGuidanceProps {
 export function CommandStageGuidance({ stage }: CommandStageGuidanceProps) {
   if (stage === "runcmd") {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700">
+      <div className="rounded-lg border border-ui-border bg-ui-inset px-4 py-3 text-ui-text">
         <p className="text-sm font-semibold">First-boot runtime commands</p>
         <p className="text-xs">
           Run commands execute once on the instance&apos;s first boot, after most
@@ -19,7 +19,7 @@ export function CommandStageGuidance({ stage }: CommandStageGuidanceProps) {
   }
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+    <div className="rounded-lg border border-ui-warning-border bg-ui-warning px-4 py-3 text-ui-warning-text">
       <p className="text-sm font-semibold">Boot commands run early on every boot</p>
       <p className="text-xs">
         Use boot commands only for low-level, idempotent tasks. Networking, users,

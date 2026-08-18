@@ -56,16 +56,16 @@ function MainLayoutContent() {
       setActiveSection={setActiveSection}
     >
       <BlockedExportAnnouncement />
-      <div className="flex h-screen flex-col">
+      <div className="flex h-screen flex-col bg-ui-canvas text-ui-text">
         <TopBar />
-        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
           <Sidebar
             activeSection={activeSection}
             onSectionChange={setActiveSection}
           />
-          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-ui-raised">
             <EditorPreviewTabs view={view} onChange={setView} />
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-6">
               <div className={view === "editor" ? "block" : "hidden lg:block"}>
                 <EditorSectionContent activeSection={activeSection} />
               </div>
@@ -76,7 +76,7 @@ function MainLayoutContent() {
               </div>
             </div>
           </main>
-          <aside className="hidden w-80 border-l border-gray-200 bg-gray-50 lg:block">
+          <aside className="hidden w-80 overflow-x-hidden overflow-y-auto border-l border-ui-border bg-ui-inset lg:block">
             <PreviewPanel onShowEditor={showEditor} />
           </aside>
         </div>

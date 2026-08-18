@@ -14,16 +14,19 @@ import {
   ArgvCommandInput,
   type ArgvCommandInputHandle,
 } from "./ArgvCommandInput.tsx";
-import { CommandFormSelector } from "./CommandFormSelector.tsx";
+import {
+  CommandFormSelector,
+  type CommandFormActivationOrigin,
+} from "./CommandFormSelector.tsx";
 import { ShellCommandInput } from "./ShellCommandInput.tsx";
 
 const REMOVE_CONFIRM =
   "Remove command? This removes the command from the project and changes the execution order.";
 
 const reorderEnabledClassName =
-  "min-h-10 rounded border border-gray-300 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50";
+  "min-h-10 rounded border border-ui-border bg-ui-raised px-3 py-2 text-xs text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 const reorderDisabledClassName =
-  "min-h-10 cursor-not-allowed rounded border border-gray-300 px-3 py-2 text-xs text-gray-700 opacity-50";
+  "min-h-10 cursor-not-allowed rounded border border-ui-disabled-border bg-ui-disabled px-3 py-2 text-xs text-ui-disabled-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised";
 
 interface CommandCardProps {
   stage: CommandStage;
@@ -94,14 +97,14 @@ export function CommandCard({
       ? {
           label: cardErrors === 1 ? "1 error" : `${cardErrors} errors`,
           className:
-            "inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs text-red-700",
+            "inline-flex items-center rounded-full border border-ui-error-border bg-ui-error px-2 py-1 text-xs text-ui-error-text",
         }
       : cardWarnings > 0
         ? {
             label:
               cardWarnings === 1 ? "1 warning" : `${cardWarnings} warnings`,
             className:
-              "inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs text-amber-800",
+              "inline-flex items-center rounded-full border border-ui-warning-border bg-ui-warning px-2 py-1 text-xs text-ui-warning-text",
           }
         : null;
 
@@ -169,23 +172,24 @@ export function CommandCard({
     onRemove(command.id);
   };
 
-  const handleFormSwitch = (form: BuilderCommand["form"]) => {
-    if (form === "argv") {
-      setFocusArgvExecutable(true);
-    }
+  const handleFormSwitch = (
+    form: BuilderCommand["form"],
+    origin: CommandFormActivationOrigin,
+  ) => {
+    setFocusArgvExecutable(form === "argv" && origin === "activation");
   };
 
   return (
     <article
       ref={cardRef}
       aria-labelledby={`command-card-title-${stage}-${command.id}`}
-      className="rounded-lg border border-gray-200 bg-white p-6"
+      className="rounded-lg border border-ui-border bg-ui-raised p-6"
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <p
             id={`command-card-title-${stage}-${command.id}`}
-            className="text-sm font-semibold text-gray-900"
+            className="text-sm font-semibold text-ui-text"
           >
             Command {position}
           </p>
@@ -216,7 +220,7 @@ export function CommandCard({
           </div>
           <button
             type="button"
-            className="min-h-10 text-sm text-red-600 hover:text-red-700"
+            className="min-h-10 rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-error-text hover:bg-ui-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
             onClick={handleRemove}
           >
             Remove command

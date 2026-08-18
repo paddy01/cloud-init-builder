@@ -139,3 +139,23 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 > Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
 > This section is managed by `generate-claude-profile` -- do not edit manually.
 <!-- GSD:profile-end -->
+
+# LEAN-CTX
+
+## For repository exploration
+
+- Prefer LeanCTX ctx_search for locating code.
+- Prefer ctx_graph, ctx_callgraph and ctx_impact for tracing TypeScript dependencies.
+- Prefer ctx_read/ctx_multi_read over native reads when investigating.
+- Use native file reads only when exact source is needed for editing or verification.
+- Do not recursively inspect directories or read many files speculatively.
+- Search or graph first, then read only the relevant files.
+- Use ctx_shell for tests, builds, git operations and diagnostic commands.
+- Treat current source code as authoritative if LeanCTX memory or graph disagrees with it.
+
+<!-- lean-ctx -->
+## lean-ctx
+
+lean-ctx is active — the MCP tools replace native equivalents.
+Full rules: LEAN-CTX.md (open on demand — do not auto-load).
+<!-- /lean-ctx -->

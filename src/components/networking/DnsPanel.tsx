@@ -8,11 +8,11 @@ import { useValidation } from "../validation/validationContext.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
 
 const inputClass =
-  "min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-10 min-w-0 w-full rounded border border-ui-border bg-ui-raised px-4 py-2 font-mono text-sm text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset";
 const addButtonClass =
-  "min-h-10 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-10 rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset";
 const removeButtonClass =
-  "min-h-10 shrink-0 rounded border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto";
+  "min-h-10 shrink-0 rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-error-text hover:bg-ui-error focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset sm:w-auto";
 
 function interfaceTitle(entry: BuilderNetworkInterface): string {
   const activeDraft =
@@ -85,11 +85,11 @@ function DnsList({
 
   return (
     <div className="space-y-2" role="group" aria-labelledby={headingId}>
-      <p id={headingId} className="text-sm font-semibold text-gray-700">
+      <p id={headingId} className="text-sm font-semibold text-ui-text">
         {heading}
       </p>
       {rows.length === 0 ? (
-        <p className="text-xs text-gray-500">{emptyCopy}</p>
+        <p className="text-xs text-ui-muted-text">{emptyCopy}</p>
       ) : (
         <div className="space-y-2">
           {rows.map((row, index) => {
@@ -116,13 +116,13 @@ function DnsList({
                 <div className="min-w-0 space-y-1">
                   <label
                     htmlFor={inputId}
-                    className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+                    className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-ui-text"
                   >
                     <span>{singular}</span>
                     {row.isExampleValue ? (
                       <span
                         id={markerId}
-                        className="text-xs font-normal text-amber-700"
+                        className="text-xs font-normal text-ui-warning-text"
                       >
                         Example value—replace for your network
                       </span>
@@ -210,10 +210,10 @@ export function DnsPanel({ entry }: DnsPanelProps) {
 
   return (
     <section
-      className="min-w-0 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+      className="min-w-0 space-y-4 rounded-lg border border-ui-border bg-ui-inset p-4"
       aria-labelledby={headingId}
     >
-      <h4 id={headingId} className="text-lg font-semibold text-gray-900">
+      <h4 id={headingId} className="text-lg font-semibold text-ui-text">
         DNS
       </h4>
       <DnsList

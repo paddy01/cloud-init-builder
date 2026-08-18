@@ -4,6 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cloud-Init Builder</title>
+    <script id="theme-bootstrap">
+      (() => {
+        const root = document.documentElement;
+        let preference = "system";
+
+        try {
+          const stored = window.localStorage.getItem("cloud-init-builder.theme");
+          if (stored === "light" || stored === "dark") preference = stored;
+        } catch {}
+
+        let systemIsDark = false;
+        if (preference === "system") {
+          try {
+            systemIsDark =
+              typeof window.matchMedia === "function" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches;
+          } catch {}
+        }
+
+        const resolved = preference === "system" ? (systemIsDark ? "dark" : "light") : preference;
+        root.dataset.theme = resolved;
+        root.style.colorScheme = resolved;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

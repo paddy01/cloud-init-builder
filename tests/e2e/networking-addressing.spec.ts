@@ -389,7 +389,14 @@ test.describe("embedded networking output contract", () => {
     await expectNoHorizontalPageOverflow(page);
     const mobilePre = page.getByRole("main").locator("pre");
     await expect(mobilePre).toBeVisible();
-    expect(await mobilePre.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+    expect(
+      await mobilePre.evaluate((node) => {
+        const scroller = node.parentElement;
+        return Boolean(
+          scroller && scroller.scrollWidth > scroller.clientWidth,
+        );
+      }),
+    ).toBe(true);
 
     await page.getByRole("tab", { name: "Editor" }).click();
     await firstCard.getByRole("textbox", { name: "Device name" }).fill("");

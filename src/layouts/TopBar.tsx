@@ -3,6 +3,8 @@ import { COMMANDS_VALIDATION_SUMMARY_HEADING_ID } from "../components/commands/C
 import { useUserValidation } from "../components/users/UserValidationContext.ts";
 import { USERS_VALIDATION_SUMMARY_HEADING_ID } from "../components/users/UserValidationSummary.tsx";
 import { NETWORKING_VALIDATION_SUMMARY_HEADING_ID } from "../components/networking/NetworkingValidationSummary.tsx";
+import { ThemeControl } from "../components/theme/ThemeControl.tsx";
+import { RepositoryLink } from "../components/navigation/RepositoryLink.tsx";
 import { isNetworkingIssuePath } from "../components/networking/networkingValidationPaths.ts";
 import type { YamlOutputChannel } from "../components/validation/validationContext.ts";
 import { exportProject, importProject } from "../services/projectService.ts";
@@ -385,14 +387,14 @@ export function TopBar() {
   };
 
   const exportButtonClassName =
-    exportBlocked && !nativeExportDisabled
-      ? "min-h-10 rounded bg-blue-600 px-2 py-1.5 text-sm text-white opacity-50 cursor-not-allowed sm:px-3"
-      : "min-h-10 rounded bg-blue-600 px-2 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3";
+    exportBlocked || nativeExportDisabled
+      ? "min-h-10 min-w-10 rounded border border-ui-disabled-border bg-ui-disabled px-2 py-1.5 text-sm text-ui-disabled-text cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3"
+      : "min-h-10 min-w-10 rounded border border-ui-action bg-ui-action px-2 py-1.5 text-sm text-ui-action-contrast hover:bg-ui-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3";
 
   const copyButtonClassName =
-    copyBlocked && !noProject
-      ? "min-h-10 rounded border border-gray-300 px-2 py-1.5 text-sm opacity-50 cursor-not-allowed sm:px-3"
-      : "min-h-10 rounded border border-gray-300 px-2 py-1.5 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3";
+    copyBlocked || noProject
+      ? "min-h-10 min-w-10 rounded border border-ui-disabled-border bg-ui-disabled px-2 py-1.5 text-sm text-ui-disabled-text cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3"
+      : "min-h-10 min-w-10 rounded border border-ui-border bg-ui-raised px-2 py-1.5 text-sm text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3";
 
   const exportYamlButton = (
     <button
@@ -421,11 +423,11 @@ export function TopBar() {
   );
 
   return (
-    <div className="border-b border-gray-200 bg-white">
-      <header className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2 sm:h-14 sm:flex-nowrap sm:gap-3 sm:py-0">
-        <h1 className="text-lg font-semibold text-gray-900">Cloud-Init Builder</h1>
-        <div className="h-6 border-l border-gray-300" />
-        <div className="flex min-w-0 items-center gap-2 text-sm text-gray-700">
+    <div data-testid="top-bar-shell" className="relative border-b border-ui-border bg-ui-raised">
+      <header data-testid="top-bar-header" className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2 sm:gap-3 xl:pr-36">
+        <h1 className="text-lg font-semibold text-ui-text">Cloud-Init Builder</h1>
+        <div className="h-6 border-l border-ui-border" />
+        <div className="flex min-w-0 items-center gap-2 text-sm text-ui-text">
           {isRenamingProject && project ? (
             <>
               <input
@@ -436,10 +438,10 @@ export function TopBar() {
                 onKeyDown={handleRenameInputKeyDown}
                 onBlur={handleRenameInputBlur}
                 aria-label="Project name"
-                className="h-8 w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 rounded border border-gray-300 bg-white px-2 text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="h-10 w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 rounded border border-ui-border bg-ui-raised px-2 text-sm text-ui-text shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
               />
               {isDirty && (
-                <span className="text-amber-500" title="Unsaved changes">
+                <span className="text-ui-warning-text" title="Unsaved changes">
                   *
                 </span>
               )}
@@ -448,7 +450,7 @@ export function TopBar() {
                 aria-label="Save project name"
                 onMouseDown={handleRenameConfirmPointerDown}
                 onClick={handleCommitProjectName}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded border border-ui-border bg-ui-raised text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
               >
                 <svg
                   aria-hidden="true"
@@ -465,7 +467,7 @@ export function TopBar() {
                 type="button"
                 aria-label="Cancel project rename"
                 onClick={handleCancelProjectRename}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded border border-ui-border bg-ui-raised text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
               >
                 <svg
                   aria-hidden="true"
@@ -483,12 +485,12 @@ export function TopBar() {
             <>
               <span
                 title={project ? project.metadata.name : undefined}
-                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                className="block w-[min(20rem,32vw)] max-w-[20rem] min-w-0 max-[640px]:w-28 truncate whitespace-nowrap overflow-hidden text-ellipsis xl:w-48 xl:max-w-48"
               >
                 {project?.metadata.name ?? "No Project"}
               </span>
               {isDirty && (
-                <span className="text-amber-500" title="Unsaved changes">
+                <span className="text-ui-warning-text" title="Unsaved changes">
                   *
                 </span>
               )}
@@ -497,7 +499,7 @@ export function TopBar() {
                   type="button"
                   aria-label="Rename project"
                   onClick={handleBeginProjectRename}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded border border-ui-border bg-ui-raised text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised"
                 >
                   <svg
                     aria-hidden="true"
@@ -514,24 +516,27 @@ export function TopBar() {
             </>
           )}
         </div>
+        <div className="order-1 sm:order-none">
+          <ThemeControl />
+        </div>
         {copyFeedback && (
-          <span className="order-3 w-full text-xs text-gray-600 sm:order-none sm:w-auto">
+          <span className="order-3 w-full rounded border border-ui-border bg-ui-inset px-2 py-1 text-xs text-ui-muted-text sm:order-none sm:w-auto">
             {copyFeedback}
           </span>
         )}
         <div className="hidden flex-1 sm:block" />
-        <div className="order-2 flex w-full min-w-0 flex-wrap items-center justify-between gap-1 sm:order-none sm:w-auto sm:flex-nowrap sm:justify-start sm:gap-3">
+        <div data-testid="top-bar-utilities" className="order-2 flex w-full shrink-0 min-w-0 flex-wrap items-center justify-between gap-1 sm:order-none sm:justify-start sm:gap-3 xl:w-auto xl:flex-nowrap">
           <button
             type="button"
             onClick={handleNew}
-            className="rounded border border-gray-300 px-2 py-1.5 text-sm hover:bg-gray-50 sm:px-3"
+            className="min-h-10 min-w-10 rounded border border-ui-border bg-ui-raised px-2 py-1.5 text-sm text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3"
           >
             New
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="rounded border border-gray-300 px-2 py-1.5 text-sm hover:bg-gray-50 sm:px-3"
+            className="min-h-10 min-w-10 rounded border border-ui-border bg-ui-raised px-2 py-1.5 text-sm text-ui-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3"
           >
             Open
           </button>
@@ -539,7 +544,9 @@ export function TopBar() {
             type="button"
             onClick={handleSave}
             disabled={project === null}
-            className="rounded bg-blue-600 px-2 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
+            className={project === null
+              ? "min-h-10 min-w-10 rounded border border-ui-disabled-border bg-ui-disabled px-2 py-1.5 text-sm text-ui-disabled-text cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3"
+              : "min-h-10 min-w-10 rounded border border-ui-action bg-ui-action px-2 py-1.5 text-sm text-ui-action-contrast hover:bg-ui-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-raised sm:px-3"}
           >
             Save
           </button>
@@ -553,6 +560,7 @@ export function TopBar() {
           ) : (
             exportYamlButton
           )}
+          <RepositoryLink />
         </div>
         <input
           ref={fileInputRef}
@@ -567,7 +575,7 @@ export function TopBar() {
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className="flex items-start justify-between gap-3 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+          className="flex items-start justify-between gap-3 border-t border-ui-warning-border bg-ui-warning px-4 py-2 text-sm text-ui-warning-text"
         >
           <div className="min-w-0 flex-1">
             <p>
@@ -593,7 +601,7 @@ export function TopBar() {
           <button
             type="button"
             onClick={clearWarnings}
-            className="shrink-0 rounded border border-amber-300 px-2 py-1 text-xs hover:bg-amber-100"
+            className="min-h-10 shrink-0 rounded border border-ui-warning-border bg-ui-warning px-2 py-1 text-xs text-ui-warning-text hover:bg-ui-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-focus-offset-warning"
           >
             Dismiss import warnings
           </button>

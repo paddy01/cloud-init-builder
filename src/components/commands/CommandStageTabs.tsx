@@ -56,7 +56,7 @@ export function CommandStageTabs({
     <div
       role="tablist"
       aria-label="Command stages"
-      className="mt-6 flex border-b border-gray-200"
+      className="mt-6 flex border-b border-ui-border bg-ui-inset"
       onKeyDown={handleKeyDown}
     >
       {COMMAND_STAGES.map((stage) => {
@@ -74,8 +74,8 @@ export function CommandStageTabs({
             tabIndex={isActive ? 0 : -1}
             className={
               isActive
-                ? "flex items-center gap-2 border-b-2 border-blue-600 px-4 py-3 text-sm font-semibold text-blue-700"
-                : "flex items-center gap-2 border-b-2 border-transparent px-4 py-3 text-sm text-gray-600 hover:text-gray-900"
+                ? "flex items-center gap-2 border-b-2 border-ui-selected-border bg-ui-selected px-4 py-3 text-sm font-semibold text-ui-selected-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-inset)]"
+                : "flex items-center gap-2 border-b-2 border-transparent px-4 py-3 text-sm text-ui-muted-text hover:bg-ui-raised hover:text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ui-focus-offset-inset)]"
             }
             onClick={() => onStageChange(stage.id)}
           >
@@ -83,8 +83,8 @@ export function CommandStageTabs({
             <span
               className={
                 isActive
-                  ? "rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
-                  : "rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
+                  ? "rounded-full border border-ui-selected-border bg-ui-selected px-2 py-0.5 text-xs text-ui-selected-text"
+                  : "rounded-full border border-ui-border bg-ui-raised px-2 py-0.5 text-xs text-ui-text"
               }
             >
               {count}

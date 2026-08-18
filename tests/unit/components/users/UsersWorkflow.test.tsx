@@ -14,6 +14,7 @@ import {
 } from "../../../../src/models/users.ts";
 import { importProject } from "../../../../src/services/projectService.ts";
 import { useProjectStore } from "../../../../src/state/projectStore.ts";
+import { USER_VALIDATION_MESSAGES } from "../../../../src/validators/validateUsers.ts";
 
 const initialState = {
   project: null,
@@ -126,6 +127,32 @@ describe("UsersWorkflow add and edit", () => {
     const previewCode = container.querySelector("aside pre code");
     expect(previewCode?.textContent).toContain("- default");
     expect(previewCode?.textContent).not.toMatch(/^name:/m);
+  });
+
+  it("shows the canonical invalid-username message and keeps a long full name readable", () => {
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+    const username = screen.getByLabelText("Username");
+    fireEvent.change(username, {
+      target: { value: "invalid username with spaces" },
+    });
+    fireEvent.blur(username);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      USER_VALIDATION_MESSAGES.USER_NAME_INVALID,
+    );
+
+    const longFullName =
+      "Alexandria Example With A Deliberately Long Cloud Account Display Name";
+    const fullName = screen.getByLabelText("Full name");
+    fireEvent.change(fullName, { target: { value: longFullName } });
+
+    expect(fullName).toHaveValue(longFullName);
+    expect(fullName).toHaveClass("min-w-0");
+    expect(fullName).not.toHaveClass("truncate");
+    expect(screen.getByText(longFullName)).toHaveClass("break-words");
   });
 });
 

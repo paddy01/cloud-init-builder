@@ -163,6 +163,46 @@ describe("CommandsSection", () => {
     expect(commands().bootcmd).toHaveLength(1);
   });
 
+  it("uses semantic selected tabs, focus treatment, and distinct guidance states", () => {
+    render(<CommandsSection />);
+
+    const tablist = screen.getByRole("tablist", { name: "Command stages" });
+    const runTab = within(tablist).getByRole("tab", { name: /Run commands/i });
+    const bootTab = within(tablist).getByRole("tab", { name: /Boot commands/i });
+
+    expect(runTab).toHaveAttribute("aria-selected", "true");
+    expect(runTab).toHaveClass(
+      "bg-ui-selected",
+      "border-ui-selected-border",
+      "text-ui-selected-text",
+    );
+    expect(bootTab).toHaveClass(
+      "text-ui-muted-text",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(runTab).toHaveClass("focus-visible:ring-ui-focus");
+
+    const runtimeGuidance = screen
+      .getByText("First-boot runtime commands")
+      .closest("div");
+    expect(runtimeGuidance).toHaveClass(
+      "bg-ui-inset",
+      "border-ui-border",
+      "text-ui-text",
+    );
+
+    fireEvent.click(bootTab);
+
+    const warningGuidance = screen
+      .getByText("Boot commands run early on every boot")
+      .closest("div");
+    expect(warningGuidance).toHaveClass(
+      "bg-ui-warning",
+      "border-ui-warning-border",
+      "text-ui-warning-text",
+    );
+  });
+
   it("adds, removes, and reorders shell commands in the active stage", () => {
     render(<CommandsSection />);
 
@@ -366,5 +406,35 @@ describe("CommandsSection", () => {
       );
       expect(screen.getByLabelText("Command")).toHaveFocus();
     });
+  });
+
+  it("uses semantic status surfaces and focus roles for command issue routes", async () => {
+    render(
+      <UserValidationProvider>
+        <CommandsRevealHarness />
+      </UserValidationProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add run command" }));
+    fireEvent.blur(screen.getByLabelText("Command"));
+
+    const heading = await screen.findByRole("heading", {
+      name: "Commands need attention",
+    });
+    const summary = heading.closest("section");
+    expect(summary).toHaveClass(
+      "bg-ui-error",
+      "border-ui-error-border",
+      "text-ui-error-text",
+    );
+
+    const route = screen.getByRole("button", {
+      name: /Run command 1: Export blocked: enter a command/i,
+    });
+    expect(route).toHaveClass(
+      "text-ui-error-text",
+      "focus-visible:ring-ui-focus",
+      "focus-visible:ring-offset-ui-focus-offset-error",
+    );
   });
 });

@@ -1,1 +1,155 @@
 @import "tailwindcss";
+
+@theme inline {
+  --color-ui-canvas: var(--ui-canvas);
+  --color-ui-raised: var(--ui-raised);
+  --color-ui-inset: var(--ui-inset);
+  --color-ui-border: var(--ui-border);
+  --color-ui-text: var(--ui-text);
+  --color-ui-muted-text: var(--ui-muted-text);
+  --color-ui-action: var(--ui-action);
+  --color-ui-action-hover: var(--ui-action-hover);
+  --color-ui-action-contrast: var(--ui-action-contrast);
+  --color-ui-selected: var(--ui-selected-fill);
+  --color-ui-selected-border: var(--ui-selected-border);
+  --color-ui-selected-text: var(--ui-selected-text);
+  --color-ui-disabled: var(--ui-disabled-fill);
+  --color-ui-disabled-border: var(--ui-disabled-border);
+  --color-ui-disabled-text: var(--ui-disabled-text);
+  --color-ui-error: var(--ui-error-surface);
+  --color-ui-error-border: var(--ui-error-border);
+  --color-ui-error-text: var(--ui-error-text);
+  --color-ui-warning: var(--ui-warning-surface);
+  --color-ui-warning-border: var(--ui-warning-border);
+  --color-ui-warning-text: var(--ui-warning-text);
+  --color-ui-focus: var(--ui-focus);
+  --color-ui-focus-offset-canvas: var(--ui-focus-offset-canvas);
+  --color-ui-focus-offset-raised: var(--ui-focus-offset-raised);
+  --color-ui-focus-offset-inset: var(--ui-focus-offset-inset);
+  --color-ui-focus-offset-selected: var(--ui-focus-offset-selected);
+  --color-ui-focus-offset-error: var(--ui-focus-offset-error);
+  --color-ui-focus-offset-warning: var(--ui-focus-offset-warning);
+  --color-ui-focus-offset-terminal: var(--ui-focus-offset-terminal);
+  --color-ui-terminal: var(--ui-terminal-background);
+  --color-ui-terminal-border: var(--ui-terminal-border);
+  --color-ui-terminal-text: var(--ui-terminal-text);
+}
+
+html[data-theme="light"] {
+  --ui-canvas: #F8FAFC;
+  --ui-raised: #FFFFFF;
+  --ui-inset: #F1F5F9;
+  --ui-border: #CBD5E1;
+  --ui-text: #0F172A;
+  --ui-muted-text: #475569;
+  --ui-action: #2563EB;
+  --ui-action-hover: #1D4ED8;
+  --ui-action-contrast: #FFFFFF;
+  --ui-selected-fill: #DBEAFE;
+  --ui-selected-border: #2563EB;
+  --ui-selected-text: #1D4ED8;
+  --ui-disabled-fill: #F1F5F9;
+  --ui-disabled-border: #CBD5E1;
+  --ui-disabled-text: #475569;
+  --ui-error-surface: #FEF2F2;
+  --ui-error-border: #FCA5A5;
+  --ui-error-text: #991B1B;
+  --ui-warning-surface: #FFFBEB;
+  --ui-warning-border: #FCD34D;
+  --ui-warning-text: #92400E;
+  --ui-focus: #2563EB;
+  --ui-focus-offset-canvas: var(--ui-canvas);
+  --ui-focus-offset-raised: var(--ui-raised);
+  --ui-focus-offset-inset: var(--ui-inset);
+  --ui-focus-offset-selected: var(--ui-selected-fill);
+  --ui-focus-offset-error: var(--ui-error-surface);
+  --ui-focus-offset-warning: var(--ui-warning-surface);
+  --ui-focus-offset-terminal: var(--ui-terminal-background);
+  --ui-overlay: rgb(2 6 23 / 0.60);
+  --ui-terminal-background: #020617;
+  --ui-terminal-border: #334155;
+  --ui-terminal-text: #E2E8F0;
+  --theme-canvas: var(--ui-canvas);
+  --theme-surface: var(--ui-raised);
+  --theme-text: var(--ui-text);
+  --theme-muted-text: var(--ui-muted-text);
+  --theme-border: var(--ui-border);
+  --theme-accent: var(--ui-action);
+  background-color: var(--ui-canvas);
+  color: var(--ui-text);
+}
+
+html[data-theme="dark"] {
+  --ui-canvas: #0F172A;
+  --ui-raised: #111827;
+  --ui-inset: #1E293B;
+  --ui-border: #334155;
+  --ui-text: #F8FAFC;
+  --ui-muted-text: #CBD5E1;
+  --ui-action: #2563EB;
+  --ui-action-hover: #1D4ED8;
+  --ui-action-contrast: #FFFFFF;
+  --ui-selected-fill: #172554;
+  --ui-selected-border: #60A5FA;
+  --ui-selected-text: #93C5FD;
+  --ui-disabled-fill: #1E293B;
+  --ui-disabled-border: #475569;
+  --ui-disabled-text: #94A3B8;
+  --ui-error-surface: #450A0A;
+  --ui-error-border: #B91C1C;
+  --ui-error-text: #FECACA;
+  --ui-warning-surface: #451A03;
+  --ui-warning-border: #D97706;
+  --ui-warning-text: #FDE68A;
+  --ui-focus: #60A5FA;
+  --ui-focus-offset-canvas: var(--ui-canvas);
+  --ui-focus-offset-raised: var(--ui-raised);
+  --ui-focus-offset-inset: var(--ui-inset);
+  --ui-focus-offset-selected: var(--ui-selected-fill);
+  --ui-focus-offset-error: var(--ui-error-surface);
+  --ui-focus-offset-warning: var(--ui-warning-surface);
+  --ui-focus-offset-terminal: var(--ui-terminal-background);
+  --ui-overlay: rgb(2 6 23 / 0.72);
+  --ui-terminal-background: #020617;
+  --ui-terminal-border: #334155;
+  --ui-terminal-text: #E2E8F0;
+  --theme-canvas: var(--ui-canvas);
+  --theme-surface: var(--ui-raised);
+  --theme-text: var(--ui-text);
+  --theme-muted-text: var(--ui-muted-text);
+  --theme-border: var(--ui-border);
+  --theme-accent: var(--ui-action);
+  background-color: var(--ui-canvas);
+  color: var(--ui-text);
+}
+
+html[data-theme] body,
+html[data-theme] #root {
+  background-color: var(--ui-canvas);
+  color: var(--ui-text);
+}
+
+html[data-theme-transitions="enabled"],
+html[data-theme-transitions="enabled"] body,
+html[data-theme-transitions="enabled"] #root,
+html[data-theme-transitions="enabled"] [data-theme-transition="colors"] {
+  transition: background-color 150ms ease-out, color 150ms ease-out,
+    border-color 150ms ease-out, fill 150ms ease-out, stroke 150ms ease-out,
+    outline-color 150ms ease-out;
+}
+
+html[data-theme-transitions="enabled"] [data-theme-transition-focus]:is(:focus-visible, :focus-within) {
+  transition: background-color 150ms ease-out, color 150ms ease-out,
+    border-color 150ms ease-out, fill 150ms ease-out, stroke 150ms ease-out,
+    outline-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-transitions="enabled"],
+  html[data-theme-transitions="enabled"] body,
+  html[data-theme-transitions="enabled"] #root,
+  html[data-theme-transitions="enabled"] [data-theme-transition="colors"],
+  html[data-theme-transitions="enabled"] [data-theme-transition-focus]:is(:focus-visible, :focus-within) {
+    transition-duration: 0ms;
+  }
+}

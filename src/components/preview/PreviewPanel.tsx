@@ -26,47 +26,52 @@ export function PreviewPanel({ onShowEditor }: PreviewPanelProps = {}) {
 
   if (!project) {
     return (
-      <div className="p-4 text-center">
-        <p className="text-sm font-semibold text-gray-900">No project loaded</p>
-        <p className="text-sm text-gray-500">
-          Create or open a project to preview cloud-init YAML.
-        </p>
-      </div>
+      <section aria-label="YAML preview" className="p-4 text-center text-ui-text">
+        <p className="text-sm font-semibold">No project loaded</p>
+        <p className="text-sm text-ui-muted-text">Create or open a project to preview cloud-init YAML.</p>
+      </section>
     );
   }
 
   if (blockingErrors.length > 0) {
-    return <>{hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}<PreviewBanner issues={blockingErrors} onShowEditor={onShowEditor} /></>;
+    return (
+      <section aria-label="YAML preview">
+        {hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}
+        <PreviewBanner issues={blockingErrors} onShowEditor={onShowEditor} />
+      </section>
+    );
   }
 
   if (result.yaml === CLOUD_CONFIG_HEADER) {
     return (
-      <>
+      <section aria-label="YAML preview">
         {hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}
         <PreviewBanner issues={blockingErrors} warnings={warnings} onShowEditor={onShowEditor} />
-        <div className="p-4 text-center">
-          <p className="text-sm font-semibold text-gray-900">No identity yet</p>
-          <p className="text-sm text-gray-500">
+        <div className="p-4 text-center text-ui-text">
+          <p className="text-sm font-semibold">No identity yet</p>
+          <p className="text-sm text-ui-muted-text">
             Add a hostname on the left to see your cloud-init YAML appear here.
           </p>
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-ui-muted-text">
             No users section will be emitted until the default user is preserved
             or a custom user is added.
           </p>
         </div>
-      </>
+      </section>
     );
   }
 
   return (
-    <>
+    <section aria-label="YAML preview">
       {hasNetworkingOutput && <NetworkingOutputDisclosure variant="preview" />}
       <PreviewBanner issues={blockingErrors} warnings={warnings} onShowEditor={onShowEditor} />
-      <pre className="min-w-0 max-w-full overflow-auto px-4 py-3">
-        <code className="font-mono text-xs leading-5 whitespace-pre text-gray-900">
-          {result.yaml}
-        </code>
-      </pre>
-    </>
+      <div className="border border-ui-terminal-border bg-ui-terminal px-4 py-3 text-ui-terminal-text">
+        <div className="max-w-full overflow-x-auto overflow-y-hidden">
+          <pre className="min-w-max whitespace-pre font-mono text-xs leading-5">
+            <code>{result.yaml}</code>
+          </pre>
+        </div>
+      </div>
+    </section>
   );
 }

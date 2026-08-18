@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { PreviewBanner } from "../../../src/components/preview/PreviewBanner.tsx";
 import type { ValidationIssue } from "../../../src/validators/validateConfig.ts";
 
@@ -65,5 +65,46 @@ describe("PreviewBanner", () => {
     render(<PreviewBanner issues={[hostnameRequired]} />);
 
     expect(screen.queryByRole("button", { name: /dismiss/i })).toBeNull();
+  });
+
+  it("keeps error copy, live-region routing, and semantic error focus treatment", () => {
+    const onShowEditor = vi.fn();
+    render(<PreviewBanner issues={[hostnameRequired]} onShowEditor={onShowEditor} />);
+
+    const section = screen.getByText("YAML preview is unavailable").closest("section");
+    const fixButton = screen.getByRole("button", { name: /fix 1 error/i });
+    const issueButton = screen.getByRole("button", { name: /hostname: hostname is required/i });
+
+    expect(section).toHaveAttribute("aria-live", "polite");
+    expect(section).toHaveClass("bg-ui-error", "border-ui-error-border", "text-ui-error-text");
+    expect(fixButton).toHaveClass(
+      "focus-visible:ring-ui-focus",
+      "focus-visible:ring-offset-[var(--ui-focus-offset-error)]",
+    );
+    expect(issueButton).toHaveClass("focus-visible:ring-ui-focus");
+
+    fireEvent.click(issueButton);
+    expect(onShowEditor).toHaveBeenCalledWith("identity.hostname");
+  });
+
+  it("keeps warning heading and explanation on the semantic warning surface", () => {
+    render(
+      <PreviewBanner
+        issues={[]}
+        warnings={[
+          {
+            path: "networking.interfaces.eth0.mtu",
+            code: "NET_MTU_OUT_OF_RANGE",
+            message: "MTU is unusual.",
+            severity: "warning",
+          },
+        ]}
+      />,
+    );
+
+    const section = screen.getByText("Networking safety warnings").closest("section");
+    expect(section).toHaveAttribute("aria-live", "polite");
+    expect(section).toHaveClass("bg-ui-warning", "border-ui-warning-border", "text-ui-warning-text");
+    expect(screen.getByText("Warnings do not block YAML output.")).toBeInTheDocument();
   });
 });

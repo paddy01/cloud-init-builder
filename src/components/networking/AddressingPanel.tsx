@@ -11,11 +11,11 @@ import { useValidation } from "../validation/validationContext.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
 
 const inputClass =
-  "min-h-10 min-w-0 w-full rounded border border-gray-300 bg-white px-4 py-2 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-10 min-w-0 w-full rounded border border-ui-border bg-ui-raised px-4 py-2 font-mono text-sm text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset";
 const addButtonClass =
-  "min-h-10 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "min-h-10 rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text hover:bg-ui-inset focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset";
 const removeButtonClass =
-  "min-h-10 shrink-0 rounded border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto";
+  "min-h-10 shrink-0 rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-error-text hover:bg-ui-error focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset sm:w-auto";
 
 function interfaceTitle(entry: BuilderNetworkInterface): string {
   const activeDraft =
@@ -82,15 +82,15 @@ function AddressFamilyFieldset({
   };
 
   return (
-    <fieldset className="min-w-0 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <legend className="px-1 text-sm font-semibold text-gray-900">
+    <fieldset className="min-w-0 space-y-4 rounded-lg border border-ui-border bg-ui-inset p-4">
+      <legend className="px-1 text-sm font-semibold text-ui-text">
         {familyLabel}
       </legend>
 
-      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-gray-700">
+      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-ui-text">
         <input
           type="checkbox"
-          className="size-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          className="size-4 rounded border-ui-border text-ui-action focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-inset"
           checked={entry[dhcpField]}
           aria-describedby={
             entry.exampleFields.includes(dhcpField) ? dhcpMarkerId : undefined
@@ -103,7 +103,7 @@ function AddressFamilyFieldset({
         {entry.exampleFields.includes(dhcpField) ? (
           <span
             id={dhcpMarkerId}
-            className="text-xs font-normal text-amber-700"
+            className="text-xs font-normal text-ui-warning-text"
           >
             Example value—replace for your network
           </span>
@@ -117,13 +117,13 @@ function AddressFamilyFieldset({
       >
         <p
           id={`network-${entry.id}-${family}-addresses-heading`}
-          className="text-sm font-semibold text-gray-700"
+          className="text-sm font-semibold text-ui-text"
         >
           Static {familyLabel} addresses
         </p>
 
         {rows.length === 0 ? (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ui-muted-text">
             No static {familyLabel} addresses added.
           </p>
         ) : (
@@ -206,11 +206,11 @@ function AddressRow({
       <div className="min-w-0 space-y-1">
         <label
           htmlFor={inputId}
-          className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-gray-700"
+          className="flex flex-wrap items-baseline gap-1 text-sm font-semibold text-ui-text"
         >
           <span>CIDR address</span>
           {row.isExampleValue ? (
-            <span id={markerId} className="text-xs font-normal text-amber-700">
+            <span id={markerId} className="text-xs font-normal text-ui-warning-text">
               Example value—replace for your network
             </span>
           ) : null}
@@ -261,7 +261,7 @@ export function AddressingPanel({ entry }: AddressingPanelProps) {
     <section className="space-y-4" aria-labelledby={`network-${entry.id}-addressing`}>
       <h4
         id={`network-${entry.id}-addressing`}
-        className="text-lg font-semibold text-gray-900"
+        className="text-lg font-semibold text-ui-text"
       >
         Addressing
       </h4>

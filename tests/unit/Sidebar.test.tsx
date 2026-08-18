@@ -18,10 +18,10 @@ describe("Sidebar section styling", () => {
     render(<Sidebar activeSection="identity" onSectionChange={onSectionChange} />);
 
     const identityRow = screen.getByRole("button", { name: "Identity" });
-    expect(identityRow.className).toContain("bg-blue-50");
+    expect(identityRow.className).toContain("bg-ui-selected");
     expect(identityRow.className).toContain("border-l-2");
-    expect(identityRow.className).toContain("border-blue-600");
-    expect(identityRow.className).toContain("text-blue-700");
+    expect(identityRow.className).toContain("border-ui-selected-border");
+    expect(identityRow.className).toContain("text-ui-selected-text");
   });
 
   it("marks Identity row with aria-current page", () => {
@@ -42,7 +42,7 @@ describe("Sidebar section styling", () => {
     expect(commandsButton).not.toHaveAttribute("aria-current");
 
     const exportRow = screen.getByText("Export").closest("span");
-    expect(exportRow?.className).toContain("text-gray-400");
+    expect(exportRow?.className).toContain("text-ui-disabled-text");
     expect(exportRow?.className).toContain("cursor-not-allowed");
     expect(exportRow).not.toHaveAttribute("aria-current");
   });
@@ -80,7 +80,7 @@ describe("Sidebar section styling", () => {
     );
 
     const commandsButton = screen.getByRole("button", { name: "Commands" });
-    expect(commandsButton.className).toContain("bg-blue-50");
+    expect(commandsButton.className).toContain("bg-ui-selected");
     expect(commandsButton.className).toContain("border-l-2");
     expect(commandsButton).toHaveAttribute("aria-current", "page");
   });

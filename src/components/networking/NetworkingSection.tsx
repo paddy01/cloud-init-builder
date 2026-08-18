@@ -10,8 +10,8 @@ export function NetworkingSection() {
   if (!project) {
     return (
       <section className="space-y-2 p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-gray-900">No project loaded</h2>
-        <p className="text-sm text-gray-500">
+        <h2 className="text-lg font-semibold text-ui-text">No project loaded</h2>
+        <p className="text-sm text-ui-muted-text">
           Create or open a project to configure networking.
         </p>
       </section>
@@ -21,7 +21,7 @@ export function NetworkingSection() {
   if (!isNetworkingConfig(project.networking)) {
     return (
       <section className="p-4 sm:p-6">
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded border border-ui-error-border bg-ui-error px-3 py-2 text-sm text-ui-error-text">
           Networking settings couldn&apos;t be displayed. Reopen the project and
           review any import warnings.
         </p>
@@ -32,10 +32,10 @@ export function NetworkingSection() {
   return (
     <section className="space-y-8 p-4 sm:p-6" aria-labelledby="networking-heading">
       <div>
-        <h2 id="networking-heading" className="text-lg font-semibold text-gray-900">
+        <h2 id="networking-heading" className="text-lg font-semibold text-ui-text">
           Networking
         </h2>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-ui-muted-text">
           Configure addressing, routes, DNS, and link settings for each physical
           interface.
         </p>

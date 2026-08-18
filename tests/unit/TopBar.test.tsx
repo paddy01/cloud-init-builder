@@ -5,6 +5,10 @@ import { UserValidationProvider } from "../../src/components/users/UserValidatio
 import { EditorNavigationProvider } from "../../src/layouts/EditorNavigationProvider.tsx";
 import type { EditorSection } from "../../src/layouts/editorNavigation.ts";
 import { TopBar } from "../../src/layouts/TopBar.tsx";
+import {
+  REPOSITORY_LINK_NAME,
+  REPOSITORY_URL,
+} from "../../src/components/navigation/RepositoryLink.tsx";
 import { useProjectStore } from "../../src/state/projectStore.ts";
 import { createDefaultProject } from "../../src/models/project.ts";
 import * as projectService from "../../src/services/projectService.ts";
@@ -12,6 +16,12 @@ import * as yamlService from "../../src/services/yamlService.ts";
 import { generateCloudInit } from "../../src/generators/generateCloudInit.ts";
 import { isUsersConfig } from "../../src/models/users.ts";
 import identityUsersSafetyValid from "../fixtures/identity-users-safety-valid.yaml?raw";
+
+const productionSources = import.meta.glob("../../src/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+}) as Record<string, string>;
 
 function renderTopBar(
   activeSection: EditorSection = "identity",
@@ -28,6 +38,40 @@ function renderTopBar(
     </UserValidationProvider>,
   );
 }
+
+describe("TopBar repository navigation", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+  });
+
+  it("exposes one fixed same-tab repository link without changing the utility actions", () => {
+    renderTopBar();
+
+    const repositoryLinks = screen.getAllByRole("link", { name: REPOSITORY_LINK_NAME });
+    expect(repositoryLinks).toHaveLength(1);
+    expect(repositoryLinks[0]).toHaveAttribute("href", REPOSITORY_URL);
+    expect(repositoryLinks[0]).not.toHaveAttribute("target");
+    expect(repositoryLinks[0]).toHaveTextContent("GitHub");
+
+    for (const name of ["New", "Open", "Save", "Copy YAML", "Export YAML"]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
+  });
+
+  it("keeps the fixed repository destination literal in its sole production owner", () => {
+    const owners = Object.entries(productionSources)
+      .filter(([, source]) => source.includes(REPOSITORY_URL))
+      .map(([path]) => path.replace(/^\.\.\/\.\.\//, ""));
+
+    expect(owners).toEqual(["src/components/navigation/RepositoryLink.tsx"]);
+  });
+});
 
 describe("TopBar Open dirty guard (WR-01)", () => {
   beforeEach(() => {
@@ -489,6 +533,105 @@ describe("Copy YAML button", () => {
     expect(
       screen.queryByText("Couldn't copy. Select the preview text and copy manually."),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("TopBar semantic interaction states (VISU-01, VISU-02)", () => {
+  beforeEach(() => {
+    useProjectStore.setState({
+      project: null,
+      lastSavedProject: null,
+      isDirty: false,
+      importWarnings: [],
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps dirty identity, import warnings, and their exact copy in semantic status roles", () => {
+    useProjectStore.setState({
+      project: createDefaultProject("Status fixture"),
+      isDirty: true,
+      importWarnings: [{ path: "metadata.name", message: "Default applied" }],
+    });
+    renderTopBar();
+
+    expect(screen.getByText("Status fixture").parentElement).toHaveClass("text-ui-text");
+    expect(screen.getByTitle("Unsaved changes")).toHaveClass("text-ui-warning-text");
+    const warning = screen.getByRole("status");
+    expect(warning).toHaveClass("border-ui-warning-border", "bg-ui-warning", "text-ui-warning-text");
+    expect(screen.getByRole("button", { name: "Dismiss import warnings" })).toHaveClass(
+      "border-ui-warning-border",
+      "text-ui-warning-text",
+    );
+  });
+
+  it("keeps native and aria-disabled output controls explicit, full-opacity, and explainable", () => {
+    const { rerender } = renderTopBar();
+
+    for (const name of ["Save", "Copy YAML", "Export YAML"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass(
+        "bg-ui-disabled",
+        "border-ui-disabled-border",
+        "text-ui-disabled-text",
+        "cursor-not-allowed",
+      );
+      expect(screen.getByRole("button", { name }).className).not.toMatch(/opacity-/);
+    }
+
+    act(() => {
+      useProjectStore.getState().newProject("Blocked fixture");
+    });
+    rerender(
+      <UserValidationProvider>
+        <EditorNavigationProvider activeSection="identity" setActiveSection={vi.fn()}>
+          <TopBar />
+        </EditorNavigationProvider>
+      </UserValidationProvider>,
+    );
+
+    for (const name of ["Copy YAML", "Export YAML"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveAttribute("aria-disabled", "true");
+      expect(button).toHaveClass(
+        "bg-ui-disabled",
+        "border-ui-disabled-border",
+        "text-ui-disabled-text",
+        "cursor-not-allowed",
+      );
+      expect(button.closest("span")?.getAttribute("title")).toMatch(/Cannot (copy|export) yet/);
+    }
+  });
+
+  it("preserves the action inventory and ordering with the exact Save accessible name", () => {
+    const { container } = renderTopBar();
+    const actions = ["New", "Open", "Save", "Copy YAML", "Export YAML"].map((name) =>
+      screen.getByRole("button", { name }),
+    );
+    expect(screen.getByRole("button", { name: "Save" })).toHaveAccessibleName("Save");
+    for (let index = 1; index < actions.length; index += 1) {
+      expect(actions[index - 1]!.compareDocumentPosition(actions[index]!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    }
+    expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: REPOSITORY_LINK_NAME })).toBeInTheDocument();
+    expect(container.querySelector('input[type="file"]')).toHaveClass("hidden");
+  });
+
+  it("gives every plan-owned TopBar action a 40px minimum target in both rename branches", async () => {
+    useProjectStore.getState().newProject("Size fixture");
+    renderTopBar();
+
+    for (const name of ["New", "Open", "Save", "Rename project"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass("min-h-10");
+    }
+    expect(screen.getByRole("button", { name: "Rename project" })).toHaveClass("min-w-10");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename project" }));
+    for (const name of ["Save project name", "Cancel project rename"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass("min-h-10", "min-w-10");
+    }
   });
 });
 

@@ -4,9 +4,9 @@ import { validateIdentity } from "../../validators/validateConfig.ts";
 import { FieldError } from "./FieldError.tsx";
 
 const inputDefaultClass =
-  "border border-gray-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised";
 const inputErrorClass =
-  "border border-red-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "rounded border border-ui-error-border bg-ui-raised px-3 py-2 text-sm text-ui-text focus:outline-none focus:ring-2 focus:ring-ui-focus focus:border-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised";
 
 export function IdentityAdvanced() {
   const identity = useProjectStore((s) => s.project?.identity);
@@ -19,14 +19,14 @@ export function IdentityAdvanced() {
   );
 
   return (
-    <details className="border-t border-gray-200 group">
-      <summary className="cursor-pointer py-3 text-sm font-semibold text-gray-700 list-none [&::-webkit-details-marker]:hidden">
+    <details className="group border-t border-ui-border">
+      <summary className="cursor-pointer list-none py-3 text-sm font-semibold text-ui-text focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-raised [&::-webkit-details-marker]:hidden">
         <span className="group-open:hidden">Advanced identity (4 more fields)</span>
         <span className="hidden group-open:inline">Advanced identity</span>
       </summary>
       <div className="space-y-4 pt-2 pb-4">
         <div className="space-y-1">
-          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <label className="flex items-center gap-2 text-sm font-semibold text-ui-text">
             <input
               type="checkbox"
               checked={identity?.prefer_fqdn_over_hostname ?? false}
@@ -35,10 +35,11 @@ export function IdentityAdvanced() {
                   prefer_fqdn_over_hostname: e.target.checked || undefined,
                 })
               }
+              className="accent-ui-action focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ui-raised"
             />
             Prefer FQDN over hostname
           </label>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ui-muted">
             When on, cloud-init uses the FQDN instead of the short hostname when
             both are set.
           </p>
@@ -47,7 +48,7 @@ export function IdentityAdvanced() {
         <div className="space-y-1">
           <label
             htmlFor="manage-etc-hosts"
-            className="text-sm font-semibold text-gray-700"
+            className="text-sm font-semibold text-ui-text"
           >
             Manage /etc/hosts
           </label>
@@ -78,7 +79,7 @@ export function IdentityAdvanced() {
             <option value="true">Rewrite from template</option>
             <option value="localhost">Localhost-only</option>
           </select>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ui-muted">
             Choose how cloud-init updates /etc/hosts on boot.
           </p>
         </div>
@@ -86,7 +87,7 @@ export function IdentityAdvanced() {
         <div className="space-y-1">
           <label
             htmlFor="identity-timezone"
-            className="text-sm font-semibold text-gray-700"
+            className="text-sm font-semibold text-ui-text"
           >
             Timezone
           </label>
@@ -100,7 +101,7 @@ export function IdentityAdvanced() {
               errorByField["identity.timezone"] ? inputErrorClass : inputDefaultClass
             }
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ui-muted">
             IANA timezone name. Validated against your browser's timezone
             database.
           </p>
@@ -110,7 +111,7 @@ export function IdentityAdvanced() {
         <div className="space-y-1">
           <label
             htmlFor="identity-locale"
-            className="text-sm font-semibold text-gray-700"
+            className="text-sm font-semibold text-ui-text"
           >
             Locale
           </label>
@@ -124,7 +125,7 @@ export function IdentityAdvanced() {
               errorByField["identity.locale"] ? inputErrorClass : inputDefaultClass
             }
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ui-muted">
             POSIX locale: language[_TERRITORY][.codeset].
           </p>
           <FieldError message={errorByField["identity.locale"]} />

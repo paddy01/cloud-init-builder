@@ -80,15 +80,6 @@ export function NetworkingValidationSummary() {
     networking && isNetworkingConfig(networking) ? networking.interfaces : [];
 
   const hasErrors = errors.length > 0;
-  const heading = hasErrors
-    ? "Networking needs attention"
-    : warnings.length > 0
-      ? "Networking safety warnings"
-      : "Networking needs attention";
-
-  const containerClassName = hasErrors
-    ? "mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-900"
-    : "mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900";
 
   const errorCountLabel =
     errors.length === 1
@@ -110,41 +101,83 @@ export function NetworkingValidationSummary() {
     requestFocus(issue.path);
   };
 
+  const renderIssueList = (
+    issues: ValidationIssue[],
+    tone: "error" | "warning",
+  ) => (
+    <ul className="mt-2 space-y-1">
+      {issues.map((issue, index) => (
+        <li key={`${issue.path}-${issue.code}-${index}`}>
+          <button
+            type="button"
+            className={`min-h-10 w-full break-words text-left text-sm underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 ${
+              tone === "error"
+                ? "text-ui-error-text focus:ring-offset-ui-error"
+                : "text-ui-warning-text focus:ring-offset-ui-warning"
+            }`}
+            onClick={() => handleIssueActivate(issue)}
+          >
+            {labelForIssue(issue)}: {issue.message}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <section
       ref={summaryRef}
-      className={containerClassName}
-      aria-labelledby={NETWORKING_VALIDATION_SUMMARY_HEADING_ID}
+      className="mb-6 space-y-3"
       aria-live="polite"
     >
-      <h3
-        ref={headingRef}
-        id={NETWORKING_VALIDATION_SUMMARY_HEADING_ID}
-        tabIndex={-1}
-        className="text-sm font-semibold"
-      >
-        {heading}
-      </h3>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
-        {errors.length > 0 ? <span>{errorCountLabel}</span> : null}
-        {warnings.length > 0 ? <span>{warningCountLabel}</span> : null}
-      </div>
-      <p className="mt-2 text-xs">
-        Select an issue to move to the affected networking field.
-      </p>
-      <ul className="mt-2 space-y-1">
-        {visibleNetworkingIssues.map((issue, index) => (
-          <li key={`${issue.path}-${issue.code}-${index}`}>
-            <button
-              type="button"
-              className="min-h-10 w-full break-words text-left text-sm text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onClick={() => handleIssueActivate(issue)}
-            >
-              {labelForIssue(issue)}: {issue.message}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {hasErrors ? (
+        <section
+          className="rounded-lg border border-ui-error-border bg-ui-error px-4 py-3 text-ui-error-text"
+          aria-labelledby={NETWORKING_VALIDATION_SUMMARY_HEADING_ID}
+        >
+          <h3
+            ref={headingRef}
+            id={NETWORKING_VALIDATION_SUMMARY_HEADING_ID}
+            tabIndex={-1}
+            className="text-sm font-semibold"
+          >
+            Networking needs attention
+          </h3>
+          <div className="mt-1 text-xs font-semibold">{errorCountLabel}</div>
+          <p className="mt-2 text-xs">
+            Select an issue to move to the affected networking field.
+          </p>
+          {renderIssueList(errors, "error")}
+        </section>
+      ) : null}
+      {warnings.length > 0 ? (
+        <section
+          className="rounded-lg border border-ui-warning-border bg-ui-warning px-4 py-3 text-ui-warning-text"
+          aria-labelledby={
+            hasErrors
+              ? "networking-validation-summary-warning-heading"
+              : NETWORKING_VALIDATION_SUMMARY_HEADING_ID
+          }
+        >
+          <h3
+            ref={hasErrors ? undefined : headingRef}
+            id={
+              hasErrors
+                ? "networking-validation-summary-warning-heading"
+                : NETWORKING_VALIDATION_SUMMARY_HEADING_ID
+            }
+            tabIndex={-1}
+            className="text-sm font-semibold"
+          >
+            Networking safety warnings
+          </h3>
+          <div className="mt-1 text-xs font-semibold">{warningCountLabel}</div>
+          <p className="mt-2 text-xs">
+            Select an issue to review the affected networking warning.
+          </p>
+          {renderIssueList(warnings, "warning")}
+        </section>
+      ) : null}
     </section>
   );
 }

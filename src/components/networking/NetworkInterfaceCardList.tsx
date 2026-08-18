@@ -123,7 +123,7 @@ export function NetworkInterfaceCardList({
         <button
           ref={addButtonRef}
           type="button"
-          className="mt-6 min-h-10 w-full rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
+          className="mt-6 min-h-10 w-full rounded bg-ui-action px-4 py-2 text-sm text-ui-action-contrast hover:bg-ui-action-hover focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-canvas sm:w-auto"
           onClick={handleAdd}
         >
           Add blank interface

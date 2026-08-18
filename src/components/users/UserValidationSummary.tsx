@@ -86,8 +86,11 @@ export function UserValidationSummary() {
       : "Users need attention";
 
   const containerClassName = hasErrors
-    ? "mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-900"
-    : "mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900";
+    ? "mb-6 rounded-lg border border-ui-error-border bg-ui-error px-4 py-3 text-ui-error-text"
+    : "mb-6 rounded-lg border border-ui-warning-border bg-ui-warning px-4 py-3 text-ui-warning-text";
+  const issueFocusOffsetClassName = hasErrors
+    ? "focus:ring-offset-ui-focus-offset-error"
+    : "focus:ring-offset-ui-focus-offset-warning";
 
   const errorCountLabel =
     errors.length === 1
@@ -148,7 +151,7 @@ export function UserValidationSummary() {
           <li key={`${issue.path}-${issue.code}-${index}`}>
             <button
               type="button"
-              className="min-h-10 w-full text-left text-sm text-blue-700 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`min-h-10 w-full text-left text-sm text-ui-selected-text underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 ${issueFocusOffsetClassName}`}
               onClick={() => handleIssueActivate(issue)}
             >
               {labelForIssue(issue)}: {issue.message}

@@ -129,6 +129,104 @@ describe("CommandsWorkflow argv editing and form switching", () => {
     expect(focusSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("uses two semantic custom radios with the checked radio as the only tab stop", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+
+    const group = screen.getByRole("radiogroup", { name: "Command form" });
+    const shell = within(group).getByRole("radio", { name: "Shell command" });
+    const argv = within(group).getByRole("radio", {
+      name: "Executable and arguments",
+    });
+
+    expect(within(group).getAllByRole("radio")).toHaveLength(2);
+    expect(shell).toHaveAttribute("aria-checked", "true");
+    expect(shell).toHaveAttribute("tabindex", "0");
+    expect(argv).toHaveAttribute("aria-checked", "false");
+    expect(argv).toHaveAttribute("tabindex", "-1");
+    expect(shell).toHaveClass(
+      "bg-ui-selected",
+      "border-ui-selected-border",
+      "text-ui-selected-text",
+    );
+    expect(argv).toHaveClass("text-ui-muted-text");
+  });
+
+  it("uses Arrow/Home/End navigation to select and focus exactly the checked radio", () => {
+    const focusSpy = vi.spyOn(HTMLInputElement.prototype, "focus");
+
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+
+    const group = screen.getByRole("radiogroup", { name: "Command form" });
+    const shell = within(group).getByRole("radio", { name: "Shell command" });
+    const argv = within(group).getByRole("radio", {
+      name: "Executable and arguments",
+    });
+    focusSpy.mockClear();
+
+    fireEvent.keyDown(shell, { key: "ArrowRight" });
+
+    expect(argv).toHaveAttribute("aria-checked", "true");
+    expect(argv).toHaveAttribute("tabindex", "0");
+    expect(shell).toHaveAttribute("tabindex", "-1");
+    expect(argv).toHaveFocus();
+    expect(screen.getByLabelText("Executable")).not.toHaveFocus();
+    expect(focusSpy).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(argv, { key: "Home" });
+    expect(shell).toHaveAttribute("aria-checked", "true");
+    expect(shell).toHaveFocus();
+
+    fireEvent.keyDown(shell, { key: "End" });
+    expect(argv).toHaveAttribute("aria-checked", "true");
+    expect(argv).toHaveFocus();
+  });
+
+  it("uses semantic mono input, status, action, and repeatable-row roles", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+    addRunCommand();
+
+    const shellInput = screen.getByLabelText("Command");
+    expect(shellInput).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(screen.getByText(/Enter the command as cloud-init/i)).toHaveClass(
+      "text-ui-muted-text",
+    );
+
+    selectArgvForm(getCommandCard(0));
+    const executable = screen.getByLabelText("Executable");
+    expect(executable).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(screen.getByRole("button", { name: "Add argument" })).toHaveClass(
+      "border-ui-border",
+      "text-ui-text",
+      "focus-visible:ring-ui-focus",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add argument" }));
+    const argument = screen.getByPlaceholderText("e.g. enable");
+    expect(argument).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+      "focus-visible:ring-ui-focus",
+    );
+    expect(screen.getByRole("button", { name: "Remove argument" })).toHaveClass(
+      "border-ui-error-border",
+      "text-ui-error-text",
+      "focus-visible:ring-ui-focus",
+    );
+  });
+
   it("requires confirmation for ambiguous shell-to-argv conversion and preserves shell on cancel", () => {
     render(<MainLayout />);
     openCommandsSection();
@@ -285,6 +383,80 @@ describe("CommandsWorkflow warning visibility", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("keeps zero, one, and many command cards structurally distinct with semantic actions", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+
+    const emptyHeading = screen.getByText("No run commands yet");
+    const emptyState = emptyHeading.closest("div");
+    expect(emptyState).toHaveClass(
+      "border-ui-border",
+      "bg-ui-raised",
+    );
+    expect(emptyHeading).toHaveClass("text-ui-text");
+
+    addRunCommand();
+    addRunCommand();
+    addRunCommand();
+
+    expect(commands().runcmd).toHaveLength(3);
+    expect(new Set(commands().runcmd.map((command) => command.id)).size).toBe(3);
+
+    const firstCard = getCommandCard(0);
+    const secondCard = getCommandCard(1);
+    expect(firstCard).toHaveClass("border-ui-border", "bg-ui-raised");
+
+    const moveUp = within(firstCard).getByRole("button", { name: "Move up" });
+    expect(moveUp).toBeDisabled();
+    expect(moveUp).toHaveClass(
+      "cursor-not-allowed",
+      "border-ui-disabled-border",
+      "bg-ui-disabled",
+      "text-ui-disabled-text",
+    );
+    expect(moveUp.className).not.toMatch(/opacity-/);
+
+    const moveDown = within(secondCard).getByRole("button", {
+      name: "Move down",
+    });
+    expect(moveDown).toHaveClass("focus-visible:ring-ui-focus");
+    expect(
+      within(secondCard).getByRole("button", { name: "Remove command" }),
+    ).toHaveClass("focus-visible:ring-ui-focus", "text-ui-error-text");
+  });
+
+  it("reveals semantic error and warning badges through live command interaction", () => {
+    render(<MainLayout />);
+    openCommandsSection();
+
+    addRunCommand();
+    const blankCard = getCommandCard(0);
+    const blankCommand = within(blankCard).getByLabelText("Command");
+
+    expect(within(blankCard).queryByText("1 error")).toBeNull();
+    fireEvent.blur(blankCommand);
+
+    const errorBadge = within(blankCard).getByText("1 error");
+    expect(errorBadge).toHaveClass(
+      "border-ui-error-border",
+      "bg-ui-error",
+      "text-ui-error-text",
+    );
+
+    addRunCommand();
+    const warningCard = getCommandCard(1);
+    fireEvent.change(within(warningCard).getByLabelText("Command"), {
+      target: { value: "rm -rf /tmp/demo" },
+    });
+
+    const warningBadge = within(warningCard).getByText("1 warning");
+    expect(warningBadge).toHaveClass(
+      "border-ui-warning-border",
+      "bg-ui-warning",
+      "text-ui-warning-text",
+    );
   });
 
   it("shows recursive-deletion warnings inline in Run commands without blur", () => {

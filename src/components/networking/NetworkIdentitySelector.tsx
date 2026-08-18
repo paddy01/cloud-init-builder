@@ -5,7 +5,7 @@ import { useValidation } from "../validation/validationContext.ts";
 import { FieldMessage } from "../users/FieldMessage.tsx";
 
 const segmentBase =
-  "relative flex min-h-10 items-center justify-center rounded px-4 py-2 text-center text-sm focus-within:ring-2 focus-within:ring-blue-500";
+  "relative flex min-h-10 items-center justify-center rounded border px-4 py-2 text-center text-sm focus-within:ring-2 focus-within:ring-ui-focus focus-within:ring-offset-2 focus-within:ring-offset-ui-inset";
 
 interface NetworkIdentitySelectorProps {
   entry: BuilderNetworkInterface;
@@ -54,15 +54,15 @@ export function NetworkIdentitySelector({
 
   return (
     <fieldset className="space-y-4">
-      <legend className="text-sm font-semibold text-gray-700">
+      <legend className="text-sm font-semibold text-ui-text">
         Interface identity
       </legend>
-      <div className="grid grid-cols-2 rounded border border-gray-300 bg-gray-50 p-1">
+      <div className="grid grid-cols-2 rounded border border-ui-border bg-ui-inset p-1">
         <label
           className={`${segmentBase} ${
             entry.identityMode === "name"
-              ? "bg-white text-blue-700 ring-1 ring-blue-500"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "border-ui-selected-border bg-ui-selected text-ui-selected-text ring-1 ring-ui-selected-border"
+              : "border-transparent text-ui-text hover:bg-ui-raised"
           }`}
         >
           <input
@@ -80,8 +80,8 @@ export function NetworkIdentitySelector({
         <label
           className={`${segmentBase} ${
             entry.identityMode === "mac"
-              ? "bg-white text-blue-700 ring-1 ring-blue-500"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "border-ui-selected-border bg-ui-selected text-ui-selected-text ring-1 ring-ui-selected-border"
+              : "border-transparent text-ui-text hover:bg-ui-raised"
           }`}
         >
           <input
@@ -101,11 +101,11 @@ export function NetworkIdentitySelector({
       {entry.identityMode === "name" ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <label htmlFor={nameInputId} className="text-sm font-medium text-gray-700">
+            <label htmlFor={nameInputId} className="text-sm font-medium text-ui-text">
               Device name
             </label>
             {entry.exampleFields.includes("name") ? (
-              <span id={nameMarkerId} className="text-xs text-amber-700">
+              <span id={nameMarkerId} className="text-xs text-ui-warning-text">
                 Example value—replace for your network
               </span>
             ) : null}
@@ -116,7 +116,7 @@ export function NetworkIdentitySelector({
             type="text"
             autoComplete="off"
             autoCapitalize="none"
-            className="min-h-10 w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="min-h-10 w-full rounded border border-ui-border bg-ui-raised px-4 py-2 text-sm text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised"
             placeholder="e.g. ens18"
             value={entry.name}
             aria-describedby={nameDescribedBy || undefined}
@@ -137,11 +137,11 @@ export function NetworkIdentitySelector({
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <label htmlFor={macInputId} className="text-sm font-medium text-gray-700">
+            <label htmlFor={macInputId} className="text-sm font-medium text-ui-text">
               MAC address
             </label>
             {entry.exampleFields.includes("macAddress") ? (
-              <span id={macMarkerId} className="text-xs text-amber-700">
+              <span id={macMarkerId} className="text-xs text-ui-warning-text">
                 Example value—replace for your network
               </span>
             ) : null}
@@ -152,7 +152,7 @@ export function NetworkIdentitySelector({
             type="text"
             inputMode="text"
             spellCheck={false}
-            className="min-h-10 w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="min-h-10 w-full rounded border border-ui-border bg-ui-raised px-4 py-2 text-sm text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-raised"
             placeholder="52:54:00:12:34:56"
             value={entry.macAddress}
             aria-describedby={macDescribedBy || undefined}

@@ -5,8 +5,8 @@ import {
 } from "../../models/users.ts";
 
 const inputClassName =
-  "border border-gray-300 rounded px-3 py-2 text-sm bg-white " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+  "rounded border border-ui-border bg-ui-raised px-3 py-2 text-sm text-ui-text " +
+  "focus:outline-none focus:ring-2 focus:ring-ui-focus focus:ring-offset-2 focus:ring-offset-ui-focus-offset-raised focus:border-ui-focus";
 
 interface ShellSelectorProps {
   shellId: string;
@@ -27,7 +27,7 @@ export function ShellSelector({
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <label htmlFor={shellId} className="text-sm font-semibold text-gray-700">
+        <label htmlFor={shellId} className="text-sm font-semibold text-ui-text">
           Shell
         </label>
         <select
@@ -50,7 +50,7 @@ export function ShellSelector({
           ))}
           <option value="other">Other</option>
         </select>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ui-muted-text">
           Choose a common login shell or pick Other to enter a custom path.
         </p>
       </div>
@@ -59,7 +59,7 @@ export function ShellSelector({
         <div className="space-y-1">
           <label
             htmlFor={customShellId}
-            className="text-sm font-semibold text-gray-700"
+            className="text-sm font-semibold text-ui-text"
           >
             Custom shell path
           </label>
