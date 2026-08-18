@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { THEMED_EXPERIENCE_CASE_MANIFEST } from "../e2e/themedExperienceManifest.ts";
 
 export const SEMANTIC_MIGRATION_FILES = [
+  "src/components/navigation/RepositoryLink.tsx",
   "src/components/theme/ThemeControl.tsx",
   "src/layouts/TopBar.tsx",
   "src/layouts/MainLayout.tsx",
@@ -82,6 +83,7 @@ const fixture = (name: string) => `${FIXTURE_DIRECTORY}/${name}.tsx`;
 
 const LEGACY_PALETTE = /^(?:bg|text|border|ring|outline|fill|stroke)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-|$)/;
 const ARBITRARY_PALETTE = /^(?:bg|text|border|ring|outline|fill|stroke)-\[(.+)\]$/;
+export const UI_CUSTOM_PROPERTY_PATTERN = /var\((--ui-[a-z0-9-]+)\)/g;
 export const FOCUS_OFFSET_UTILITY_PATTERN = /^(?:(?:focus|focus-visible|focus-within):)?ring-offset-ui-focus-offset-(canvas|raised|inset|selected|error|warning|terminal)$/;
 const FOCUS_OFFSET_ROLES = [
   "canvas",
@@ -305,6 +307,67 @@ function focusOffsetProperty(role: string): string {
   return ["--ui-focus", "offset", role].join("-");
 }
 
+export function parseThemeCustomProperties(css: string, theme: "light" | "dark"): Set<string> {
+  return new Set([...parseDeclarations(css, `html[data-theme="${theme}"]`).keys()]
+    .filter((property) => property.startsWith("--ui-")));
+}
+
+type ReferencedUiProperty = {
+  file: string;
+  property: string;
+};
+
+function collectUiProperties(value: string): string[] {
+  return [...value.matchAll(UI_CUSTOM_PROPERTY_PATTERN)].map((match) => match[1]).filter((property): property is string => property !== undefined);
+}
+
+export async function collectReferencedUiProperties(files = SEMANTIC_MIGRATION_FILES): Promise<ReferencedUiProperty[]> {
+  const references: ReferencedUiProperty[] = [];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const context: ScanContext = {
+      file,
+      source,
+      constants: collectSameFileConstants(source),
+      findings: [],
+    };
+    const addProperties = (values: string[]) => {
+      for (const value of values) {
+        for (const property of collectUiProperties(value)) references.push({ file, property });
+      }
+    };
+    const visit = (node: ts.Node): void => {
+      if (ts.isJsxAttribute(node) && node.initializer) {
+        const attributeName = node.name.getText(source);
+        if (attributeName === "className") {
+          if (ts.isStringLiteral(node.initializer)) addProperties(staticFragments(node.initializer, context));
+          else if (ts.isJsxExpression(node.initializer) && node.initializer.expression) {
+            addProperties(staticFragments(node.initializer.expression, context));
+          }
+        }
+        if (
+          attributeName === "style"
+          && ts.isJsxExpression(node.initializer)
+          && node.initializer.expression
+          && ts.isObjectLiteralExpression(node.initializer.expression)
+        ) {
+          for (const assignment of node.initializer.expression.properties) {
+            if (!ts.isPropertyAssignment(assignment)) continue;
+            const name = ts.isIdentifier(assignment.name) || ts.isStringLiteral(assignment.name)
+              ? assignment.name.text
+              : undefined;
+            if (name && STYLE_COLOR_PROPERTIES.has(name)) addProperties(staticFragments(assignment.initializer, context));
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return references;
+}
+
 export async function buildProductionCss(): Promise<string> {
   vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
     const warning = args.map(String).join(" ");
@@ -435,6 +498,7 @@ const EXPECTED_MANIFEST_IDS = [
 describe("semantic migration audit", () => {
   it("uses an explicit complete phase-owned production inventory with no broad glob", async () => {
     expect(SEMANTIC_MIGRATION_FILES).toEqual(expect.arrayContaining([
+      "src/components/navigation/RepositoryLink.tsx",
       "src/components/theme/ThemeControl.tsx",
       "src/layouts/TopBar.tsx",
       "src/components/commands/CommandValidationSummary.tsx",
@@ -442,6 +506,16 @@ describe("semantic migration audit", () => {
     expect(new Set(SEMANTIC_MIGRATION_FILES).size).toBe(SEMANTIC_MIGRATION_FILES.length);
     expect(SEMANTIC_MIGRATION_FILES.every((file) => file.startsWith("src/") && file.endsWith(".tsx"))).toBe(true);
     await expect(Promise.all(SEMANTIC_MIGRATION_FILES.map((file) => readFile(file, "utf8")))).resolves.toHaveLength(SEMANTIC_MIGRATION_FILES.length);
+  });
+
+  it("requires every supported phase-owned UI property reference in both exact theme blocks", async () => {
+    const css = await readFile("src/assets/styles.css", "utf8");
+    const lightProperties = parseThemeCustomProperties(css, "light");
+    const darkProperties = parseThemeCustomProperties(css, "dark");
+    const references = await collectReferencedUiProperties();
+    const missing = references.filter(({ property }) => !lightProperties.has(property) || !darkProperties.has(property));
+
+    expect(missing, missing.map(({ file, property }) => `${file}: ${property}`).join("\n")).toEqual([]);
   });
 
   it("maps every raw focus-offset role to its same-suffix Tailwind alias in both themes", async () => {
