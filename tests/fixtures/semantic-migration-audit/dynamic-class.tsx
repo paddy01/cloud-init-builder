@@ -1,4 +1,4 @@
-import { importedPalette } from "./external";
+declare const importedPalette: { value: string };
 
 const classes = { surface: "bg-[var(--ui-raised)]" };
 

@@ -255,14 +255,15 @@ async function inspectFile(file: string): Promise<Finding[]> {
 
   const visit = (node: ts.Node): void => {
     if (ts.isJsxAttribute(node) && node.initializer) {
-      if (node.name.text === "className") {
+      const attributeName = node.name.getText(context.source);
+      if (attributeName === "className") {
         if (ts.isStringLiteral(node.initializer)) {
           scanClassExpression(node.initializer, context);
         } else if (ts.isJsxExpression(node.initializer) && node.initializer.expression) {
           scanClassExpression(node.initializer.expression, context);
         }
       }
-      if (node.name.text === "style" && ts.isJsxExpression(node.initializer) && node.initializer.expression) {
+      if (attributeName === "style" && ts.isJsxExpression(node.initializer) && node.initializer.expression) {
         scanStyleExpression(node.initializer.expression, context);
       }
     }
@@ -303,7 +304,10 @@ function assertExactOpacityAllowlist(findings: readonly Finding[], allowlist: re
 }
 
 async function allProductionSourceFiles(directory = "src"): Promise<string[]> {
-  const entries = await readdir(directory, { withFileTypes: true });
+  const entries = await readdir(directory, { withFileTypes: true }) as Array<{
+    name: string;
+    isDirectory(): boolean;
+  }>;
   const nested = await Promise.all(entries.map(async (entry) => {
     const path = `${directory}/${entry.name}`;
     if (entry.isDirectory()) return allProductionSourceFiles(path);
@@ -383,20 +387,22 @@ describe("semantic migration audit", () => {
       rationale: FIXTURE_OPACITY_RATIONALE,
     }];
     expect(() => assertExactOpacityAllowlist(decorativeFindings, decorativeAllowlist)).not.toThrow();
+    const decorative = decorativeAllowlist[0];
+    if (!decorative) throw new Error("Expected one decorative opacity allowlist record");
 
     for (const altered of [
-      { ...decorativeAllowlist[0], file: "other.tsx" },
-      { ...decorativeAllowlist[0], line: 15 },
-      { ...decorativeAllowlist[0], column: 25 },
-      { ...decorativeAllowlist[0], value: "opacity-50" },
-      { ...decorativeAllowlist[0], rationale: "Changed rationale" },
+      { ...decorative, file: "other.tsx" },
+      { ...decorative, line: 15 },
+      { ...decorative, column: 25 },
+      { ...decorative, value: "opacity-50" },
+      { ...decorative, rationale: "Changed rationale" },
     ]) {
       expect(() => assertExactOpacityAllowlist(decorativeFindings, [altered])).toThrow(/Unallowlisted opacity|Opacity rationale mismatch/);
     }
 
     const interactiveFindings = await inspectFile(fixture("state-opacity"));
     expect(() => assertExactOpacityAllowlist(interactiveFindings, decorativeAllowlist)).toThrow(/Unallowlisted opacity/);
-    expect(() => assertExactOpacityAllowlist(decorativeFindings, [...decorativeAllowlist, { ...decorativeAllowlist[0] }])).toThrow(/Stale opacity allowlist record/);
+    expect(() => assertExactOpacityAllowlist(decorativeFindings, [...decorativeAllowlist, { ...decorative }])).toThrow(/Stale opacity allowlist record/);
   });
 
   it("rejects legacy palette and unavailable opacity in the complete production migration scope", async () => {
